@@ -1,0 +1,8 @@
+[package]
+name = "hooks_common"
+version = "0.1.0"
+authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
+
+[dependencies]
+specs = "0.10.0"
+enet-sys = "0.1.4"
