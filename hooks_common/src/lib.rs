@@ -1,7 +1,8 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+extern crate specs;
+#[macro_use] extern crate specs_derive;
+extern crate enet_sys as enet;
+#[macro_use] extern crate serde;
+//#[macro_use] extern crate serde_derive;
+extern crate cgmath;
+
+mod protocol;

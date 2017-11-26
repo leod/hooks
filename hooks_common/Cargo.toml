@@ -5,4 +5,7 @@ authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 
 [dependencies]
 specs = "0.10.0"
+specs-derive = "0.1.0"
 enet-sys = "0.1.4"
+serde = { version = "1.0", features = ["serde_derive"] }
+cgmath = { version = "0.15.0", features = ["serde"] }
