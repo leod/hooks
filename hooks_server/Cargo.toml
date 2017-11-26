@@ -1,0 +1,6 @@
+[package]
+name = "hooks_server"
+version = "0.1.0"
+authors = ["leod <subtle.frustration@proton.me>"]
+
+[dependencies]
