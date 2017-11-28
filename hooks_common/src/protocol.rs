@@ -1,7 +1,7 @@
-use cgmath::Vector2;
+use nalgebra::Vector2;
 
 pub type PlayerId = u32;
-pub type EntityId = u32;
+pub type ReplEntityId = u32;
 pub type EntityTypeId = u32;
 pub type TickNumber = u32;
 
@@ -100,6 +100,6 @@ pub enum GameEvent {
     },
     
     // Entity replication
-    CreateEntity(EntityId, EntityTypeId, PlayerId),
+    CreateEntity(ReplEntityId, EntityTypeId, PlayerId),
     RemoveEntity(EntityId),
 }

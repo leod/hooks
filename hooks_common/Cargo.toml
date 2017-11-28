@@ -5,7 +5,9 @@ authors = ["leod <subtle.frustration@proton.me>"]
 
 [dependencies]
 specs = "0.10.0"
+shred = "0.5.0"
 specs-derive = "0.1.0"
 enet-sys = "0.1.4"
+wrapped2d = "0.3.4"
 serde = { version = "1.0", features = ["serde_derive"] }
-cgmath = { version = "0.15.0", features = ["serde"] }
+nalgebra = { version = "0.13.1", features = ["serde-serialize"] }
