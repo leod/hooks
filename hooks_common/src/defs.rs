@@ -1,16 +1,11 @@
 use nalgebra::Vector2;
 
 pub type PlayerId = u32;
-pub type ReplEntityId = u32;
-pub type EntityTypeId = u32;
 pub type TickNumber = u32;
 
-#[derive(Debug, Clone)]
-pub enum Channel {
-    Messages,
-    Ticks,
-} 
-pub const NUM_CHANNELS: usize = 2;
+// Entities shared between server and clients
+pub type EntityId = u32;
+pub type EntityTypeId = u32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapInfo {
@@ -47,27 +42,6 @@ pub struct GameInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ClientMessage {
-    Pong,
-    WishConnect {
-        name: String,
-    },
-    PlayerInput(TimedPlayerInput),
-    StartingTick {
-        tick: TickNumber,
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ServerMessage {
-    Ping,
-    AcceptConnect {
-        your_id: PlayerId,
-        game_info: GameInfo,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerInput {
     pub rot_angle: f32,
     pub shoot_one: bool,
@@ -100,6 +74,6 @@ pub enum GameEvent {
     },
     
     // Entity replication
-    CreateEntity(ReplEntityId, EntityTypeId, PlayerId),
+    CreateEntity(EntityId, EntityTypeId, PlayerId),
     RemoveEntity(EntityId),
 }

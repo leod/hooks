@@ -1,10 +1,12 @@
+#[macro_use] extern crate serde;
 extern crate shred;
 extern crate specs;
 #[macro_use] extern crate specs_derive;
-extern crate enet_sys as enet;
-#[macro_use] extern crate serde;
-//#[macro_use] extern crate serde_derive;
 extern crate nalgebra;
+extern crate ncollide;
+extern crate enet_sys as enet;
 
-mod protocol;
-mod net_component;
+mod defs;
+mod physics;
+mod repl;
+mod net;
