@@ -86,6 +86,10 @@ impl<'a> System<'a> for CreateCollisionObjectSys {
         for entity in created_entities {
             create_object.remove(entity);
         }
+
+        for (entity, _) in (&*entities, &create_object).join() {
+            panic!("Entity {:?} has CreateCollisionObject but not Position, Orientation or Shape", entity);
+        }
     }
 }
 
@@ -107,6 +111,10 @@ impl<'a> System<'a> for RemoveCollisionObjectSys {
         for entity in removed_entities {
             remove_object.remove(entity);
             object_uid.remove(entity);
+        }
+
+        for (entity, _) in (&*entities, &remove_object).join() {
+            panic!("Entity {:?} has RemoveCollisionObject but not CollisionObjectUid");
         }
     }
 }
