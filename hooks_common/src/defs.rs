@@ -1,11 +1,17 @@
 use nalgebra::Vector2;
 
 pub type PlayerId = u32;
-pub type TickNumber = u32;
 
-// Entities shared between server and clients
+// Global Ids for entities shared between server and clients.
+// Note that the zero Id is reserved.
 pub type EntityId = u32;
+
+pub const INVALID_PLAYER_ID: PlayerId = 0;
+pub const INVALID_ENTITY_ID: EntityId = 0;
+
 pub type EntityTypeId = u32;
+
+pub type TickNumber = u32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapInfo {

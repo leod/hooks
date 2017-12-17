@@ -5,6 +5,7 @@ authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 
 [dependencies]
 serde = { version = "1.0", features = ["serde_derive"] }
+bincode = "0.9.2"
 shred = "0.5.0"
 specs = "0.10.0"
 specs-derive = "0.1.0"
