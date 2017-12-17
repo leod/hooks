@@ -4,11 +4,18 @@ use std::collections::HashMap;
 
 use specs::{Entity, VecStorage};
 
-use defs::{EntityId};
+use defs::{EntityId, PlayerId};
+
+pub struct EntityType {
+    
+}
 
 #[derive(Component)]
 #[component(VecStorage)]
-pub struct ReplId(EntityId);
+pub struct ReplEntity {
+    pub id: EntityId,
+    pub owner: PlayerId
+}
 
 // Map from shared EntityId to the local Entity
 pub struct ReplEntities {
