@@ -4,17 +4,21 @@ use std::collections::HashMap;
 
 use specs::{Entity, VecStorage};
 
-use defs::{EntityId, PlayerId};
+use defs::{EntityId, EntityKindId, PlayerId};
 
-pub struct EntityType {
-    
+pub trait ReplComponent {
+    const OWNER_ONLY: bool = false;
 }
 
 #[derive(Component)]
 #[component(VecStorage)]
+pub struct ReplId(EntityId);
+
+#[derive(Component)]
+#[component(VecStorage)]
 pub struct ReplEntity {
-    pub id: EntityId,
-    pub owner: PlayerId
+    pub owner: PlayerId,
+    pub kind: EntityKindId,
 }
 
 // Map from shared EntityId to the local Entity

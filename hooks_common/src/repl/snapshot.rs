@@ -1,27 +1,38 @@
-use std::collections::HashMap;
+use std::cocollections::BTreeMap;
 
 use serde::ser::{Serialize, Serializer};
 use serde::de::{Deserialize, Deserializer};
 
-use defs::{EntityId, INVALID_ENTITY_ID};
+use defs::{EntityId, PlayerId, INVALID_ENTITY_ID};
 use ordered_join;
 
-pub trait Delta {
+/// Trait implemented by the EntitySnapshot struct in the `snapshot!` macro.
+/// An EntitySnapshot stores the state of a set of components of one entity.
+pub trait EntitySnapshot: Serialize + Deserialize {
+    /// Returns the state of only the next components that have changed.
+    /// This can then be used to delta serialize the snapshot.
     fn delta(&self, next: &Self) -> Self;
+
+    /// Filter out components that are only shared with the entity's owner
+    fn filter_by_owner(&mut self, player_id: PlayerId);
+
+    /// Returns true if the snapshot contains the state of at least one component
+    fn any(&self) -> bool;
 }
 
-pub struct Snapshot<T: Delta>(pub Vec<(EntityId, T)>);
+/// Entity state snapshots for replicated entities
+pub struct WorldSnapshot<T: EntitySnapshot>(pub BTreeMap<EntityId, T>);
 
-impl<T: Delta> Snapshot<T> {
+impl<T: EntitySnapshot> WorldSnapshot<T> {
     pub fn new() -> Self {
-        Snapshot (
-            HashMap::new()
+        WorldSnapshot (
+            BTreeMap::new()
         )
     }
 }
 
-/// Serialize only those entities and components that have changed from this tick to the next one
-impl<T: Serialize> Snapshot<T> {
+impl<T: Serialize> WorldSnapshot<T> {
+    /// Serialize only those entities and components that have changed from this tick to the next one
     fn delta_serialize<S>(&self, next: &Self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_tuple(0);
 
@@ -40,10 +51,10 @@ impl<T: Serialize> Snapshot<T> {
     }
 }
 
-/// This macro generates a `Snapshot` struct to be able to copy the state of a
-/// selection of components from a `specs::World`. We only look at entities
-/// that have a `ReplId` component, which stores the unique EntityId shared by
-/// the server and all clients. 
+/// This macro generates an `EntitySnapshot` struct to be able to copy the state of a
+/// selection of components from a `specs::World`. We only replicate entities that have a
+/// `ReplId` component storing the unique EntityId shared by the server and
+/// all clients. 
 ///
 /// The macro requires a list of names and types of the components to be stored.
 /// The components are assumed to implement Component, Clone, PartialEq,
@@ -68,7 +79,6 @@ macro_rules! snapshot {
         }
     } => {
         pub mod $name {
-            use std::collections::HashMap;
             use std::fmt;
 
             use serde::ser::{Serialize, Serializer, SerializeTuple};
@@ -78,7 +88,7 @@ macro_rules! snapshot {
 
             use defs::{EntityId, INVALID_ENTITY_ID};
             use repl::{ReplEntity, ReplEntities};
-            use repl::snapshot::{self, DeltaSerialize, DeltaDeserialize};
+            use repl::snapshot;
 
             $(use $use_head$(::$use_tail)*;)*
 
@@ -91,7 +101,7 @@ macro_rules! snapshot {
             }
 
             impl EntitySnapshot {
-                pub fn new() -> Self {
+                pub fn none() -> Self {
                     Self {
                         $(
                             $field_name: None,
@@ -106,10 +116,10 @@ macro_rules! snapshot {
                 )+
             }
 
-            pub type Snapshot = snapshot::Snapshot<EntitySnapshot>;
+            pub type WorldSnapshot = snapshot::WorldSnapshot<EntitySnapshot>;
 
-            // Store World state of entities with ReplId component in a Snapshot
-            pub struct StoreSnapshotSys<'a>(pub &'a mut Snapshot);
+            /// Store World state of entities with ReplId component in a Snapshot
+            pub struct StoreSnapshotSys<'a>(pub &'a mut WorldSnapshot);
 
             impl<'a> System<'a> for StoreSnapshotSys<'a> {
                 type SystemData = (Entities<'a>,
@@ -127,13 +137,13 @@ macro_rules! snapshot {
                                 $field_name: $field_name.get(entity).map(|c| c.clone()),
                             )+
                         };
-                        (self.0).0.insert(repl_entity.id, entity_snapshot);
+                        (self.0).0.push((repl_entity.id, entity_snapshot));
                     }
                 }
             }
 
-            // Overwrite World state of entities with ReplId component with the state in a Snapshot
-            pub struct LoadSnapshotSys<'a>(pub &'a Snapshot);
+            /// Overwrite World state of entities with ReplId component with the state in a Snapshot
+            pub struct LoadSnapshotSys<'a>(pub &'a WorldSnapshot);
 
             impl<'a> System<'a> for LoadSnapshotSys<'a> {
                 type SystemData = (Fetch<'a, ReplEntities>,
@@ -154,23 +164,55 @@ macro_rules! snapshot {
                 }
             }
 
-            // Serialize Snapshots
+            // Implement EntitySnapshot
+            impl snapshot::EntitySnapshot for EntitySnapshot {
+                fn delta(&self, next: &Self) -> Self {
+                    let mut snapshot = EntitySnapshot::none();
+
+                    $(
+                        // See if this component is different in the next snapshot
+                        let changed =
+                            match (self.$field_name.as_ref(), next.$field_name.as_ref()) {
+                                (Some(component), Some(next_component)) =>
+                                    component != next_component,
+                                (None, Some(next_component)) =>
+                                    true,
+                                _ => false
+                            };
+
+                        if changed {
+                            snapshot.$field_name = Some(next.$field_name.unwrap().clone());
+                        }
+                    )+
+
+                    return snapshot;
+                }
+ 
+                fn filter_by_owner(&mut self, player_id: PlayerId) {
+                    if self.repl_entity.owner != player_id {
+                        $(
+                            if $field_type::OWNER_ONLY {
+                                self.$field_name = None;
+                            }
+                        )+
+                    }
+                }
+
+                fn any(&self) -> bool {
+                    $(self.$field_name.is_some() || )+ false
+                }
+            }
+
+            // Serialize EntitySnapshots
             type ComponentsBitSet = u16; // TODO: This fails for >16 components
 
             #[allow(unused_assignments)]
-            fn changed_components(cur: &EntitySnapshot, next: &EntitySnapshot) -> ComponentsBitSet {
+            fn components_bit_set(snapshot: &EntitySnapshot) -> ComponentsBitSet {
                 let mut bit_set: ComponentsBitSet = 0; 
                 let mut i = 0;
 
                 $(
-                    let set = match (cur.$field_name.as_ref(), next.$field_name.as_ref()) {
-                        (Some(component), Some(next_component)) =>
-                            component != next_component,
-                        (None, Some(next_component)) => true,
-                        _ => false
-                    };
-
-                    if set {
+                    if snapshot.$field_name.is_some() {
                         bit_set |= 1 << i;
                     }
 
@@ -181,51 +223,47 @@ macro_rules! snapshot {
             }
 
             impl Serialize for EntitySnapshot {
-                fn any_delta(&self, next: &EntitySnapshot) -> bool {
-                    changed_components(self, next) > 0
-                }
-
-                fn delta_serialize<S>(&self, next: &EntitySnapshot, serializer: S) -> Result<S::Ok, S::Error>
+                fn serialize<S>(&self, next: &EntitySnapshot, serializer: S) -> Result<S::Ok, S::Error>
                     where S: Serializer
                 {
-                    let mut changed = changed_components(self, next);
-
                     // TODO: Here, we could assume that the set of components of one entity does
                     // not change in its lifetime. Then we could use fewer than 16 bits.
-                    let mut seq = serializer.serialize_tuple(1 + changed.count_ones() as usize)?;
+                    let mut bit_set = components_bit_set(self);
 
-                    seq.serialize_element(&changed)?;
+                    let mut seq = serializer.serialize_tuple(1 + bit_set.count_ones() as usize)?;
+
+                    seq.serialize_element(&bit_set)?;
 
                     $(
-                        if changed & 1 == 1 {
+                        if bit_set & 1 == 1 {
                             let component = self.$field_name.as_ref().unwrap();
-                            seq.serialize_element(component)?;
+                            seq.serialize_element(&component)?;
                         }
-                        changed <<= 1;
+                        bit_set <<= 1;
                     )+
 
                     seq.end()
                 }
             }
 
-            impl DeltaDeserialize for EntitySnapshot {
-                fn delta_deserialize<'a, 'de, D>(&'a mut self, deserializer: D) -> Result<(), D::Error>
+            impl<'de> Deserialize<'de> for EntitySnapshot {
+                fn deserialize<'de, D>(&mut self, deserializer: D) -> Result<(), D::Error>
                     where D: Deserializer<'de>
                 {
                     struct ComponentsVisitor<'a>(&'a mut EntitySnapshot);
 
                     impl<'a, 'de> Visitor<'de> for ComponentsVisitor<'a> {
-                        type Value = ();
+                        type Value = EntitySnapshot;
 
                         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                             write!(formatter, "Expected components tuple")
                         }
 
                         fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<(), A::Error> {
-                            let changed = seq.next_element::<ComponentsBitSet>()?.unwrap();
+                            let bit_set = seq.next_element::<ComponentsBitSet>()?.unwrap();
 
                             $(
-                                if changed & 1 == 1 {
+                                if bit_set & 1 == 1 {
                                     let component = seq.next_element::<$field_type>()?.unwrap();
                                     (self.0).$field_name = Some(component);
                                 }
@@ -243,10 +281,12 @@ macro_rules! snapshot {
 }
 
 snapshot! {
+    use repl::ReplEntity,
     use physics::Position;
     use physics::Orientation;
 
     mod net_repl {
+        repl_entity: ReplEntity,
         position: Position,
         orientation: Orientation,
     }
