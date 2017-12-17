@@ -9,7 +9,7 @@ pub type EntityId = u32;
 pub const INVALID_PLAYER_ID: PlayerId = 0;
 pub const INVALID_ENTITY_ID: EntityId = 0;
 
-pub type EntityTypeId = u32;
+pub type EntityKindId = u32;
 
 pub type TickNumber = u32;
 
@@ -80,6 +80,5 @@ pub enum GameEvent {
     },
     
     // Entity replication
-    CreateEntity(EntityId, EntityTypeId, PlayerId),
     RemoveEntity(EntityId),
 }
