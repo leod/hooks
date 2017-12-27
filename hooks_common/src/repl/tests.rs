@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use bit_manager::{BitWriter, BitReader, BitWrite, BitRead};
+use bit_manager::{BitRead, BitReader, BitWrite, BitWriter};
 
 use repl;
 
@@ -28,17 +28,15 @@ snapshot! {
 #[test]
 fn test_delta() {
     // Entity classes
-    let class_none = snap::EntityClass {
-        components: vec![]
-    };
+    let class_none = snap::EntityClass { components: vec![] };
     let class_a = snap::EntityClass {
-        components: vec![snap::ComponentType::A]
+        components: vec![snap::ComponentType::A],
     };
     let class_b = snap::EntityClass {
-        components: vec![snap::ComponentType::B]
+        components: vec![snap::ComponentType::B],
     };
     let class_a_b = snap::EntityClass {
-        components: vec![snap::ComponentType::A, snap::ComponentType::B]
+        components: vec![snap::ComponentType::A, snap::ComponentType::B],
     };
 
     let classes = {
@@ -53,19 +51,19 @@ fn test_delta() {
     // Meta-information about entities
     let repl_none = repl::Entity {
         owner: 0,
-        class_id: 1
+        class_id: 1,
     };
     let repl_a = repl::Entity {
         owner: 0,
-        class_id: 2
+        class_id: 2,
     };
     let repl_b = repl::Entity {
         owner: 0,
-        class_id: 3
+        class_id: 3,
     };
     let repl_a_b = repl::Entity {
         owner: 0,
-        class_id: 7
+        class_id: 7,
     };
 
     // Some entity snapshots.
@@ -80,19 +78,11 @@ fn test_delta() {
     };
     let entity_b = snap::EntitySnapshot {
         a: None,
-        b: Some(
-            B {
-                x: 128,
-                y: true
-            }),
+        b: Some(B { x: 128, y: true }),
     };
     let entity_ab = snap::EntitySnapshot {
         a: Some(A { x: 1.0 }),
-        b: Some(
-            B { 
-                x: 256,
-                y: true
-            }),
+        b: Some(B { x: 256, y: true }),
     };
 
     // Snapshots
@@ -116,7 +106,7 @@ fn test_delta() {
     let snapshot_aa = {
         let mut snapshot = snap::WorldSnapshot::new();
         snapshot.0.insert(42, (repl_a.clone(), entity_a1.clone()));
-        snapshot.0.insert(1,  (repl_a.clone(), entity_a2.clone()));
+        snapshot.0.insert(1, (repl_a.clone(), entity_a2.clone()));
         snapshot
     };
     assert!(snapshot_aa.0.len() == 2);
@@ -125,13 +115,17 @@ fn test_delta() {
     {
         let repr_empty_a1 = {
             let mut writer = BitWriter::new(Vec::new());
-            snapshot_empty.delta_write(&snapshot_a1, &classes, 0, &mut writer).unwrap();
+            snapshot_empty
+                .delta_write(&snapshot_a1, &classes, 0, &mut writer)
+                .unwrap();
 
             writer.into_inner().unwrap()
         };
         let repr_empty_a2 = {
             let mut writer = BitWriter::new(Vec::new());
-            snapshot_empty.delta_write(&snapshot_a2, &classes, 0, &mut writer).unwrap();
+            snapshot_empty
+                .delta_write(&snapshot_a2, &classes, 0, &mut writer)
+                .unwrap();
 
             writer.into_inner().unwrap()
         };
@@ -156,17 +150,21 @@ fn test_delta() {
     {
         let repr_a1_a2 = {
             let mut writer = BitWriter::new(Vec::new());
-            snapshot_a1.delta_write(&snapshot_a2, &classes, 0, &mut writer).unwrap();
+            snapshot_a1
+                .delta_write(&snapshot_a2, &classes, 0, &mut writer)
+                .unwrap();
 
             writer.into_inner().unwrap()
         };
         let repr_a1_a1 = {
             let mut writer = BitWriter::new(Vec::new());
-            snapshot_a1.delta_write(&snapshot_a1, &classes, 0, &mut writer).unwrap();
+            snapshot_a1
+                .delta_write(&snapshot_a1, &classes, 0, &mut writer)
+                .unwrap();
 
             writer.into_inner().unwrap()
         };
-        
+
         // Nothing should be written if snapshot is the same
         assert!(repr_a1_a1 == [0, 0, 0, 0]);
 
@@ -190,13 +188,17 @@ fn test_delta() {
     {
         let repr_a1_aa = {
             let mut writer = BitWriter::new(Vec::new());
-            snapshot_a1.delta_write(&snapshot_aa, &classes, 0, &mut writer).unwrap();
+            snapshot_a1
+                .delta_write(&snapshot_aa, &classes, 0, &mut writer)
+                .unwrap();
 
             writer.into_inner().unwrap()
         };
         let repr_a2_aa = {
             let mut writer = BitWriter::new(Vec::new());
-            snapshot_a2.delta_write(&snapshot_aa, &classes, 0, &mut writer).unwrap();
+            snapshot_a2
+                .delta_write(&snapshot_aa, &classes, 0, &mut writer)
+                .unwrap();
 
             writer.into_inner().unwrap()
         };

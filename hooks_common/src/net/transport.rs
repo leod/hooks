@@ -1,14 +1,14 @@
-use std::{slice, mem, ptr};
+use std::{mem, ptr, slice};
 use std::ffi::CString;
 
 use libc::c_void;
 
 use enet_sys::{ENetEvent, ENetEventType, ENET_HOST_ANY};
-use enet_sys::address::{ENetAddress, enet_address_set_host};
-use enet_sys::peer::{ENetPeer, enet_peer_send};
-use enet_sys::host::{ENetHost, enet_host_create, enet_host_connect, enet_host_service,
-                     enet_host_flush, enet_host_broadcast, enet_host_destroy};
-use enet_sys::packet::{ENetPacket, ENetPacketFlag, enet_packet_create, enet_packet_destroy};
+use enet_sys::address::{enet_address_set_host, ENetAddress};
+use enet_sys::peer::{enet_peer_send, ENetPeer};
+use enet_sys::host::{enet_host_broadcast, enet_host_connect, enet_host_create, enet_host_destroy,
+                     enet_host_flush, enet_host_service, ENetHost};
+use enet_sys::packet::{enet_packet_create, enet_packet_destroy, ENetPacket, ENetPacketFlag};
 
 // TODO: Error handling (check ENet return values)
 // TODO: Annotate with lifetimes?
@@ -29,14 +29,14 @@ enum Event {
 enum PacketFlag {
     Reliable,
     Unreliable,
-    Unsequenced
+    Unsequenced,
 }
 
 impl Address {
     pub fn create(host: &str, port: u16) -> Address {
         let mut address = ENetAddress {
             host: 0,
-            port: port
+            port: port,
         };
 
         let c_host = CString::new(host).unwrap();
@@ -55,7 +55,7 @@ impl Host {
         peer_count: usize,
         channel_limit: usize,
         incoming_bandwidth: u32,
-        outgoing_bandwidth: u32
+        outgoing_bandwidth: u32,
     ) -> Host {
         let address = ENetAddress {
             host: ENET_HOST_ANY,
@@ -63,8 +63,13 @@ impl Host {
         };
 
         let host = unsafe {
-            enet_host_create(&address, peer_count, channel_limit, incoming_bandwidth,
-                             outgoing_bandwidth)
+            enet_host_create(
+                &address,
+                peer_count,
+                channel_limit,
+                incoming_bandwidth,
+                outgoing_bandwidth,
+            )
         };
 
         Host(host)
@@ -73,19 +78,23 @@ impl Host {
     pub fn create_client(
         channel_limit: usize,
         incoming_bandwidth: u32,
-        outgoing_bandwidth: u32
+        outgoing_bandwidth: u32,
     ) -> Host {
         let host = unsafe {
-            enet_host_create(ptr::null(), 1, channel_limit, incoming_bandwidth, outgoing_bandwidth)
+            enet_host_create(
+                ptr::null(),
+                1,
+                channel_limit,
+                incoming_bandwidth,
+                outgoing_bandwidth,
+            )
         };
 
         Host(host)
     }
 
     pub fn connect(&self, address: Address, channel_count: usize) -> Peer {
-        let peer = unsafe {
-            enet_host_connect(self.0, &address.0, channel_count, 0)
-        };
+        let peer = unsafe { enet_host_connect(self.0, &address.0, channel_count, 0) };
 
         Peer(peer)
     }
@@ -101,8 +110,11 @@ impl Host {
         match event._type {
             ENetEventType::ENET_EVENT_TYPE_NONE => None,
             ENetEventType::ENET_EVENT_TYPE_CONNECT => Some(Event::Connect(Peer(event.peer))),
-            ENetEventType::ENET_EVENT_TYPE_RECEIVE => 
-                Some(Event::Receive(Peer(event.peer), event.channelID, ReceivedPacket(event.packet))),
+            ENetEventType::ENET_EVENT_TYPE_RECEIVE => Some(Event::Receive(
+                Peer(event.peer),
+                event.channelID,
+                ReceivedPacket(event.packet),
+            )),
             ENetEventType::ENET_EVENT_TYPE_DISCONNECT => Some(Event::Disconnect(Peer(event.peer))),
         }
     }
@@ -144,9 +156,8 @@ impl Packet {
             PacketFlag::Unsequenced => ENetPacketFlag::ENET_PACKET_FLAG_UNSEQUENCED as u32,
         };
 
-        let packet = unsafe {
-            enet_packet_create(data.as_ptr() as *const c_void, data.len(), flags)
-        };
+        let packet =
+            unsafe { enet_packet_create(data.as_ptr() as *const c_void, data.len(), flags) };
 
         Packet(packet)
     }
@@ -154,9 +165,7 @@ impl Packet {
 
 impl ReceivedPacket {
     pub fn data<'a>(&'a self) -> &'a [u8] {
-        unsafe {
-            slice::from_raw_parts((*self.0).data, (*self.0).dataLength)
-        }
+        unsafe { slice::from_raw_parts((*self.0).data, (*self.0).dataLength) }
     }
 }
 

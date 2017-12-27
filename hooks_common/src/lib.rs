@@ -1,8 +1,8 @@
 extern crate bit_manager;
 #[macro_use]
 extern crate bit_manager_derive;
-extern crate libc;
 extern crate enet_sys;
+extern crate libc;
 extern crate nalgebra;
 extern crate ncollide;
 #[macro_use]
