@@ -9,13 +9,12 @@ pub type EntityId = u32;
 pub const INVALID_PLAYER_ID: PlayerId = 0;
 pub const INVALID_ENTITY_ID: EntityId = 0;
 
-pub type EntityKindId = u32;
+pub type EntityClassId = u32;
 
 pub type TickNumber = u32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MapInfo {
-}
+pub struct MapInfo {}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PlayerStats {
@@ -74,11 +73,11 @@ pub enum GameEvent {
 
     PlayerDied {
         player_id: PlayerId,
-        position: Vector2<f32>, 
+        position: Vector2<f32>,
         responsible_player_id: PlayerId,
         reason: DeathReason,
     },
-    
+
     // Entity replication
     RemoveEntity(EntityId),
 }

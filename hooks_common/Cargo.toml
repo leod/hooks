@@ -5,7 +5,8 @@ authors = ["leod <subtle.frustration@proton.me>"]
 
 [dependencies]
 serde = { version = "1.0", features = ["serde_derive"] }
-bincode = "0.9.2"
+bit_manager = "*"
+bit_manager_derive = "*"
 shred = "0.5.0"
 specs = "0.10.0"
 specs-derive = "0.1.0"
