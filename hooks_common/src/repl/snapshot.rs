@@ -44,9 +44,16 @@ pub struct EntityClass<T: EntitySnapshot> {
 /// storing an index into this map.
 pub struct EntityClasses<T: EntitySnapshot>(pub HashMap<EntityClassId, EntityClass<T>>);
 
+impl<T: EntitySnapshot> EntityClasses<T> {
+    pub fn new() -> Self {
+        EntityClasses(HashMap::new())
+    }
+}
+
 /// Snapshot of a set of entities at one point in time. In addition to the EntitySnapshot, we store
 /// the entities' meta-information `repl::Entity` here as well, so that we know which components
 /// should be replicated.
+#[derive(PartialEq)]
 pub struct WorldSnapshot<T: EntitySnapshot>(pub BTreeMap<EntityId, (Entity, T)>);
 
 impl<T: EntitySnapshot> WorldSnapshot<T> {
@@ -58,7 +65,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
 impl<T: EntitySnapshot> WorldSnapshot<T> {
     /// Write only those entities and components that have changed compared to a previous tick.
     /// The entities are written ordered by id.
-    fn delta_write<W: BitWrite>(
+    pub fn delta_write<W: BitWrite>(
         &self,
         cur: &Self,
         classes: &EntityClasses<T>,
@@ -118,7 +125,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
     /// Return a new snapshot, updating entities and components from the received delta.
     /// The return type is a tuple, where the first element is a list of new entities and the
     /// second element is the `WorldSnapshot`.
-    fn delta_read<R: BitRead>(
+    pub fn delta_read<R: BitRead>(
         &self,
         classes: &EntityClasses<T>,
         reader: &mut R,
@@ -260,7 +267,7 @@ macro_rules! snapshot {
             #[derive(Clone, PartialEq)]
             pub struct EntitySnapshot {
                 $(
-                    $field_name: Option<$field_type>,
+                    pub $field_name: Option<$field_type>,
                 )+
             }
 
