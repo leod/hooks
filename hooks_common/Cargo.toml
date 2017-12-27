@@ -12,4 +12,5 @@ specs = "0.10.0"
 specs-derive = "0.1.0"
 nalgebra = { version = "*", features = ["serde-serialize"] }
 ncollide = { git = "https://github.com/sebcrozet/ncollide.git", branch = "send_sync" }
+libc = "*"
 enet-sys = "0.1.4"
