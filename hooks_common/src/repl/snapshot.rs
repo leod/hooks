@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-use bit_manager::{Result, BitRead, BitWrite};
+use bit_manager::{BitRead, BitWrite, Result};
 
 use ordered_join;
-use defs::{EntityId, EntityClassId, PlayerId, INVALID_ENTITY_ID};
+use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
 use super::Entity;
 
 /// Trait implemented by the EntitySnapshot struct in the `snapshot!` macro. An EntitySnapshot
@@ -21,23 +21,23 @@ pub trait EntitySnapshot: Clone + PartialEq {
         &self,
         cur: &Self,
         components: &[Self::ComponentType],
-        writer: &mut W
+        writer: &mut W,
     ) -> Result<()>;
 
     /// Return updated state with changed components as read in the bitstream.
     fn delta_read<R: BitRead>(
-        &self, 
+        &self,
         components: &[Self::ComponentType],
-        reader: &mut R
+        reader: &mut R,
     ) -> Result<Self>;
 }
 
-/// Meta information about replicated entity types. 
+/// Meta information about replicated entity types.
 pub struct EntityClass<T: EntitySnapshot> {
     /// Which components are to be replicated for this entity type. We use this knowledge to create
     /// a smaller representation of the entity delta snapshot in the bitstreams. This means that
     /// the set components which are replicated for one entity can not change during its lifetime.
-    pub components: Vec<T::ComponentType>
+    pub components: Vec<T::ComponentType>,
 }
 
 /// All possible replicated entity types. Every replicated entity has a `repl::Entity` component,
@@ -66,7 +66,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         writer: &mut W,
     ) -> Result<()> {
         // Iterate entity pairs contained in the previous (left) and the next (right) snapshot
-        for join_item in ordered_join::FullJoinIter::new(self.0.iter(), cur.0.iter()){
+        for join_item in ordered_join::FullJoinIter::new(self.0.iter(), cur.0.iter()) {
             match join_item {
                 ordered_join::Item::Left(&id, _left) => {
                     // The entity stopped existing in the new snapshot - write nothing
@@ -86,8 +86,11 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                     let left_snapshot = T::none();
                     left_snapshot.delta_write(right_snapshot, components, writer)?;
                 }
-                ordered_join::Item::Both(&id, &(ref left_entity, ref left_snapshot),
-                                              &(ref right_entity, ref right_snapshot)) => {
+                ordered_join::Item::Both(
+                    &id,
+                    &(ref left_entity, ref left_snapshot),
+                    &(ref right_entity, ref right_snapshot),
+                ) => {
                     // This entity exists in the left and the right snapshot
                     assert!(id != INVALID_ENTITY_ID);
                     assert!(left_entity == right_entity);
@@ -98,7 +101,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
 
                         let components = &classes.0.get(&left_entity.class_id).unwrap().components;
 
-                        // Write all the changed components 
+                        // Write all the changed components
                         left_snapshot.delta_write(&right_snapshot, components, writer)?;
                     }
                 }
@@ -116,9 +119,9 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
     /// The return type is a tuple, where the first element is a list of new entities and the
     /// second element is the `WorldSnapshot`.
     fn delta_read<R: BitRead>(
-        &self, 
+        &self,
         classes: &EntityClasses<T>,
-        reader: &mut R
+        reader: &mut R,
     ) -> Result<(Vec<EntityId>, WorldSnapshot<T>)> {
         let mut new_entities = Vec::new();
         let mut cur_snapshot = WorldSnapshot(BTreeMap::new());
@@ -147,55 +150,53 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
             let left = prev_entity_iter.peek().map(|&(&id, entity)| (id, entity));
             let right = delta_id.map(|id| (id, ()));
 
-            let (left_next, right_next) =
-                match ordered_join::full_join_item(left, right) {
-                    Some(item) => {
-                        match item {
-                            ordered_join::Item::Left(id, left) => {
-                                // No new information about this entity
-                                assert!(id != INVALID_ENTITY_ID);
+            let (left_next, right_next) = match ordered_join::full_join_item(left, right) {
+                Some(item) => {
+                    match item {
+                        ordered_join::Item::Left(id, left) => {
+                            // No new information about this entity
+                            assert!(id != INVALID_ENTITY_ID);
 
-                                // Keep previous snapshot
-                                cur_snapshot.0.insert(id, (*left).clone());
-                            }
-                            ordered_join::Item::Right(id, _) => {
-                                // New entity
-                                assert!(id != INVALID_ENTITY_ID);
-                                new_entities.push(id);
-
-                                // Read meta-information
-                                let entity: Entity = reader.read()?;
-
-                                // Read all components
-                                let components = &classes.0.get(&entity.class_id)
-                                    .unwrap().components;
-                                let left_snapshot = T::none();
-                                let entity_snapshot =
-                                    left_snapshot.delta_read(components, reader)?;
-
-                                cur_snapshot.0.insert(id, (entity, entity_snapshot));
-                            }
-                            ordered_join::Item::Both(id, &(ref left_entity, ref left_snapshot), _) => {
-                                // This entity exists in both snapshots              
-                                assert!(id != INVALID_ENTITY_ID);
-
-                                // Update existing entity snapshot with delta from the stream
-                                let components = &classes.0.get(&left_entity.class_id)
-                                    .unwrap().components;
-                                let entity_snapshot =
-                                    left_snapshot.delta_read(components, reader)?;
-                                
-                                cur_snapshot.0.insert(id, (left_entity.clone(), entity_snapshot));
-                            }
+                            // Keep previous snapshot
+                            cur_snapshot.0.insert(id, (*left).clone());
                         }
+                        ordered_join::Item::Right(id, _) => {
+                            // New entity
+                            assert!(id != INVALID_ENTITY_ID);
+                            new_entities.push(id);
 
-                        item.next_flags()
+                            // Read meta-information
+                            let entity: Entity = reader.read()?;
+
+                            // Read all components
+                            let components = &classes.0.get(&entity.class_id).unwrap().components;
+                            let left_snapshot = T::none();
+                            let entity_snapshot = left_snapshot.delta_read(components, reader)?;
+
+                            cur_snapshot.0.insert(id, (entity, entity_snapshot));
+                        }
+                        ordered_join::Item::Both(id, &(ref left_entity, ref left_snapshot), _) => {
+                            // This entity exists in both snapshots
+                            assert!(id != INVALID_ENTITY_ID);
+
+                            // Update existing entity snapshot with delta from the stream
+                            let components =
+                                &classes.0.get(&left_entity.class_id).unwrap().components;
+                            let entity_snapshot = left_snapshot.delta_read(components, reader)?;
+
+                            cur_snapshot
+                                .0
+                                .insert(id, (left_entity.clone(), entity_snapshot));
+                        }
                     }
-                    None => {
-                        // Both snapshots are exhausted
-                        break;
-                    }
-                };
+
+                    item.next_flags()
+                }
+                None => {
+                    // Both snapshots are exhausted
+                    break;
+                }
+            };
 
             // Advance iterators
             if left_next {
@@ -317,7 +318,7 @@ macro_rules! snapshot {
                 }
 
                 fn delta_read<R: BitRead>(
-                    &self, 
+                    &self,
                     components: &[Self::ComponentType],
                     reader: &mut R
                 ) -> Result<Self> {
