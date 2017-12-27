@@ -260,7 +260,7 @@ macro_rules! snapshot {
             #[derive(Clone, PartialEq)]
             pub struct EntitySnapshot {
                 $(
-                    pub $field_name: Option<$field_type>,
+                    $field_name: Option<$field_type>,
                 )+
             }
 
@@ -379,7 +379,7 @@ macro_rules! snapshot {
                         for component in components {
                             match component {
                                 $(
-                                    $field_type => entity_snapshot.$field_name =
+                                    &ComponentType::$field_type => entity_snapshot.$field_name =
                                         Some($field_name.get(entity).unwrap().clone()),
                                 )+
                             }
