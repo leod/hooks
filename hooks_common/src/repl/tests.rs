@@ -121,7 +121,6 @@ fn test_delta() {
     };
     assert!(snapshot_aa.0.len() == 2);
 
-
     // Testing
     {
         let repr_empty_a1 = {

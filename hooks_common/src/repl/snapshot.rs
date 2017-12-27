@@ -36,7 +36,8 @@ pub trait EntitySnapshot: Clone + PartialEq {
 pub struct EntityClass<T: EntitySnapshot> {
     /// Which components are to be replicated for this entity type. We use this knowledge to create
     /// a smaller representation of the entity delta snapshot in the bitstreams. This means that
-    /// the set components which are replicated for one entity can not change during its lifetime.
+    /// the set of components which are replicated for one entity can not change during its
+    /// lifetime.
     pub components: Vec<T::ComponentType>,
 }
 
