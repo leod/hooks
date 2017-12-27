@@ -1,5 +1,7 @@
-#[macro_use] mod snapshot;
-#[cfg(test)] mod tests;
+#[macro_use]
+mod snapshot;
+#[cfg(test)]
+mod tests;
 
 use std::collections::HashMap;
 
