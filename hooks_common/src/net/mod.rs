@@ -1,3 +1,3 @@
 mod defs;
 
-pub use self::defs::{Channel, ServerMessage, ClientMessage};
+pub use self::defs::{Channel, ClientMessage, ServerMessage};

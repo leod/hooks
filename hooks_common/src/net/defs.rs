@@ -1,22 +1,18 @@
-use defs::{PlayerId, GameInfo, TimedPlayerInput, TickNumber};
+use defs::{GameInfo, PlayerId, TickNumber, TimedPlayerInput};
 
 #[derive(Debug, Clone)]
 pub enum Channel {
     Messages,
     Ticks,
-} 
+}
 pub const NUM_CHANNELS: usize = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientMessage {
     Pong,
-    WishConnect {
-        name: String,
-    },
+    WishConnect { name: String },
     PlayerInput(TimedPlayerInput),
-    StartingTick {
-        tick: TickNumber,
-    }
+    StartingTick { tick: TickNumber },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

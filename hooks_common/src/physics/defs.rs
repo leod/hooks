@@ -1,25 +1,21 @@
-use specs::{VecStorage, HashMapStorage};
+use bit_manager::{BitRead, BitWrite, Result};
+use bit_manager::data::BitStore;
 
+use specs::VecStorage;
 use nalgebra::Point2;
 use ncollide::shape::ShapeHandle2;
 
-use repl::ReplComponent;
-
-#[derive(Component, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Component, PartialEq, Clone, Debug)]
 #[component(VecStorage)]
 pub struct Position {
     pub pos: Point2<f32>,
 }
 
-impl ReplComponent for Position {}
-
-#[derive(Component, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[component(VecStorage)]
 pub struct Orientation {
     pub angle: f32,
 }
-
-impl ReplComponent for Orientation {}
 
 #[derive(Clone, Component)]
 #[component(VecStorage)]
@@ -27,4 +23,15 @@ pub struct CollisionShape {
     pub shape: ShapeHandle2<f32>,
 }
 
-impl ReplComponent for CollisionShape {}
+impl BitStore for Position {
+    fn read_from<R: BitRead>(reader: &mut R) -> Result<Self> {
+        Ok(Position {
+            pos: Point2::new(reader.read()?, reader.read()?),
+        })
+    }
+
+    fn write_to<W: BitWrite>(&self, writer: &mut W) -> Result<()> {
+        writer.write(&self.pos.x)?;
+        writer.write(&self.pos.y)
+    }
+}

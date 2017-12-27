@@ -2,32 +2,30 @@ mod snapshot;
 
 use std::collections::HashMap;
 
-use specs::{Entity, VecStorage};
+use specs;
 
-use defs::{EntityId, EntityKindId, PlayerId};
+use defs::{EntityClassId, EntityId, PlayerId};
 
-pub trait ReplComponent {
-    const OWNER_ONLY: bool = false;
-}
-
-#[derive(Component)]
+/// Shared entity Id for replication.
+#[derive(PartialEq, Component)]
 #[component(VecStorage)]
-pub struct ReplId(EntityId);
+pub struct Id(EntityId);
 
-#[derive(Component)]
+/// Meta-information about replicated entities.
+#[derive(Clone, PartialEq, Component, BitStore)]
 #[component(VecStorage)]
-pub struct ReplEntity {
+pub struct Entity {
     pub owner: PlayerId,
-    pub kind: EntityKindId,
+    pub class_id: EntityClassId,
 }
 
-// Map from shared EntityId to the local Entity
-pub struct ReplEntities {
-    pub map: HashMap<EntityId, Entity>,
+/// Map from shared EntityId to the local ECS handle.
+pub struct Entities {
+    pub map: HashMap<EntityId, specs::Entity>,
 }
 
-impl ReplEntities {
-    pub fn id_to_entity(&self, id: EntityId) -> Entity {
-        *self.map.get(&id).unwrap() 
+impl Entities {
+    pub fn id_to_entity(&self, id: EntityId) -> specs::Entity {
+        *self.map.get(&id).unwrap()
     }
 }
