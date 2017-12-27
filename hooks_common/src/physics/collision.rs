@@ -123,7 +123,10 @@ impl<'a> System<'a> for RemoveCollisionObjectSys {
         }
 
         for (entity, _) in (&*entities, &remove_object).join() {
-            panic!("Entity {:?} has RemoveCollisionObject but not CollisionObjectUid", entity);
+            panic!(
+                "Entity {:?} has RemoveCollisionObject but not CollisionObjectUid",
+                entity
+            );
         }
     }
 }

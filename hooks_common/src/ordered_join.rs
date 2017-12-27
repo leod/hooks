@@ -18,7 +18,7 @@ impl<K, T, U> Item<K, T, U> {
         match self {
             &Item::Left(_, _) => (true, false),
             &Item::Right(_, _) => (false, true),
-            &Item::Both(_, _, _) => (true, true)
+            &Item::Both(_, _, _) => (true, true),
         }
     }
 }
@@ -29,12 +29,9 @@ enum ItemKind {
     Right,
 }
 
-pub fn full_join_item<K, T, U>(
-    left: Option<(K, T)>,
-    right: Option<(K, U)>,
-) -> Option<Item<K, T, U>>
+pub fn full_join_item<K, T, U>(left: Option<(K, T)>, right: Option<(K, U)>) -> Option<Item<K, T, U>>
 where
-    K: Ord
+    K: Ord,
 {
     match (left, right) {
         (Some((left_k, t)), Some((right_k, u))) => {
@@ -47,12 +44,9 @@ where
                 Some(Item::Both(left_k, t, u))
             }
         }
-        (Some((left_k, t)), None) =>
-            Some(Item::Left(left_k, t)),
-        (None, Some((right_k, u))) =>
-            Some(Item::Right(right_k, u)),
-        (None, None) =>
-            None,
+        (Some((left_k, t)), None) => Some(Item::Left(left_k, t)),
+        (None, Some((right_k, u))) => Some(Item::Right(right_k, u)),
+        (None, None) => None,
     }
 }
 
