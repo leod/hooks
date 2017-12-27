@@ -355,26 +355,36 @@ macro_rules! snapshot {
             pub struct StoreSnapshotSys<'a>(pub &'a mut WorldSnapshot);
 
             impl<'a> System<'a> for StoreSnapshotSys<'a> {
-                type SystemData = (Entities<'a>,
-                                   ReadStorage<'a, repl::Id>,
-                                   ReadStorage<'a, repl::Entity>,
-                                   $(
-                                       ReadStorage<'a, $field_type>,
-                                   )+);
+                type SystemData = (
+                    Fetch<'a, EntityClasses>,
+                    Entities<'a>,
+                    ReadStorage<'a, repl::Id>,
+                    ReadStorage<'a, repl::Entity>,
+                    $(
+                        ReadStorage<'a, $field_type>,
+                    )+
+                );
 
                 fn run(
                     &mut self,
-                    (entities, repl_id, repl_entity, $($field_name,)+): Self::SystemData,
+                    (classes, entities, repl_id, repl_entity, $($field_name,)+): Self::SystemData,
                 ) {
                     (self.0).0.clear();
 
                     let join = (&*entities, &repl_id, &repl_entity).join();
                     for (entity, repl_id, repl_entity) in join {
-                        let entity_snapshot = EntitySnapshot {
-                            $(
-                                $field_name: $field_name.get(entity).map(|c| c.clone()),
-                            )+
-                        };
+                        let components = &classes.0.get(&repl_entity.class_id).unwrap().components;
+
+                        let mut entity_snapshot: EntitySnapshot = snapshot::EntitySnapshot::none();
+                        for component in components {
+                            match component {
+                                $(
+                                    $field_type => entity_snapshot.$field_name =
+                                        Some($field_name.get(entity).unwrap().clone()),
+                                )+
+                            }
+                        }
+
                         (self.0).0.insert(repl_id.0, (repl_entity.clone(), entity_snapshot));
                     }
                 }
@@ -385,10 +395,12 @@ macro_rules! snapshot {
             pub struct LoadSnapshotSys<'a>(pub &'a WorldSnapshot);
 
             impl<'a> System<'a> for LoadSnapshotSys<'a> {
-                type SystemData = (Fetch<'a, repl::Entities>,
-                                   $(
-                                       WriteStorage<'a, $field_type>,
-                                   )+);
+                type SystemData = (
+                    Fetch<'a, repl::Entities>,
+                    $(
+                        WriteStorage<'a, $field_type>,
+                    )+
+                );
 
                 fn run(&mut self, (repl_entities, $(mut $field_name,)+): Self::SystemData) {
                     for (&entity_id, entity_snapshot) in (self.0).0.iter() {
