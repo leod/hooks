@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 
 use bit_manager::{BitRead, BitWrite, Result};
 
@@ -43,11 +42,11 @@ pub struct EntityClass<T: EntitySnapshot> {
 
 /// All possible replicated entity types. Every replicated entity has a `repl::Entity` component,
 /// storing an index into this map.
-pub struct EntityClasses<T: EntitySnapshot>(pub HashMap<EntityClassId, EntityClass<T>>);
+pub struct EntityClasses<T: EntitySnapshot>(pub BTreeMap<EntityClassId, EntityClass<T>>);
 
 impl<T: EntitySnapshot> EntityClasses<T> {
     pub fn new() -> Self {
-        EntityClasses(HashMap::new())
+        EntityClasses(BTreeMap::new())
     }
 }
 
