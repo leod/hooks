@@ -295,11 +295,11 @@ macro_rules! snapshot {
                                 &ComponentType::$field_type => {
                                     match (self.$field_name.as_ref(), cur.$field_name.as_ref()) {
                                         (Some(left), Some(right)) => {
-                                            if left != right {
-                                                writer.write_bit(true)?;
+                                            // Only write the component if it has changed
+                                            let changed: bool = (left != right);
+                                            writer.write_bit(changed)?;
+                                            if changed {
                                                 writer.write(right)?;
-                                            } else {
-                                                writer.write_bit(false)?;
                                             }
                                         }
                                         (None, Some(right)) => {
@@ -336,9 +336,9 @@ macro_rules! snapshot {
                         match component {
                             $(
                                 &ComponentType::$field_type => {
-                                    let bit = reader.read_bit()?;
+                                    let changed = reader.read_bit()?;
 
-                                    if bit {
+                                    if changed {
                                         // Component has changed, so read the updated value
                                         result.$field_name = Some(reader.read()?);
                                     } else {
