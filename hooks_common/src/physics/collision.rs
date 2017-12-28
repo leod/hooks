@@ -1,5 +1,5 @@
-use specs::{Entities, Entity, FetchMut, BTreeStorage, Join, ReadStorage, System, VecStorage,
-            NullStorage, WriteStorage};
+use specs::{BTreeStorage, Entities, Entity, FetchMut, Join, NullStorage, ReadStorage, System,
+            VecStorage, WriteStorage};
 
 use nalgebra::Isometry2;
 use ncollide::world::{CollisionGroups, CollisionWorld2, GeometricQueryType};
