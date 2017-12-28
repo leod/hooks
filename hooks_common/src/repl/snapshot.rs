@@ -425,13 +425,3 @@ macro_rules! snapshot {
         }
     }
 }
-
-snapshot! {
-    use physics::Position;
-    use physics::Orientation;
-
-    mod net_repl {
-        position: Position,
-        orientation: Orientation,
-    }
-}
