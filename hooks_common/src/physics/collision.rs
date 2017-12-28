@@ -1,5 +1,5 @@
-use specs::{Entities, Entity, FetchMut, HashMapStorage, Join, ReadStorage, System, VecStorage,
-            WriteStorage};
+use specs::{Entities, Entity, FetchMut, BTreeStorage, Join, ReadStorage, System, VecStorage,
+            NullStorage, WriteStorage};
 
 use nalgebra::Isometry2;
 use ncollide::world::{CollisionGroups, CollisionWorld2, GeometricQueryType};
@@ -8,14 +8,14 @@ use super::{CollisionShape, Orientation, Position};
 
 // Tag components
 #[derive(Component)]
-#[component(HashMapStorage)]
+#[component(BTreeStorage)]
 pub struct CreateCollisionObject {
     pub collision_groups: CollisionGroups,
     pub query_type: GeometricQueryType<f32>,
 }
 
-#[derive(Component)]
-#[component(HashMapStorage)]
+#[derive(Component, Default)]
+#[component(NullStorage)]
 pub struct RemoveCollisionObject;
 
 // Handle of a ncollide CollisionObject
