@@ -295,7 +295,7 @@ macro_rules! snapshot {
                                     match (self.$field_name.as_ref(), cur.$field_name.as_ref()) {
                                         (Some(left), Some(right)) => {
                                             // Only write the component if it has changed
-                                            let changed: bool = (left != right);
+                                            let changed: bool = left != right;
                                             writer.write_bit(changed)?;
                                             if changed {
                                                 writer.write(right)?;
@@ -397,7 +397,7 @@ macro_rules! snapshot {
                 }
             }
 
-            /// Overwrite World state of entities with ReplId component with the state in a
+            /// Overwrite World state of entities with `ReplId` component with the state in a
             /// Snapshot. Note that this system does not create new entities.
             pub struct LoadSnapshotSys<'a>(pub &'a WorldSnapshot);
 
