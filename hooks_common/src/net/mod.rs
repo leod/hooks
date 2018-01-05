@@ -1,4 +1,4 @@
-mod defs;
+mod protocol;
 mod transport;
 
-pub use self::defs::{Channel, ClientMessage, ServerMessage};
+pub use self::protocol::{Channel, ClientInfoMsg, ServerInfoMsg};
