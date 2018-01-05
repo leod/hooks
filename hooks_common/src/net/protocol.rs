@@ -3,7 +3,7 @@ use defs::{GameInfo, PlayerId, PlayerInput, TickNum, TimedPlayerInput};
 #[derive(Debug, Clone)]
 pub enum Channel {
     /// Reliable meta messages
-    Info,
+    Comm,
 
     /// Unreliable messages about the game
     Game,
@@ -11,12 +11,12 @@ pub enum Channel {
 pub const NUM_CHANNELS: usize = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ClientInfoMsg {
+pub enum ClientCommMsg {
     WishConnect { name: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ServerInfoMsg {
+pub enum ServerCommMsg {
     AcceptConnect {
         your_id: PlayerId,
         game_info: GameInfo,
