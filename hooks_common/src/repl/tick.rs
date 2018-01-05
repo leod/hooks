@@ -3,7 +3,7 @@ use std::collections::Bound::{Excluded, Included};
 
 use bit_manager::{BitRead, BitWrite, Error, Result};
 
-use defs::{GameEvent, PlayerId, TickNum, INVALID_PLAYER_ID};
+use defs::{GameEvent, TickNum, INVALID_PLAYER_ID};
 
 pub use self::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
 
@@ -43,7 +43,7 @@ impl TickHistory {
         let events = if reader.read_bit()? {
             let len = reader.read::<u32>()?;
             let mut events = Vec::new();
-            for i in 0..len {
+            for _ in 0..len {
                 let event = reader.read::<GameEvent>()?;
                 events.push(event);
             }
@@ -65,6 +65,26 @@ impl TickHistory {
 
     pub fn len(&self) -> usize {
         self.ticks.len()
+    }
+
+    pub fn push_tick(&mut self, data: TickData) -> TickNum {
+        // No gaps in recording snapshots on the server
+        let num = self.max_num().unwrap_or(0) + 1;
+        self.ticks.insert(num, data);
+        num
+    }
+
+    pub fn prune_older_ticks(&mut self, new_min_num: TickNum) {
+        if let Some(min_num) = self.min_num() {
+            let range = (Included(min_num), Excluded(new_min_num));
+            let prune_nums = self.ticks.range(range).map(|(&num, _)| num).collect::<Vec<_>>();
+            
+            for num in prune_nums {
+                self.ticks.remove(&num);
+            }
+        }
+
+        assert!(self.min_num().is_none() || new_min_num < self.min_num().unwrap());
     }
 
     pub fn delta_write_tick<W: BitWrite>(
@@ -96,7 +116,7 @@ impl TickHistory {
                 .map(|(num, data)| (num, &data.events))
                 .rev();
 
-            for (num, events) in iter {
+            for (_num, events) in iter {
                 writer.write_bit(true)?;
                 Self::write_events(events, writer)?;
             }
