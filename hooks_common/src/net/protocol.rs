@@ -1,4 +1,4 @@
-use defs::{GameInfo, PlayerId, PlayerInput, TickNumber, TimedPlayerInput};
+use defs::{GameInfo, PlayerId, PlayerInput, TickNum, TimedPlayerInput};
 
 #[derive(Debug, Clone)]
 pub enum Channel {
@@ -26,7 +26,7 @@ pub enum ServerInfoMsg {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientGameMsg {
     PlayerInput(PlayerInput),
-    ReceivedTick(TickNumber),
+    ReceivedTick(TickNum),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

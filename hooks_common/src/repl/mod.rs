@@ -1,5 +1,6 @@
 #[macro_use]
 mod snapshot;
+mod tick;
 #[cfg(test)]
 mod tests;
 

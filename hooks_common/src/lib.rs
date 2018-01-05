@@ -7,6 +7,7 @@ extern crate nalgebra;
 extern crate ncollide;
 #[macro_use]
 extern crate serde;
+extern crate bincode;
 extern crate shred;
 extern crate specs;
 #[macro_use]

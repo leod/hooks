@@ -6,24 +6,24 @@ pub type PlayerId = u32;
 // Note that the zero Id is reserved.
 pub type EntityId = u32;
 
-pub const INVALID_PLAYER_ID: PlayerId = 0;
-pub const INVALID_ENTITY_ID: EntityId = 0;
-
 pub type EntityClassId = u32;
 
-pub type TickNumber = u32;
+pub type TickNum = u32;
+
+pub const INVALID_PLAYER_ID: PlayerId = 0;
+pub const INVALID_ENTITY_ID: EntityId = 0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapInfo {}
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, BitStore, Serialize, Deserialize)]
 pub struct PlayerStats {
     pub score: u32,
     pub deaths: u32,
     pub ping_ms: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
 pub struct PlayerInfo {
     pub name: String,
     pub stats: PlayerStats,
@@ -46,34 +46,37 @@ pub struct GameInfo {
     pub players: Vec<(PlayerId, PlayerInfo)>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
 pub struct PlayerInput {
     pub rot_angle: f32,
     pub shoot_one: bool,
     pub shoot_two: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
 pub struct TimedPlayerInput {
     pub duration_s: f32,
     pub input: PlayerInput,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
 pub enum DeathReason {
     Caught(PlayerId),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
+pub struct PlayerStatsUpdate;
+
+#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
 pub enum GameEvent {
     // Player list replication
     PlayerJoin(PlayerId, PlayerInfo),
     PlayerLeave(PlayerId),
-    UpdatePlayerStats(Vec<(PlayerId, PlayerStats)>),
+    PlayerStatsUpdate(PlayerStatsUpdate),
 
     PlayerDied {
         player_id: PlayerId,
-        position: Vector2<f32>,
+        //position: Vector2<f32>,
         responsible_player_id: PlayerId,
         reason: DeathReason,
     },
