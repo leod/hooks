@@ -31,5 +31,5 @@ pub enum ClientGameMsg {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServerGameMsg {
-     
+
 }

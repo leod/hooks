@@ -5,10 +5,10 @@ use libc::c_void;
 
 use enet_sys::{ENetEvent, ENetEventType, ENET_HOST_ANY};
 use enet_sys::address::{enet_address_set_host, ENetAddress};
-use enet_sys::peer::{enet_peer_send, ENetPeer};
 use enet_sys::host::{enet_host_broadcast, enet_host_connect, enet_host_create, enet_host_destroy,
                      enet_host_flush, enet_host_service, ENetHost};
 use enet_sys::packet::{enet_packet_create, enet_packet_destroy, ENetPacket, ENetPacketFlag};
+use enet_sys::peer::{enet_peer_send, ENetPeer};
 
 // TODO: Error handling (check ENet return values)
 // TODO: Annotate with lifetimes?
