@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use bit_manager::{BitRead, BitWrite, Result};
 
-use ordered_join;
-use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
 use super::Entity;
+use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
+use ordered_join;
 
 /// Trait implemented by the EntitySnapshot struct in the `snapshot!` macro. An EntitySnapshot
 /// stores the state of a set of components of one entity.

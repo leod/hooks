@@ -1,9 +1,9 @@
 use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
 
-use specs::VecStorage;
 use nalgebra::Point2;
 use ncollide::shape::ShapeHandle2;
+use specs::VecStorage;
 
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(VecStorage)]
