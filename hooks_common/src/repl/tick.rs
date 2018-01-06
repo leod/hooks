@@ -77,8 +77,11 @@ impl TickHistory {
     pub fn prune_older_ticks(&mut self, new_min_num: TickNum) {
         if let Some(min_num) = self.min_num() {
             let range = (Included(min_num), Excluded(new_min_num));
-            let prune_nums = self.ticks.range(range).map(|(&num, _)| num).collect::<Vec<_>>();
-            
+            let prune_nums = self.ticks
+                .range(range)
+                .map(|(&num, _)| num)
+                .collect::<Vec<_>>();
+
             for num in prune_nums {
                 self.ticks.remove(&num);
             }
@@ -201,7 +204,7 @@ impl TickHistory {
             // same previous tick, because it has not received our acknowledgment. If we receive
             // the same tick twice, all we have to do is ignore it.
             if !self.ticks.contains_key(&prev_num) {
-                // For these intermediate ticks, we only have the events, but no world snapshot
+                // For intermediate ticks, we only have the events, but no world snapshot
                 let prev_data = TickData {
                     events: events,
                     snapshot: None,
