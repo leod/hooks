@@ -11,8 +11,8 @@ use mopa;
 
 pub type TypeIndex = u16;
 
-type Writer = BitWriter<Vec<u8>>;
-type Reader = BitReader<Cursor<Vec<u8>>>;
+pub type Writer = BitWriter<Vec<u8>>;
+pub type Reader = BitReader<Cursor<Vec<u8>>>;
 
 pub trait Event: mopa::Any + Debug {
     fn type_id(&self) -> any::TypeId;
@@ -41,6 +41,7 @@ fn read_event<T: Event + BitStore>(reader: &mut Reader) -> Result<Box<Event>> {
     Ok(Box::new(T::read_from(reader)?))
 }
 
+#[derive(Clone)]
 pub struct Registry {
     /// Event types, indexed by TypeIndex
     types: Vec<Type>,
@@ -74,8 +75,8 @@ impl Registry {
         self.type_indices.insert(type_id, type_index);
     }
 
-    pub fn write(&self, event: &Box<Event>, writer: &mut Writer) -> Result<()> {
-        let type_id = (*event).type_id();
+    pub fn write(&self, event: &Event, writer: &mut Writer) -> Result<()> {
+        let type_id = event.type_id();
         let type_index = self.type_indices.get(&type_id).unwrap();
 
         writer.write(type_index)?;
