@@ -14,14 +14,16 @@ pub type TypeIndex = u16;
 pub type Writer = BitWriter<Vec<u8>>;
 pub type Reader = BitReader<Cursor<Vec<u8>>>;
 
-pub trait Event: mopa::Any + Debug {
+pub trait Event: mopa::Any + Debug + Sync + Send {
     fn type_id(&self) -> any::TypeId;
     fn write(&self, writer: &mut Writer) -> Result<()>;
 }
 
+pub type EventBox = Box<Event>;
+
 mopafy!(Event);
 
-impl<T: Any + Debug + BitStore> Event for T {
+impl<T: Any + Debug + BitStore + Sync + Send> Event for T {
     fn type_id(&self) -> any::TypeId {
         any::TypeId::of::<T>()
     }
@@ -50,10 +52,10 @@ macro_rules! match_event {
 /// Event type
 #[derive(Clone)]
 struct Type {
-    pub read: fn(&mut Reader) -> Result<Box<Event>>,
+    pub read: fn(&mut Reader) -> Result<EventBox>,
 }
 
-fn read_event<T: Event + BitStore>(reader: &mut Reader) -> Result<Box<Event>> {
+fn read_event<T: Event + BitStore + Send>(reader: &mut Reader) -> Result<EventBox> {
     Ok(Box::new(T::read_from(reader)?))
 }
 
@@ -74,7 +76,7 @@ impl Registry {
         }
     }
 
-    pub fn add<T: Event + BitStore>(&mut self) {
+    pub fn add<T: Event + BitStore + Send>(&mut self) {
         assert!(
             self.types.len() <= u16::MAX as usize,
             "too many event types"
@@ -99,7 +101,7 @@ impl Registry {
         event.write(writer)
     }
 
-    pub fn read(&self, reader: &mut Reader) -> Result<Box<Event>> {
+    pub fn read(&self, reader: &mut Reader) -> Result<EventBox> {
         let type_index = reader.read::<TypeIndex>()?;
 
         let event_type = &self.types[type_index as usize];
@@ -107,26 +109,24 @@ impl Registry {
     }
 }
 
-struct Sink {
-    events: Vec<Box<Event>>,
+pub struct Sink {
+    events: Vec<EventBox>,
 }
 
 impl Sink {
     pub fn new() -> Self {
-        Self {
-            events: Vec::new(),
-        }
+        Self { events: Vec::new() }
     }
 
-    pub fn push<T: Event>(&mut self, event: T) {
-        self.push_any(Box::new(event));
+    pub fn push<T: Event + Send>(&mut self, event: T) {
+        self.push_box(Box::new(event));
     }
 
-    pub fn push_any(&mut self, event: Box<Event>) {
+    pub fn push_box(&mut self, event: EventBox) {
         self.events.push(event);
     }
 
-    pub fn into_inner(self) -> Vec<Box<Event>> {
+    pub fn into_inner(self) -> Vec<EventBox> {
         self.events
     }
 }
@@ -137,7 +137,7 @@ mod tests {
 
     use bit_manager::{BitRead, BitReader, BitWrite, BitWriter};
 
-    use super::{Event, Registry};
+    use super::{Event, EventBox, Registry};
 
     #[derive(Debug, BitStore)]
     struct A;
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_match() {
-        let event: Box<Event> = Box::new(A);
+        let event: EventBox = Box::new(A);
 
         let mut n: usize = 0;
         match_event!(event:
@@ -173,11 +173,11 @@ mod tests {
         reg.add::<B>();
         reg.add::<C>();
 
-        let event: Box<Event> = Box::new(C::Y(42, true));
+        let event: EventBox = Box::new(C::Y(42, true));
 
         let data = {
             let mut writer = BitWriter::new(Vec::new());
-            reg.write(&event, &mut writer).unwrap();
+            reg.write(&*event, &mut writer).unwrap();
             writer.into_inner().unwrap()
         };
 

@@ -358,6 +358,20 @@ macro_rules! snapshot {
             pub type EntityClasses = snapshot::EntityClasses<EntitySnapshot>;
             pub type WorldSnapshot = snapshot::WorldSnapshot<EntitySnapshot>;
 
+            /// System data for loading an entity snapshot
+            pub type LoadData<'a> = (
+                $(
+                    ReadStorage<'a, $field_type>,
+                )+
+            );
+
+            /// System data for storing an entity snapshot
+            pub type StoreData<'a> = (
+                $(
+                    WriteStorage<'a, $field_type>,
+                )+
+            );
+
             /// Store World state of entities with ReplId component in a Snapshot.
             pub struct StoreSnapshotSys<'a>(pub &'a mut WorldSnapshot);
 
@@ -367,14 +381,12 @@ macro_rules! snapshot {
                     Entities<'a>,
                     ReadStorage<'a, repl::Id>,
                     ReadStorage<'a, repl::Entity>,
-                    $(
-                        ReadStorage<'a, $field_type>,
-                    )+
+                    LoadData<'a>,
                 );
 
                 fn run(
                     &mut self,
-                    (classes, entities, repl_id, repl_entity, $($field_name,)+): Self::SystemData,
+                    (classes, entities, repl_id, repl_entity, ($($field_name,)+)): Self::SystemData,
                 ) {
                     (self.0).0.clear();
 
@@ -404,12 +416,10 @@ macro_rules! snapshot {
             impl<'a> System<'a> for LoadSnapshotSys<'a> {
                 type SystemData = (
                     Fetch<'a, repl::Entities>,
-                    $(
-                        WriteStorage<'a, $field_type>,
-                    )+
+                    StoreData<'a>,
                 );
 
-                fn run(&mut self, (repl_entities, $(mut $field_name,)+): Self::SystemData) {
+                fn run(&mut self, (repl_entities, ($(mut $field_name,)+)): Self::SystemData) {
                     for (&entity_id, entity_snapshot) in (self.0).0.iter() {
                         let entity = repl_entities.id_to_entity(entity_id);
 

@@ -3,8 +3,9 @@ mod snapshot;
 mod tick;
 #[cfg(test)]
 mod tests;
+mod entity;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use specs;
 
@@ -25,7 +26,7 @@ pub struct Entity {
 
 /// Map from shared EntityId to the local ECS handle.
 pub struct Entities {
-    pub map: HashMap<EntityId, specs::Entity>,
+    map: BTreeMap<EntityId, specs::Entity>,
 }
 
 impl Entities {

@@ -1,5 +1,3 @@
-#![feature(get_type_id)]
-
 extern crate bincode;
 extern crate bit_manager;
 #[macro_use]
@@ -13,6 +11,8 @@ extern crate ncollide;
 #[macro_use]
 extern crate serde;
 extern crate shred;
+#[macro_use]
+extern crate shred_derive;
 extern crate specs;
 #[macro_use]
 extern crate specs_derive;
