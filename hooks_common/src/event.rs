@@ -31,6 +31,22 @@ impl<T: Any + Debug + BitStore> Event for T {
     }
 }
 
+macro_rules! match_event {
+    {
+        $event:ident:
+        $($typ:ty => $body:expr),*,
+    } => {
+        #[allow(unused)]
+        {
+            $(
+                if let Some($event) = $event.downcast_ref::<$typ>() {
+                    $body
+                }
+            )*
+        }
+    };
+}
+
 /// Event type
 #[derive(Clone)]
 struct Type {
@@ -91,20 +107,28 @@ impl Registry {
     }
 }
 
-macro_rules! match_event {
-    {
-        $event:ident:
-        $($typ:ty => $body:expr),*,
-    } => {
-        #[allow(unused)]
-        {
-            $(
-                if let Some($event) = $event.downcast_ref::<$typ>() {
-                    $body
-                }
-            )*
+struct Sink {
+    events: Vec<Box<Event>>,
+}
+
+impl Sink {
+    pub fn new() -> Self {
+        Self {
+            events: Vec::new(),
         }
-    };
+    }
+
+    pub fn push<T: Event>(&mut self, event: T) {
+        self.push_any(Box::new(event));
+    }
+
+    pub fn push_any(&mut self, event: Box<Event>) {
+        self.events.push(event);
+    }
+
+    pub fn into_inner(self) -> Vec<Box<Event>> {
+        self.events
+    }
 }
 
 #[cfg(test)]
