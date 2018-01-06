@@ -1,7 +1,7 @@
-use std::any::{Any, TypeId};
+use std::any::{self, Any};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::io::{Cursor, Read, Write};
+use std::io::Cursor;
 use std::u16;
 
 use bit_manager::{BitRead, BitReader, BitWrite, BitWriter, Result};
@@ -9,21 +9,21 @@ use bit_manager::data::BitStore;
 
 use mopa;
 
-pub type EventTypeId = u16;
+pub type TypeIndex = u16;
 
 type Writer = BitWriter<Vec<u8>>;
 type Reader = BitReader<Cursor<Vec<u8>>>;
 
 pub trait Event: mopa::Any + Debug {
-    fn type_id(&self) -> TypeId;
+    fn type_id(&self) -> any::TypeId;
     fn write(&self, writer: &mut Writer) -> Result<()>;
 }
 
 mopafy!(Event);
 
 impl<T: Any + Debug + BitStore> Event for T {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<T>()
+    fn type_id(&self) -> any::TypeId {
+        any::TypeId::of::<T>()
     }
 
     fn write(&self, writer: &mut Writer) -> Result<()> {
@@ -31,8 +31,9 @@ impl<T: Any + Debug + BitStore> Event for T {
     }
 }
 
-struct EventType {
-    pub type_id: TypeId,
+/// Event type
+#[derive(Clone)]
+struct Type {
     pub read: fn(&mut Reader) -> Result<Box<Event>>,
 }
 
@@ -40,52 +41,51 @@ fn read_event<T: Event + BitStore>(reader: &mut Reader) -> Result<Box<Event>> {
     Ok(Box::new(T::read_from(reader)?))
 }
 
-pub struct EventRegistry {
-    /// Event types indexed by EventTypeId
-    event_types: Vec<EventType>,
+pub struct Registry {
+    /// Event types, indexed by TypeIndex
+    types: Vec<Type>,
 
-    /// Map from type id to EventTypeId
-    event_type_ids: BTreeMap<TypeId, EventTypeId>,
+    /// Map from TypeId to index into `types`
+    type_indices: BTreeMap<any::TypeId, TypeIndex>,
 }
 
-impl EventRegistry {
+impl Registry {
     pub fn new() -> Self {
         Self {
-            event_types: Vec::new(),
-            event_type_ids: BTreeMap::new(),
+            types: Vec::new(),
+            type_indices: BTreeMap::new(),
         }
     }
 
     pub fn add<T: Event + BitStore>(&mut self) {
         assert!(
-            self.event_types.len() <= u16::MAX as usize,
+            self.types.len() <= u16::MAX as usize,
             "too many event types"
         );
 
-        let type_id = TypeId::of::<T>();
-        let event_type_id = self.event_types.len() as u16;
+        let type_id = any::TypeId::of::<T>();
+        let type_index = self.types.len() as u16;
 
-        let event_type = EventType {
-            type_id: type_id,
+        let event_type = Type {
             read: read_event::<T>,
         };
 
-        self.event_types.push(event_type);
-        self.event_type_ids.insert(type_id, event_type_id);
+        self.types.push(event_type);
+        self.type_indices.insert(type_id, type_index);
     }
 
     pub fn write(&self, event: &Box<Event>, writer: &mut Writer) -> Result<()> {
         let type_id = (*event).type_id();
-        let event_type_id = self.event_type_ids.get(&type_id).unwrap();
+        let type_index = self.type_indices.get(&type_id).unwrap();
 
-        writer.write(event_type_id)?;
+        writer.write(type_index)?;
         event.write(writer)
     }
 
     pub fn read(&self, reader: &mut Reader) -> Result<Box<Event>> {
-        let event_type_id = reader.read::<EventTypeId>()?;
+        let type_index = reader.read::<TypeIndex>()?;
 
-        let event_type = &self.event_types[event_type_id as usize];
+        let event_type = &self.types[type_index as usize];
         (event_type.read)(reader)
     }
 }
@@ -95,6 +95,7 @@ macro_rules! match_event {
         $event:ident:
         $($typ:ty => $body:expr),*,
     } => {
+        #[allow(unused)]
         {
             $(
                 if let Some($event) = $event.downcast_ref::<$typ>() {
@@ -111,7 +112,7 @@ mod tests {
 
     use bit_manager::{BitRead, BitReader, BitWrite, BitWriter};
 
-    use super::{Event, EventRegistry};
+    use super::{Event, Registry};
 
     #[derive(Debug, BitStore)]
     struct A;
@@ -142,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_write_read() {
-        let mut reg = EventRegistry::new();
+        let mut reg = Registry::new();
         reg.add::<A>();
         reg.add::<B>();
         reg.add::<C>();

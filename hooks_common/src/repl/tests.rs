@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use bit_manager::{BitRead, BitReader, BitWrite, BitWriter};
+use bit_manager::{BitReader, BitWriter};
 
 use repl;
 
