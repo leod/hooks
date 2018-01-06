@@ -19,7 +19,7 @@ snapshot! {
 }
 
 pub struct Data {
-    events: Vec<GameEvent>,
+    events: Vec<Box<Event>>,
     snapshot: Option<WorldSnapshot>,
 }
 
@@ -29,32 +29,11 @@ pub struct History {
 }
 
 impl History {
-    fn write_events<W: BitWrite>(events: &[GameEvent], writer: &mut W) -> Result<()> {
-        writer.write_bit(!events.is_empty())?;
-        if !events.is_empty() {
-            writer.write(&(events.len() as u32))?;
-            for event in events {
-                writer.write(event)?;
-            }
+    pub fn new(event_reg: event::Registry) -> Self {
+        Self {
+            event_reg: event_reg,
+            ticks: BTreeMap::new(),
         }
-
-        Ok(())
-    }
-
-    fn read_events<R: BitRead>(reader: &mut R) -> Result<Vec<GameEvent>> {
-        let events = if reader.read_bit()? {
-            let len = reader.read::<u32>()?;
-            let mut events = Vec::new();
-            for _ in 0..len {
-                let event = reader.read::<GameEvent>()?;
-                events.push(event);
-            }
-            events
-        } else {
-            Vec::new()
-        };
-
-        Ok(events)
     }
 
     pub fn min_num(&self) -> Option<TickNum> {
@@ -92,17 +71,17 @@ impl History {
         assert!(self.min_num().is_none() || new_min_num < self.min_num().unwrap());
     }
 
-    pub fn delta_write_tick<W: BitWrite>(
+    pub fn delta_write_tick(
         &self,
         prev_num: Option<TickNum>,
         cur_num: TickNum,
         classes: &EntityClasses,
-        writer: &mut W,
+        writer: &mut event::Writer,
     ) -> Result<()> {
         writer.write(&cur_num)?;
 
         let cur_data = self.ticks.get(&cur_num).unwrap();
-        Self::write_events(&cur_data.events, writer)?;
+        self.write_events(&cur_data.events, writer)?;
 
         if let Some(prev_num) = prev_num {
             // Send all the events that happened inbetween
@@ -123,7 +102,7 @@ impl History {
 
             for (_num, events) in iter {
                 writer.write_bit(true)?;
-                Self::write_events(events, writer)?;
+                self.write_events(events, writer)?;
             }
         }
 
@@ -156,10 +135,10 @@ impl History {
         Ok(())
     }
 
-    pub fn delta_read_tick<R: BitRead>(
+    pub fn delta_read_tick(
         &mut self,
         classes: &EntityClasses,
-        reader: &mut R,
+        reader: &mut event::Reader,
     ) -> Result<Option<TickNum>> {
         let cur_num = reader.read::<TickNum>()?;
 
@@ -170,7 +149,7 @@ impl History {
         }
         assert!(!self.ticks.contains_key(&cur_num));
 
-        let cur_events = Self::read_events(reader)?;
+        let cur_events = self.read_events(reader)?;
 
         // Read events of previous ticks. The following loop mirrors `delta_write_tick`. After it
         // is finished, `prev_num` contains the number of the tick reference for delta decoding.
@@ -199,7 +178,7 @@ impl History {
                 });
             }
 
-            let events = Self::read_events(reader)?;
+            let events = self.read_events(reader)?;
 
             // It is possible that we receive events of the same tick more than once. This can
             // happen if the server sends us multiple ticks as a delta with reference to the
@@ -251,5 +230,33 @@ impl History {
         self.ticks.insert(cur_num, cur_data);
 
         Ok(Some(cur_num))
+    }
+
+    fn write_events(&self, events: &[Box<Event>], writer: &mut event::Writer) -> Result<()> {
+        writer.write_bit(!events.is_empty())?;
+        if !events.is_empty() {
+            writer.write(&(events.len() as u32))?;
+            for event in events {
+                self.event_reg.write(&**event, writer)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn read_events(&self, reader: &mut event::Reader) -> Result<Vec<Box<Event>>> {
+        let events = if reader.read_bit()? {
+            let len = reader.read::<u32>()?;
+            let mut events = Vec::new();
+            for _ in 0..len {
+                let event = self.event_reg.read(reader)?;
+                events.push(event);
+            }
+            events
+        } else {
+            Vec::new()
+        };
+
+        Ok(events)
     }
 }
