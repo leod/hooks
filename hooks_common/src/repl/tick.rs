@@ -4,6 +4,7 @@ use std::collections::Bound::{Excluded, Included};
 use bit_manager::{BitRead, BitWrite, Error, Result};
 
 use defs::{GameEvent, TickNum, INVALID_PLAYER_ID};
+use event::{self, Event};
 
 pub use self::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
 
@@ -17,16 +18,17 @@ snapshot! {
     }
 }
 
-pub struct TickData {
+pub struct Data {
     events: Vec<GameEvent>,
     snapshot: Option<WorldSnapshot>,
 }
 
-pub struct TickHistory {
-    ticks: BTreeMap<TickNum, TickData>,
+pub struct History {
+    event_reg: event::Registry,
+    ticks: BTreeMap<TickNum, Data>,
 }
 
-impl TickHistory {
+impl History {
     fn write_events<W: BitWrite>(events: &[GameEvent], writer: &mut W) -> Result<()> {
         writer.write_bit(!events.is_empty())?;
         if !events.is_empty() {
@@ -67,7 +69,7 @@ impl TickHistory {
         self.ticks.len()
     }
 
-    pub fn push_tick(&mut self, data: TickData) -> TickNum {
+    pub fn push_tick(&mut self, data: Data) -> TickNum {
         // No gaps in recording snapshots on the server
         let num = self.max_num().unwrap_or(0) + 1;
         self.ticks.insert(num, data);
@@ -128,7 +130,7 @@ impl TickHistory {
         // End of event stream
         writer.write_bit(false)?;
 
-        let empty_data = TickData {
+        let empty_data = Data {
             events: Vec::new(),
             snapshot: Some(WorldSnapshot::new()),
         };
@@ -205,7 +207,7 @@ impl TickHistory {
             // the same tick twice, all we have to do is ignore it.
             if !self.ticks.contains_key(&prev_num) {
                 // For intermediate ticks, we only have the events, but no world snapshot
-                let prev_data = TickData {
+                let prev_data = Data {
                     events: events,
                     snapshot: None,
                 };
@@ -241,7 +243,7 @@ impl TickHistory {
             prev_snapshot.delta_read(classes, reader)?
         };
 
-        let cur_data = TickData {
+        let cur_data = Data {
             events: cur_events,
             snapshot: Some(cur_snapshot),
         };
