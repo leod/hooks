@@ -42,10 +42,10 @@ macro_rules! match_event {
         {
             $(
                 if let Some($event) = $event.downcast_ref::<$typ>() {
-                    $body
+                    $body;
                 }
             )*
-        }
+        };
     };
 }
 

@@ -33,4 +33,8 @@ impl Entities {
     pub fn id_to_entity(&self, id: EntityId) -> specs::Entity {
         *self.map.get(&id).unwrap()
     }
+
+    pub fn get_id_to_entity(&self, id: EntityId) -> Option<specs::Entity> {
+        self.map.get(&id).map(|k| *k)
+    }
 }

@@ -20,6 +20,7 @@ extern crate specs_derive;
 mod ordered_join;
 mod defs;
 mod physics;
+#[macro_use]
 mod event;
 mod repl;
 mod net;
