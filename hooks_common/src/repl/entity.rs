@@ -4,6 +4,7 @@ use specs::{self, Entities, Fetch, FetchMut, SystemData, WriteStorage};
 
 use defs::{EntityClassId, EntityId, PlayerId};
 use event::{self, EventBox};
+use ordered_join;
 
 pub use self::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
 
@@ -16,9 +17,6 @@ snapshot! {
         orientation: Orientation,
     }
 }
-
-#[derive(Debug, BitStore)]
-pub struct CreateEvent(pub EntityId);
 
 #[derive(Debug, BitStore)]
 pub struct RemoveEvent(pub EntityId);
@@ -79,8 +77,6 @@ impl EntitiesAuth {
 
         data.entity_map.map.insert(id, entity);
 
-        data.events.push(CreateEvent(id));
-
         (id, entity)
     }
 
@@ -106,35 +102,29 @@ pub fn handle_entity_events_view(
     snapshot: &WorldSnapshot,
     mut data: EventHandlingData,
 ) {
+    // Create entities that are new in this snapshot. Note that this doesn't mean that the entity
+    // was created in this snapshot, but it is the first time that this client sees it.
+    let new_entities =
+        ordered_join::FullJoinIter::new(data.entity_map.map.iter(), snapshot.0.iter())
+            .filter_map(|item| match item {
+                ordered_join::Item::Right(&id, entity_snapshot) => {
+                    // TODO: It's not clear to me why .clone() is necessary here
+                    Some((id, entity_snapshot.clone()))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+    for &(id, (ref repl_entity, ref snapshot)) in &new_entities {
+        let entity = data.entities.create();
+        data.repl_ids.insert(entity, super::Id(id));
+        data.repl_entities.insert(entity, repl_entity.clone());
+        data.entity_map.map.insert(id, entity);
+    }
+
+    // Remove entities by event
     for event in events {
         match_event!(event:
-            CreateEvent => {
-                let id = event.0;
-
-                // Since we delta encode intermediate events together with the current state, it
-                // can happen that we receive a creation event, but the corresponding snapshot does
-                // not contain the entity. The only reasonable cause for this is that the entity
-                // does not exist anymore in the server's current tick. This means that we need to
-                // ignore any events for entities that we have not replicated, everywhere.
-                //
-                // TODO: There are two alternatives:
-                // 1. Have the CreateEvent contain the initial EntitySnapshot, instead of sending
-                //    it with the WorldSnapshot. Then we always have initial state for the repl
-                //    entity, even if it later has been removed by the auth.
-                // 2. Temporarily create the entity, but do not display it (since we don't have any
-                //    e.g. position information).
-                if let Some(&(ref repl_entity, ref _state)) = snapshot.0.get(&id) {
-                    let entity = data.entities.create();
-                    data.repl_ids.insert(entity, super::Id(id));
-                    data.repl_entities.insert(entity, repl_entity.clone());
-
-                    data.entity_map.map.insert(id, entity);
-
-                    // We have now created the entity locally, but its EntitySnapshot has not been
-                    // loaded yet. This will be done only after all events have been handled,
-                    // together with loading the state of already existing repl entities.
-                }
-            },
             RemoveEvent => {
                 let id = event.0;
 
