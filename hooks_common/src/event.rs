@@ -14,16 +14,18 @@ pub type TypeIndex = u16;
 pub type Writer = BitWriter<Vec<u8>>;
 pub type Reader = BitReader<Cursor<Vec<u8>>>;
 
-pub trait Event: mopa::Any + Debug + Sync + Send {
+pub enum Class {
+    Local,
+    Order,
+    Wish
+}
+
+pub trait EventBase: mopa::Any + Debug + Sync + Send {
     fn type_id(&self) -> any::TypeId;
     fn write(&self, writer: &mut Writer) -> Result<()>;
 }
 
-pub type EventBox = Box<Event>;
-
-mopafy!(Event);
-
-impl<T: Any + Debug + BitStore + Sync + Send> Event for T {
+impl<T: Any + Debug + BitStore + Sync + Send> EventBase for T {
     fn type_id(&self) -> any::TypeId {
         any::TypeId::of::<T>()
     }
@@ -32,6 +34,16 @@ impl<T: Any + Debug + BitStore + Sync + Send> Event for T {
         self.write_to(writer)
     }
 }
+
+pub trait Event: EventBase {
+    fn class(&self) -> Class {
+        Class::Order
+    }
+}
+
+mopafy!(Event);
+
+pub type EventBox = Box<Event>;
 
 macro_rules! match_event {
     {
@@ -76,7 +88,7 @@ impl Registry {
         }
     }
 
-    pub fn add<T: Event + BitStore + Send>(&mut self) {
+    pub fn register<T: Event + BitStore + Send>(&mut self) {
         assert!(
             self.types.len() <= u16::MAX as usize,
             "too many event types"
@@ -151,6 +163,10 @@ mod tests {
         Y(i32, bool),
     }
 
+    impl Event for A {}
+    impl Event for B {}
+    impl Event for C {}
+
     #[test]
     fn test_match() {
         let event: EventBox = Box::new(A);
@@ -169,9 +185,9 @@ mod tests {
     #[test]
     fn test_write_read() {
         let mut reg = Registry::new();
-        reg.add::<A>();
-        reg.add::<B>();
-        reg.add::<C>();
+        reg.register::<A>();
+        reg.register::<B>();
+        reg.register::<C>();
 
         let event: EventBox = Box::new(C::Y(42, true));
 

@@ -1,25 +1,53 @@
-use std::collections::BTreeSet;
+use std::borrow::Borrow;
+use std::collections::BTreeMap;
+use std::fmt;
 
-use specs::{self, Entities, Fetch, FetchMut, SystemData, WriteStorage};
+use shred::Resources;
+use specs::{self, Entities, Fetch, FetchMut, SystemData, WriteStorage, World};
 
 use defs::{EntityClassId, EntityId, PlayerId};
-use event::{self, EventBox};
+use event::{self, Event, EventBox};
 use ordered_join;
+use super::snapshot;
 
-pub use self::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
+pub use self::snap::{EntityClasses, EntitySnapshot, WorldSnapshot};
 
 snapshot! {
     use physics::Position;
     use physics::Orientation;
 
-    mod snapshot {
+    mod snap {
         position: Position,
         orientation: Orientation,
     }
 }
 
+pub type EntityCtor = Fn(specs::EntityBuilder) -> specs::EntityBuilder + Sync + Send;
+
+pub struct EntityCtors(pub BTreeMap<EntityClassId, Box<EntityCtor>>);
+
+//#[derive(BitStore)]
+pub struct CreateLocal(pub EntityId, pub EntityClassId, Box<EntityCtor>);
+
+/*impl fmt::Debug for CreateLocal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CreateLocal(owner: {}, class: {}, ctor: fn)", self.0, self.1)
+    }
+}*/
+
 #[derive(Debug, BitStore)]
-pub struct RemoveEvent(pub EntityId);
+pub struct RemoveOrder(pub EntityId);
+
+impl Event for RemoveOrder {
+    fn class(&self) -> event::Class { event::Class::Order }
+}
+
+pub fn register(world: &mut World, event_reg: &mut event::Registry) {
+    world.add_resource(snapshot::EntityClasses::<EntitySnapshot>(BTreeMap::new()));
+    world.add_resource(EntityCtors(BTreeMap::new()));
+
+    event_reg.register::<RemoveOrder>();
+}
 
 struct EntitiesAuth {
     next_id: EntityId,
@@ -85,7 +113,7 @@ impl EntitiesAuth {
         data.entity_map.map.remove(&id);
         data.entities.delete(entity);
 
-        data.events.push(RemoveEvent(id));
+        data.events.push(RemoveOrder(id));
     }
 }
 
@@ -100,8 +128,11 @@ pub struct EventHandlingData<'a> {
 pub fn handle_entity_events_view(
     events: &[EventBox],
     snapshot: &WorldSnapshot,
-    mut data: EventHandlingData,
+    world: &mut World,
+    //mut data: EventHandlingData,
 ) {
+    let mut data = EventHandlingData::fetch(&world.res, 0);
+
     // Create entities that are new in this snapshot. Note that this doesn't mean that the entity
     // was created in this snapshot, but it is the first time that this client sees it.
     let new_entities =
@@ -125,7 +156,7 @@ pub fn handle_entity_events_view(
     // Remove entities by event
     for event in events {
         match_event!(event:
-            RemoveEvent => {
+            RemoveOrder => {
                 let id = event.0;
 
                 if let Some(entity) = data.entity_map.get_id_to_entity(id) {

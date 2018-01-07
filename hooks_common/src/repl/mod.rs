@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 use specs;
 
 use defs::{EntityClassId, EntityId, PlayerId};
+use event;
 
 /// Shared entity Id for replication.
 #[derive(PartialEq, Component)]
@@ -37,4 +38,13 @@ impl Entities {
     pub fn get_id_to_entity(&self, id: EntityId) -> Option<specs::Entity> {
         self.map.get(&id).map(|k| *k)
     }
+}
+
+pub fn register(world: &mut specs::World, _event_reg: &mut event::Registry) {
+    world.register::<Id>();
+    world.register::<Entity>();
+
+    world.add_resource(Entities { 
+        map: BTreeMap::new(),
+    });
 }
