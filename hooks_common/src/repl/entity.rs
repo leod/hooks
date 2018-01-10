@@ -2,15 +2,15 @@ use std::collections::BTreeMap;
 
 use specs::{self, Entity, EntityBuilder, World};
 
-use super::snapshot;
 use defs::{EntityClassId, EntityId, PlayerId};
 use event::{self, Event, EventBox};
 use registry::Registry;
+use repl;
 
-pub use self::snap::{EntityClasses, EntitySnapshot, WorldSnapshot};
+pub use self::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
 
 pub fn register(reg: &mut Registry) {
-    reg.resource(snapshot::EntityClasses::<EntitySnapshot>(BTreeMap::new()));
+    reg.resource(repl::snapshot::EntityClasses::<EntitySnapshot>(BTreeMap::new()));
     reg.resource(EntityClassNames(BTreeMap::new()));
 
     reg.event::<RemoveOrder>();
@@ -20,7 +20,7 @@ snapshot! {
     use physics::Position;
     use physics::Orientation;
 
-    mod snap {
+    mod snapshot {
         position: Position,
         orientation: Orientation,
     }
@@ -59,8 +59,8 @@ where
     let entity = {
         let builder = world
             .create_entity()
-            .with(super::Id(id))
-            .with(super::Entity { owner, class_id });
+            .with(repl::Id(id))
+            .with(repl::Entity { owner, class_id });
 
         let builder = ctor(builder);
 
@@ -69,7 +69,7 @@ where
 
     // Map from shared id to ECS handle
     {
-        let mut entity_map = world.write_resource::<super::EntityMap>();
+        let mut entity_map = world.write_resource::<repl::EntityMap>();
         assert!(!entity_map.0.contains_key(&id), "entity id used twice");
 
         entity_map.0.insert(id, entity);
@@ -80,7 +80,7 @@ where
 
 fn remove(world: &mut World, id: EntityId) {
     let entity = {
-        let mut entity_map = world.write_resource::<super::EntityMap>();
+        let mut entity_map = world.write_resource::<repl::EntityMap>();
         entity_map.0.remove(&id);
         entity_map.id_to_entity(id)
     };
@@ -130,6 +130,7 @@ mod auth {
 /// Client-side entity management
 mod view {
     use ordered_join;
+    use repl;
 
     use super::*;
 
@@ -148,7 +149,7 @@ mod view {
     /// Snapshot data of new entities is not loaded here.
     pub fn create_new_entities(world: &mut World, snapshot: &WorldSnapshot) {
         let new_entities = {
-            let entity_map = world.read_resource::<super::super::EntityMap>();
+            let entity_map = world.read_resource::<repl::EntityMap>();
 
             ordered_join::FullJoinIter::new(entity_map.0.iter(), snapshot.0.iter())
                 .filter_map(|item| match item {
@@ -183,14 +184,14 @@ mod view {
                 let id = event.0;
 
                 let entity = {
-                    let entity_map = world.read_resource::<super::super::EntityMap>();
+                    let entity_map = world.read_resource::<repl::EntityMap>();
                     entity_map.get_id_to_entity(id)
                 };
 
                 if let Some(entity) = entity {
                     world.delete_entity(entity).unwrap();
 
-                    let mut entity_map = world.write_resource::<super::super::EntityMap>();
+                    let mut entity_map = world.write_resource::<repl::EntityMap>();
                     entity_map.0.remove(&id);
                 }
             },
