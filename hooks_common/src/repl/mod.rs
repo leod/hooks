@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use specs;
 
 use defs::{EntityClassId, EntityId, PlayerId};
-use event;
+use registry::Registry;
 
 /// Shared entity Id for replication.
 #[derive(PartialEq, Component)]
@@ -40,11 +40,11 @@ impl Entities {
     }
 }
 
-pub fn register(world: &mut specs::World, _event_reg: &mut event::Registry) {
-    world.register::<Id>();
-    world.register::<Entity>();
+pub fn register(reg: &mut Registry) {
+    reg.component::<Id>();
+    reg.component::<Entity>();
 
-    world.add_resource(Entities { 
+    reg.resource(Entities { 
         map: BTreeMap::new(),
     });
 }

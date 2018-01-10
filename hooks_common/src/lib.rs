@@ -22,5 +22,6 @@ mod defs;
 mod physics;
 #[macro_use]
 mod event;
+mod registry;
 mod repl;
 mod net;

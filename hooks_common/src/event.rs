@@ -17,7 +17,6 @@ pub type Reader = BitReader<Cursor<Vec<u8>>>;
 pub enum Class {
     Local,
     Order,
-    Wish
 }
 
 pub trait EventBase: mopa::Any + Debug + Sync + Send {
@@ -36,9 +35,7 @@ impl<T: Any + Debug + BitStore + Sync + Send> EventBase for T {
 }
 
 pub trait Event: EventBase {
-    fn class(&self) -> Class {
-        Class::Order
-    }
+    fn class(&self) -> Class;
 }
 
 mopafy!(Event);
@@ -67,7 +64,7 @@ struct Type {
     pub read: fn(&mut Reader) -> Result<EventBox>,
 }
 
-fn read_event<T: Event + BitStore + Send>(reader: &mut Reader) -> Result<EventBox> {
+fn read_event<T: Event + BitStore>(reader: &mut Reader) -> Result<EventBox> {
     Ok(Box::new(T::read_from(reader)?))
 }
 
@@ -88,7 +85,7 @@ impl Registry {
         }
     }
 
-    pub fn register<T: Event + BitStore + Send>(&mut self) {
+    pub fn register<T: Event + BitStore>(&mut self) {
         assert!(
             self.types.len() <= u16::MAX as usize,
             "too many event types"
