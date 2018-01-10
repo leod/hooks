@@ -1,17 +1,20 @@
-use std::borrow::Borrow;
 use std::collections::BTreeMap;
-use std::fmt;
 
-use shred::Resources;
-use specs::{self, Entities, Fetch, FetchMut, SystemData, WriteStorage, World};
+use specs::{self, Entity, EntityBuilder, World};
 
+use super::snapshot;
 use defs::{EntityClassId, EntityId, PlayerId};
 use event::{self, Event, EventBox};
-use ordered_join;
 use registry::Registry;
-use super::snapshot;
 
 pub use self::snap::{EntityClasses, EntitySnapshot, WorldSnapshot};
+
+pub fn register(reg: &mut Registry) {
+    reg.resource(snapshot::EntityClasses::<EntitySnapshot>(BTreeMap::new()));
+    reg.resource(EntityClassNames(BTreeMap::new()));
+
+    reg.event::<RemoveOrder>();
+}
 
 snapshot! {
     use physics::Position;
@@ -27,133 +30,168 @@ snapshot! {
 pub struct RemoveOrder(pub EntityId);
 
 impl Event for RemoveOrder {
-    fn class(&self) -> event::Class { event::Class::Order }
-}
-
-pub type EntityCtor = Fn(specs::EntityBuilder) -> specs::EntityBuilder + Sync + Send;
-
-pub struct EntityCtors(pub BTreeMap<EntityClassId, Box<EntityCtor>>);
-
-pub fn register(reg: &mut Registry) {
-    reg.resource(snapshot::EntityClasses::<EntitySnapshot>(BTreeMap::new()));
-    reg.resource(EntityCtors(BTreeMap::new()));
-
-    reg.event::<RemoveOrder>();
-}
-
-struct EntitiesAuth {
-    next_id: EntityId,
-}
-
-#[derive(SystemData)]
-pub struct CreationData<'a> {
-    classes: Fetch<'a, EntityClasses>,
-    entity_map: FetchMut<'a, super::Entities>,
-    events: FetchMut<'a, event::Sink>,
-    entities: Entities<'a>,
-    repl_ids: WriteStorage<'a, super::Id>,
-    repl_entities: WriteStorage<'a, super::Entity>,
-}
-
-#[derive(SystemData)]
-pub struct RemovalData<'a> {
-    entity_map: FetchMut<'a, super::Entities>,
-    events: FetchMut<'a, event::Sink>,
-    entities: Entities<'a>,
-}
-
-impl EntitiesAuth {
-    pub fn new() -> Self {
-        Self { next_id: 0 }
-    }
-
-    pub fn create(
-        &mut self,
-        owner: PlayerId,
-        class_id: EntityClassId,
-        mut data: CreationData,
-    ) -> (EntityId, specs::Entity) {
-        assert!(
-            data.classes.0.contains_key(&class_id),
-            "unknown entity class"
-        );
-
-        let id = self.next_id;
-        self.next_id += 1;
-        assert!(
-            !data.entity_map.map.contains_key(&id),
-            "entity id used twice"
-        );
-
-        let entity = data.entities.create();
-        data.repl_ids.insert(entity, super::Id(id));
-        data.repl_entities.insert(
-            entity,
-            super::Entity {
-                owner: owner,
-                class_id: class_id,
-            },
-        );
-
-        data.entity_map.map.insert(id, entity);
-
-        (id, entity)
-    }
-
-    pub fn remove(&mut self, id: EntityId, mut data: RemovalData) {
-        let entity = *data.entity_map.map.get(&id).unwrap();
-        data.entity_map.map.remove(&id);
-        data.entities.delete(entity);
-
-        data.events.push(RemoveOrder(id));
+    fn class(&self) -> event::Class {
+        event::Class::Order
     }
 }
 
-#[derive(SystemData)]
-pub struct EventHandlingData<'a> {
-    entity_map: FetchMut<'a, super::Entities>,
-    entities: Entities<'a>,
-    repl_ids: WriteStorage<'a, super::Id>,
-    repl_entities: WriteStorage<'a, super::Entity>,
-}
+/// Maps from entity class names to their unique id. This map should be exactly the same on server
+/// and clients and not change during a game.
+pub struct EntityClassNames(pub BTreeMap<String, EntityClassId>);
 
-pub fn handle_entity_events_view(
-    events: &[EventBox],
-    snapshot: &WorldSnapshot,
+fn create<F>(
     world: &mut World,
-    //mut data: EventHandlingData,
-) {
-    let mut data = EventHandlingData::fetch(&world.res, 0);
-
-    // Create entities that are new in this snapshot. Note that this doesn't mean that the entity
-    // was created in this snapshot, but it is the first time that this client sees it.
-    let new_entities =
-        ordered_join::FullJoinIter::new(data.entity_map.map.iter(), snapshot.0.iter())
-            .filter_map(|item| match item {
-                ordered_join::Item::Right(&id, entity_snapshot) => {
-                    // TODO: It's not clear to me why .clone() is necessary here
-                    Some((id, entity_snapshot.clone()))
-                }
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-
-    for &(id, (ref repl_entity, ref snapshot)) in &new_entities {
-        let entity = data.entities.create();
-        data.repl_ids.insert(entity, super::Id(id));
-        data.repl_entities.insert(entity, repl_entity.clone());
-        data.entity_map.map.insert(id, entity);
+    id: EntityId,
+    owner: PlayerId,
+    class_id: EntityClassId,
+    ctor: F,
+) -> (EntityId, specs::Entity)
+where
+    F: FnOnce(EntityBuilder) -> EntityBuilder,
+{
+    // Sanity check
+    {
+        let classes = world.read_resource::<EntityClasses>();
+        assert!(classes.0.contains_key(&class_id), "unknown entity class");
     }
 
-    // Remove entities by event
-    for event in events {
+    // Build entity
+    let entity = {
+        let builder = world
+            .create_entity()
+            .with(super::Id(id))
+            .with(super::Entity { owner, class_id });
+
+        let builder = ctor(builder);
+
+        builder.build()
+    };
+
+    // Map from shared id to ECS handle
+    {
+        let mut entity_map = world.write_resource::<super::EntityMap>();
+        assert!(!entity_map.0.contains_key(&id), "entity id used twice");
+
+        entity_map.0.insert(id, entity);
+    }
+
+    (id, entity)
+}
+
+fn remove(world: &mut World, id: EntityId) {
+    let entity = {
+        let mut entity_map = world.write_resource::<super::EntityMap>();
+        entity_map.0.remove(&id);
+        entity_map.id_to_entity(id)
+    };
+    world.delete_entity(entity).unwrap();
+}
+
+/// Server-side entity management
+mod auth {
+    use super::*;
+
+    pub fn register(reg: &mut Registry) {
+        super::register(reg);
+
+        reg.resource(IdSource { next_id: 0 });
+    }
+
+    struct IdSource {
+        next_id: EntityId,
+    }
+
+    impl IdSource {
+        fn next_id(&mut self) -> EntityId {
+            let id = self.next_id;
+            self.next_id += 1;
+
+            id
+        }
+    }
+
+    pub fn create<F>(world: &mut World, owner: PlayerId, class: &str, ctor: F) -> (EntityId, Entity)
+    where
+        F: FnOnce(EntityBuilder) -> EntityBuilder,
+    {
+        let id = {
+            let mut id_source = world.write_resource::<IdSource>();
+            id_source.next_id()
+        };
+
+        let class_id = {
+            let class_names = world.read_resource::<EntityClassNames>();
+            *class_names.0.get(class).unwrap()
+        };
+
+        super::create(world, id, owner, class_id, ctor)
+    }
+}
+/// Client-side entity management
+mod view {
+    use ordered_join;
+
+    use super::*;
+
+    pub fn register(reg: &mut Registry) {
+        reg.resource(EntityCtors(BTreeMap::new()));
+    }
+
+    pub type EntityCtor = fn(specs::EntityBuilder) -> specs::EntityBuilder;
+
+    /// Constructors for adding client-side-specific components to replicated entities.
+    pub struct EntityCtors(pub BTreeMap<EntityClassId, EntityCtor>);
+
+    /// Create entities that are new in this snapshot. Note that this doesn't mean that the entity
+    /// was created in this snapshot, but it is the first time that this client sees it.
+    ///
+    /// Snapshot data of new entities is not loaded here.
+    pub fn create_new_entities(world: &mut World, snapshot: &WorldSnapshot) {
+        let new_entities = {
+            let entity_map = world.read_resource::<super::super::EntityMap>();
+
+            ordered_join::FullJoinIter::new(entity_map.0.iter(), snapshot.0.iter())
+                .filter_map(|item| match item {
+                    ordered_join::Item::Right(&id, entity_snapshot) => {
+                        Some((id, entity_snapshot.clone()))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+
+        for &(id, (ref repl_entity, ref _snapshot)) in &new_entities {
+            let ctor = {
+                let ctors = world.read_resource::<EntityCtors>();
+                *ctors.0.get(&repl_entity.class_id).unwrap()
+            };
+
+            super::create(
+                world,
+                id,
+                repl_entity.owner,
+                repl_entity.class_id,
+                |builder| ctor(builder),
+            );
+        }
+    }
+
+    /// Remove entities as ordered.
+    pub fn handle_event(world: &mut World, event: &EventBox) {
         match_event!(event:
             RemoveOrder => {
                 let id = event.0;
 
-                if let Some(entity) = data.entity_map.get_id_to_entity(id) {
-                    data.entity_map.map.remove(&id);
-                    data.entities.delete(entity);
+                let entity = {
+                    let entity_map = world.read_resource::<super::super::EntityMap>();
+                    entity_map.get_id_to_entity(id)
+                };
+
+                if let Some(entity) = entity {
+                    world.delete_entity(entity).unwrap();
+
+                    let mut entity_map = world.write_resource::<super::super::EntityMap>();
+                    entity_map.0.remove(&id);
                 }
             },
         );

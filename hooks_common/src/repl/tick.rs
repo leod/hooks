@@ -3,9 +3,9 @@ use std::collections::Bound::{Excluded, Included};
 
 use bit_manager::{BitRead, BitWrite, Error, Result};
 
-use super::entity::{EntityClasses, EntitySnapshot, WorldSnapshot};
-use defs::{GameEvent, TickNum, INVALID_PLAYER_ID};
-use event::{self, Event, EventBox};
+use super::entity::{EntityClasses, WorldSnapshot};
+use defs::{TickNum, INVALID_PLAYER_ID};
+use event::{self, EventBox};
 
 pub struct Data {
     events: Vec<EventBox>,

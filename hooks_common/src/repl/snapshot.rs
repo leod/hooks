@@ -69,7 +69,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         &self,
         cur: &Self,
         classes: &EntityClasses<T>,
-        recv_player_id: PlayerId,
+        _recv_player_id: PlayerId,
         writer: &mut W,
     ) -> Result<()> {
         // Iterate entity pairs contained in the previous (left) and the next (right) snapshot
@@ -262,6 +262,20 @@ macro_rules! snapshot {
                 )+
             }
 
+            /// Build an entity with a given list of component types.
+            /*pub fn build(components: &[ComponentType], mut builder: EntityBuilder) {
+                for component in component {
+                    match component {
+                        $(
+                            &ComponentType::$field_type => {
+                                builder = builder.with::<$field_type>(Default::default());
+                            }
+                        )+
+                    }
+                }
+                builder
+            }*/
+
             /// Complete replicated state of one entity. Note that not every component needs to be
             /// given for every entity.
             #[derive(Clone, PartialEq)]
@@ -415,13 +429,13 @@ macro_rules! snapshot {
 
             impl<'a> System<'a> for LoadSnapshotSys<'a> {
                 type SystemData = (
-                    Fetch<'a, repl::Entities>,
+                    Fetch<'a, repl::EntityMap>,
                     StoreData<'a>,
                 );
 
-                fn run(&mut self, (repl_entities, ($(mut $field_name,)+)): Self::SystemData) {
+                fn run(&mut self, (entity_map, ($(mut $field_name,)+)): Self::SystemData) {
                     for (&entity_id, entity_snapshot) in (self.0).0.iter() {
-                        let entity = repl_entities.id_to_entity(entity_id);
+                        let entity = entity_map.id_to_entity(entity_id);
 
                         $(
                             if let Some(component) = (entity_snapshot.1).$field_name.as_ref() {
