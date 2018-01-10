@@ -10,7 +10,9 @@ use repl;
 pub use self::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
 
 pub fn register(reg: &mut Registry) {
-    reg.resource(repl::snapshot::EntityClasses::<EntitySnapshot>(BTreeMap::new()));
+    reg.resource(repl::snapshot::EntityClasses::<EntitySnapshot>(
+        BTreeMap::new(),
+    ));
     reg.resource(EntityClassNames(BTreeMap::new()));
 
     reg.event::<RemoveOrder>();
@@ -121,7 +123,7 @@ mod auth {
 
         let class_id = {
             let class_names = world.read_resource::<EntityClassNames>();
-            *class_names.0.get(class).unwrap()
+            class_names.0[class]
         };
 
         super::create(world, id, owner, class_id, ctor)
@@ -164,7 +166,7 @@ mod view {
         for &(id, (ref repl_entity, ref _snapshot)) in &new_entities {
             let ctor = {
                 let ctors = world.read_resource::<EntityCtors>();
-                *ctors.0.get(&repl_entity.class_id).unwrap()
+                ctors.0[&repl_entity.class_id]
             };
 
             super::create(
@@ -172,7 +174,7 @@ mod view {
                 id,
                 repl_entity.owner,
                 repl_entity.class_id,
-                |builder| ctor(builder),
+                ctor
             );
         }
     }

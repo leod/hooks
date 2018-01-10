@@ -30,11 +30,11 @@ pub struct EntityMap(BTreeMap<EntityId, specs::Entity>);
 
 impl EntityMap {
     pub fn id_to_entity(&self, id: EntityId) -> specs::Entity {
-        *self.0.get(&id).unwrap()
+        self.0[&id]
     }
 
     pub fn get_id_to_entity(&self, id: EntityId) -> Option<specs::Entity> {
-        self.0.get(&id).map(|k| *k)
+        self.0.get(&id).cloned()
     }
 }
 

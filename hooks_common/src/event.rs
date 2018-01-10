@@ -104,9 +104,9 @@ impl Registry {
 
     pub fn write(&self, event: &Event, writer: &mut Writer) -> Result<()> {
         let type_id = event.type_id();
-        let type_index = self.type_indices.get(&type_id).unwrap();
+        let type_index = self.type_indices[&type_id];
 
-        writer.write(type_index)?;
+        writer.write(&type_index)?;
         event.write(writer)
     }
 

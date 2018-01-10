@@ -1,3 +1,4 @@
+use std::collections::btree_map;
 use std::collections::BTreeMap;
 use std::collections::Bound::{Excluded, Included};
 
@@ -69,7 +70,7 @@ impl History {
     ) -> Result<()> {
         writer.write(&cur_num)?;
 
-        let cur_data = self.ticks.get(&cur_num).unwrap();
+        let cur_data = &self.ticks[&cur_num];
         self.write_events(&cur_data.events, writer)?;
 
         if let Some(prev_num) = prev_num {
@@ -103,7 +104,7 @@ impl History {
             snapshot: Some(WorldSnapshot::new()),
         };
         let prev_data = if let Some(prev_num) = prev_num {
-            self.ticks.get(&prev_num).unwrap()
+            &self.ticks[&prev_num]
         } else {
             // Delta serialize with respect to an empty snapshot
             &empty_data
@@ -115,7 +116,7 @@ impl History {
 
         // Write snapshot delta
         prev_snapshot.delta_write(
-            &cur_snapshot,
+            cur_snapshot,
             classes,
             INVALID_PLAYER_ID, // TODO
             writer,
@@ -173,14 +174,14 @@ impl History {
             // happen if the server sends us multiple ticks as a delta with reference to the
             // same previous tick, because it has not received our acknowledgment. If we receive
             // the same tick twice, all we have to do is ignore it.
-            if !self.ticks.contains_key(&prev_num) {
-                // For intermediate ticks, we only have the events, but no world snapshot
+            if let btree_map::Entry::Vacant(entry) = self.ticks.entry(prev_num) {
+                // For non-existent intermediate ticks, we only have the events, but no world snapshot
                 let prev_data = Data {
                     events: events,
                     snapshot: None,
                 };
 
-                self.ticks.insert(prev_num, prev_data);
+                entry.insert(prev_data);
             }
         }
 
@@ -191,7 +192,7 @@ impl History {
             let empty_snapshot = WorldSnapshot::new();
             let prev_snapshot = if cur_num > prev_num {
                 // We have an entry for `prev_num` due to the loop for reading events
-                let prev_data = self.ticks.get(&prev_num).unwrap();
+                let prev_data = &self.ticks[&prev_num];
 
                 match prev_data.snapshot.as_ref() {
                     Some(prev_snapshot) => prev_snapshot,
