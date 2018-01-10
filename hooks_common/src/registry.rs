@@ -3,7 +3,7 @@ use take_mut;
 use bit_manager::data::BitStore;
 
 use shred::Resource;
-use specs::{World, System, Component, DispatcherBuilder};
+use specs::{Component, DispatcherBuilder, System, World};
 
 use event::{self, Event, EventBox};
 
@@ -12,7 +12,7 @@ pub type PostTickFn = fn(World, &[EventBox]) -> ();
 pub struct Registry {
     world: World,
     event_reg: event::Registry,
-    tick_systems: DispatcherBuilder<'static, 'static>, 
+    tick_systems: DispatcherBuilder<'static, 'static>,
     post_tick_fns: Vec<PostTickFn>,
 }
 

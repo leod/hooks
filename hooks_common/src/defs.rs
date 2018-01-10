@@ -66,21 +66,3 @@ pub enum DeathReason {
 
 #[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
 pub struct PlayerStatsUpdate;
-
-#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
-pub enum GameEvent {
-    // Player list replication
-    PlayerJoin(PlayerId, PlayerInfo),
-    PlayerLeave(PlayerId),
-    PlayerStatsUpdate(PlayerStatsUpdate),
-
-    PlayerDied {
-        player_id: PlayerId,
-        //position: Vector2<f32>,
-        responsible_player_id: PlayerId,
-        reason: DeathReason,
-    },
-
-    // Entity replication
-    RemoveEntity(EntityId),
-}

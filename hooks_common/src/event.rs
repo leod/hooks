@@ -146,7 +146,7 @@ mod tests {
 
     use bit_manager::{BitRead, BitReader, BitWrite, BitWriter};
 
-    use super::{Event, EventBox, Registry};
+    use super::{Class, Event, EventBox, Registry};
 
     #[derive(Debug, BitStore)]
     struct A;
@@ -160,9 +160,21 @@ mod tests {
         Y(i32, bool),
     }
 
-    impl Event for A {}
-    impl Event for B {}
-    impl Event for C {}
+    impl Event for A {
+        fn class(&self) -> Class {
+            Class::Local
+        }
+    }
+    impl Event for B {
+        fn class(&self) -> Class {
+            Class::Local
+        }
+    }
+    impl Event for C {
+        fn class(&self) -> Class {
+            Class::Local
+        }
+    }
 
     #[test]
     fn test_match() {

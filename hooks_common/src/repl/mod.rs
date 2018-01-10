@@ -26,17 +26,15 @@ pub struct Entity {
 }
 
 /// Map from shared EntityId to the local ECS handle.
-pub struct Entities {
-    map: BTreeMap<EntityId, specs::Entity>,
-}
+pub struct EntityMap(BTreeMap<EntityId, specs::Entity>);
 
-impl Entities {
+impl EntityMap {
     pub fn id_to_entity(&self, id: EntityId) -> specs::Entity {
-        *self.map.get(&id).unwrap()
+        *self.0.get(&id).unwrap()
     }
 
     pub fn get_id_to_entity(&self, id: EntityId) -> Option<specs::Entity> {
-        self.map.get(&id).map(|k| *k)
+        self.0.get(&id).map(|k| *k)
     }
 }
 
@@ -44,7 +42,5 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Id>();
     reg.component::<Entity>();
 
-    reg.resource(Entities { 
-        map: BTreeMap::new(),
-    });
+    reg.resource(EntityMap(BTreeMap::new()));
 }
