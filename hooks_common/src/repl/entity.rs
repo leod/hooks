@@ -8,6 +8,7 @@ use specs::{self, Entities, Fetch, FetchMut, SystemData, WriteStorage, World};
 use defs::{EntityClassId, EntityId, PlayerId};
 use event::{self, Event, EventBox};
 use ordered_join;
+use registry::Registry;
 use super::snapshot;
 
 pub use self::snap::{EntityClasses, EntitySnapshot, WorldSnapshot};
@@ -22,19 +23,6 @@ snapshot! {
     }
 }
 
-pub type EntityCtor = Fn(specs::EntityBuilder) -> specs::EntityBuilder + Sync + Send;
-
-pub struct EntityCtors(pub BTreeMap<EntityClassId, Box<EntityCtor>>);
-
-//#[derive(BitStore)]
-pub struct CreateLocal(pub EntityId, pub EntityClassId, Box<EntityCtor>);
-
-/*impl fmt::Debug for CreateLocal {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CreateLocal(owner: {}, class: {}, ctor: fn)", self.0, self.1)
-    }
-}*/
-
 #[derive(Debug, BitStore)]
 pub struct RemoveOrder(pub EntityId);
 
@@ -42,11 +30,15 @@ impl Event for RemoveOrder {
     fn class(&self) -> event::Class { event::Class::Order }
 }
 
-pub fn register(world: &mut World, event_reg: &mut event::Registry) {
-    world.add_resource(snapshot::EntityClasses::<EntitySnapshot>(BTreeMap::new()));
-    world.add_resource(EntityCtors(BTreeMap::new()));
+pub type EntityCtor = Fn(specs::EntityBuilder) -> specs::EntityBuilder + Sync + Send;
 
-    event_reg.register::<RemoveOrder>();
+pub struct EntityCtors(pub BTreeMap<EntityClassId, Box<EntityCtor>>);
+
+pub fn register(reg: &mut Registry) {
+    reg.resource(snapshot::EntityClasses::<EntitySnapshot>(BTreeMap::new()));
+    reg.resource(EntityCtors(BTreeMap::new()));
+
+    reg.event::<RemoveOrder>();
 }
 
 struct EntitiesAuth {
