@@ -89,7 +89,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                     writer.write(right_entity)?;
 
                     // Write all of the components
-                    let components = &classes.0.get(&right_entity.class_id).unwrap().components;
+                    let components = &classes.0[&right_entity.class_id].components;
                     let left_snapshot = T::none();
                     left_snapshot.delta_write(right_snapshot, components, writer)?;
                 }
@@ -106,10 +106,10 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                     if left_snapshot != right_snapshot {
                         writer.write(&id)?;
 
-                        let components = &classes.0.get(&left_entity.class_id).unwrap().components;
+                        let components = &classes.0[&left_entity.class_id].components;
 
                         // Write all the changed components
-                        left_snapshot.delta_write(&right_snapshot, components, writer)?;
+                        left_snapshot.delta_write(right_snapshot, components, writer)?;
                     }
                 }
             }
@@ -176,7 +176,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                             let entity: Entity = reader.read()?;
 
                             // Read all components
-                            let components = &classes.0.get(&entity.class_id).unwrap().components;
+                            let components = &classes.0[&entity.class_id].components;
                             let left_snapshot = T::none();
                             let entity_snapshot = left_snapshot.delta_read(components, reader)?;
 
@@ -188,7 +188,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
 
                             // Update existing entity snapshot with delta from the stream
                             let components =
-                                &classes.0.get(&left_entity.class_id).unwrap().components;
+                                &classes.0[&left_entity.class_id].components;
                             let entity_snapshot = left_snapshot.delta_read(components, reader)?;
 
                             cur_snapshot
@@ -303,9 +303,9 @@ macro_rules! snapshot {
                     writer: &mut W
                 ) -> Result<()> {
                     for component in components {
-                        match component {
+                        match *component {
                             $(
-                                &ComponentType::$field_type => {
+                                ComponentType::$field_type => {
                                     match (self.$field_name.as_ref(), cur.$field_name.as_ref()) {
                                         (Some(left), Some(right)) => {
                                             // Only write the component if it has changed
@@ -346,9 +346,9 @@ macro_rules! snapshot {
                     let mut result = Self::none();
 
                     for component in components {
-                        match component {
+                        match *component {
                             $(
-                                &ComponentType::$field_type => {
+                                ComponentType::$field_type => {
                                     let changed = reader.read_bit()?;
 
                                     if changed {
@@ -410,9 +410,9 @@ macro_rules! snapshot {
 
                         let mut entity_snapshot: EntitySnapshot = snapshot::EntitySnapshot::none();
                         for component in components {
-                            match component {
+                            match *component {
                                 $(
-                                    &ComponentType::$field_type => entity_snapshot.$field_name =
+                                    ComponentType::$field_type => entity_snapshot.$field_name =
                                         Some($field_name.get(entity).unwrap().clone()),
                                 )+
                             }
@@ -434,7 +434,7 @@ macro_rules! snapshot {
                 );
 
                 fn run(&mut self, (entity_map, ($(mut $field_name,)+)): Self::SystemData) {
-                    for (&entity_id, entity_snapshot) in (self.0).0.iter() {
+                    for (&entity_id, entity_snapshot) in &(self.0).0 {
                         let entity = entity_map.id_to_entity(entity_id);
 
                         $(

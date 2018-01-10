@@ -93,7 +93,7 @@ impl Host {
         Host(host)
     }
 
-    pub fn connect(&self, address: Address, channel_count: usize) -> Peer {
+    pub fn connect(&self, address: &Address, channel_count: usize) -> Peer {
         let peer = unsafe { enet_host_connect(self.0, &address.0, channel_count, 0) };
 
         Peer(peer)
@@ -164,7 +164,7 @@ impl Packet {
 }
 
 impl ReceivedPacket {
-    pub fn data<'a>(&'a self) -> &'a [u8] {
+    pub fn data(&self) -> &[u8] {
         unsafe { slice::from_raw_parts((*self.0).data, (*self.0).dataLength) }
     }
 }

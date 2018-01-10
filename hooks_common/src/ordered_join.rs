@@ -15,10 +15,10 @@ pub enum Item<K, T, U> {
 impl<K, T, U> Item<K, T, U> {
     // Which iterators need to be advanced?
     pub fn next_flags(&self) -> (bool, bool) {
-        match self {
-            &Item::Left(_, _) => (true, false),
-            &Item::Right(_, _) => (false, true),
-            &Item::Both(_, _, _) => (true, true),
+        match *self {
+            Item::Left(_, _) => (true, false),
+            Item::Right(_, _) => (false, true),
+            Item::Both(_, _, _) => (true, true),
         }
     }
 }
