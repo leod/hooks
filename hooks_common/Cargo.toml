@@ -17,3 +17,4 @@ ncollide = { git = "https://github.com/sebcrozet/ncollide.git", branch = "send_s
 libc = "*"
 enet-sys = "0.1.4"
 mopa = "*"
+take_mut = "*"
