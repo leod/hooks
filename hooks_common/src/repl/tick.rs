@@ -5,11 +5,11 @@ use std::collections::btree_map;
 use bit_manager::{BitRead, BitWrite, Error, Result};
 
 use defs::{TickNum, INVALID_PLAYER_ID};
-use event::{self, EventBox};
+use event::{self, Event};
 use repl::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
 
 pub struct Data<T: EntitySnapshot> {
-    events: Vec<EventBox>,
+    events: Vec<Box<Event>>,
     snapshot: Option<WorldSnapshot<T>>,
 }
 
@@ -222,7 +222,7 @@ impl<T: EntitySnapshot> History<T> {
         Ok(Some(cur_num))
     }
 
-    fn write_events(&self, events: &[EventBox], writer: &mut event::Writer) -> Result<()> {
+    fn write_events(&self, events: &[Box<Event>], writer: &mut event::Writer) -> Result<()> {
         writer.write_bit(!events.is_empty())?;
         if !events.is_empty() {
             writer.write(&(events.len() as u32))?;
@@ -234,7 +234,7 @@ impl<T: EntitySnapshot> History<T> {
         Ok(())
     }
 
-    fn read_events(&self, reader: &mut event::Reader) -> Result<Vec<EventBox>> {
+    fn read_events(&self, reader: &mut event::Reader) -> Result<Vec<Box<Event>>> {
         let events = if reader.read_bit()? {
             let len = reader.read::<u32>()?;
             let mut events = Vec::new();

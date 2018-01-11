@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use specs::{self, Entity, EntityBuilder, World};
 
 use defs::{EntityClassId, EntityId, PlayerId};
-use event::{self, Event, EventBox};
+use event::{self, Event};
 use registry::Registry;
 use repl;
 
@@ -215,7 +215,7 @@ mod view {
     }
 
     /// Remove entities as ordered.
-    pub fn handle_event(world: &mut World, event: &EventBox) {
+    pub fn handle_event(world: &mut World, event: &Box<Event>) {
         match_event!(event:
             RemoveOrder => {
                 let id = event.0;
