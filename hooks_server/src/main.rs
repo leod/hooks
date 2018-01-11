@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate log;
 extern crate hooks_common as common;
 
 mod client;

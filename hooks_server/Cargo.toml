@@ -5,3 +5,4 @@ authors = ["leod <subtle.frustration@proton.me>"]
 
 [dependencies]
 hooks_common = { path = "../hooks_common" }
+log = "0.4"

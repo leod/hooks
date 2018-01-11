@@ -1,15 +1,12 @@
-use common::{PlayerId, PlayerInfo, TickNum};
+use common::{PlayerInfo, TickNum};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum State {
-    Connecting,
-    InGame,
+    Connected
 }
 
 #[derive(Debug)]
 pub struct Client {
-    id: PlayerId,
-    info: PlayerInfo,
-    state: State,
-    last_ack_tick: TickNum,
+    pub state: State,
+    pub last_ack_tick: TickNum,
 }

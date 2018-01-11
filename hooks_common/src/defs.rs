@@ -13,17 +13,17 @@ pub type TickNum = u32;
 pub const INVALID_PLAYER_ID: PlayerId = 0;
 pub const INVALID_ENTITY_ID: EntityId = 0;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub struct MapInfo {}
 
-#[derive(Debug, Clone, Default, BitStore, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, BitStore)]
 pub struct PlayerStats {
     pub score: u32,
     pub deaths: u32,
     pub ping_ms: Option<u32>,
 }
 
-#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub struct PlayerInfo {
     pub name: String,
     pub stats: PlayerStats,
@@ -39,30 +39,29 @@ impl PlayerInfo {
 }
 
 /// Sent to the clients by the server after connecting
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub struct GameInfo {
     pub ticks_per_second: u32,
     pub map_info: MapInfo,
-    pub players: Vec<(PlayerId, PlayerInfo)>,
 }
 
-#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub struct PlayerInput {
     pub rot_angle: f32,
     pub shoot_one: bool,
     pub shoot_two: bool,
 }
 
-#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub struct TimedPlayerInput {
     pub duration_s: f32,
     pub input: PlayerInput,
 }
 
-#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub enum DeathReason {
     Caught(PlayerId),
 }
 
-#[derive(Debug, Clone, BitStore, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub struct PlayerStatsUpdate;

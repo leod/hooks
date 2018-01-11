@@ -10,12 +10,12 @@ pub enum Channel {
 }
 pub const NUM_CHANNELS: usize = 2;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub enum ClientCommMsg {
     WishConnect { name: String },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub enum ServerCommMsg {
     AcceptConnect {
         your_id: PlayerId,
@@ -23,13 +23,13 @@ pub enum ServerCommMsg {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub enum ClientGameMsg {
     PlayerInput(PlayerInput),
     ReceivedTick(TickNum),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BitStore)]
 pub enum ServerGameMsg {
-    
+    Dummy, 
 }
