@@ -5,3 +5,4 @@ authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 
 [dependencies]
 hooks_common = { path = "../hooks_common" }
+log = "0.4"
