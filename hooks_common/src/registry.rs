@@ -7,7 +7,7 @@ use specs::{Component, DispatcherBuilder, System, World};
 
 use event::{self, Event};
 
-pub type EventHandler = fn(&World, &Box<Event>) -> ();
+pub type EventHandler = fn(&mut World, &Box<Event>) -> ();
 
 pub struct Registry {
     world: World,
