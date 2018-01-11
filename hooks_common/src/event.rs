@@ -40,8 +40,6 @@ pub trait Event: EventBase {
 
 mopafy!(Event);
 
-pub type EventBox = Box<Event>;
-
 macro_rules! match_event {
     {
         $event:ident:
@@ -61,10 +59,10 @@ macro_rules! match_event {
 /// Event type
 #[derive(Clone)]
 struct Type {
-    pub read: fn(&mut Reader) -> Result<EventBox>,
+    pub read: fn(&mut Reader) -> Result<Box<Event>>,
 }
 
-fn read_event<T: Event + BitStore>(reader: &mut Reader) -> Result<EventBox> {
+fn read_event<T: Event + BitStore>(reader: &mut Reader) -> Result<Box<Event>> {
     Ok(Box::new(T::read_from(reader)?))
 }
 
@@ -110,7 +108,7 @@ impl Registry {
         event.write(writer)
     }
 
-    pub fn read(&self, reader: &mut Reader) -> Result<EventBox> {
+    pub fn read(&self, reader: &mut Reader) -> Result<Box<Event>> {
         let type_index = reader.read::<TypeIndex>()?;
 
         let event_type = &self.types[type_index as usize];
@@ -119,7 +117,7 @@ impl Registry {
 }
 
 pub struct Sink {
-    events: Vec<EventBox>,
+    events: Vec<Box<Event>>,
 }
 
 impl Sink {
@@ -131,11 +129,11 @@ impl Sink {
         self.push_box(Box::new(event));
     }
 
-    pub fn push_box(&mut self, event: EventBox) {
+    pub fn push_box(&mut self, event: Box<Event>) {
         self.events.push(event);
     }
 
-    pub fn into_inner(self) -> Vec<EventBox> {
+    pub fn into_inner(self) -> Vec<Box<Event>> {
         self.events
     }
 }
@@ -146,7 +144,7 @@ mod tests {
 
     use bit_manager::{BitRead, BitReader, BitWrite, BitWriter};
 
-    use super::{Class, Event, EventBox, Registry};
+    use super::{Class, Event, Registry};
 
     #[derive(Debug, BitStore)]
     struct A;
@@ -178,7 +176,7 @@ mod tests {
 
     #[test]
     fn test_match() {
-        let event: EventBox = Box::new(A);
+        let event: Box<Event> = Box::new(A);
 
         let mut n: usize = 0;
         match_event!(event:
@@ -198,7 +196,7 @@ mod tests {
         reg.register::<B>();
         reg.register::<C>();
 
-        let event: EventBox = Box::new(C::Y(42, true));
+        let event: Box<Event> = Box::new(C::Y(42, true));
 
         let data = {
             let mut writer = BitWriter::new(Vec::new());
