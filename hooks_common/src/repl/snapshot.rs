@@ -8,9 +8,9 @@ use ordered_join;
 
 /// Trait implemented by the EntitySnapshot struct in the `snapshot!` macro. An EntitySnapshot
 /// stores the state of a set of components of one entity.
-pub trait EntitySnapshot: Clone + PartialEq {
+pub trait EntitySnapshot: Clone + PartialEq + 'static {
     /// Identifier for types of components possibly held in a snapshot.
-    type ComponentType;
+    type ComponentType: ComponentType<EntitySnapshot = Self>;
 
     /// Empty entity with no components stored.
     fn none() -> Self;
@@ -29,6 +29,11 @@ pub trait EntitySnapshot: Clone + PartialEq {
         components: &[Self::ComponentType],
         reader: &mut R,
     ) -> Result<Self>;
+}
+
+/// Trait implemented by the component type enum associated with an EntitySnapshot.
+pub trait ComponentType: Sync + Send + Sized {
+    type EntitySnapshot: EntitySnapshot<ComponentType = Self>;
 }
 
 /// Meta information about replicated entity types.
@@ -259,6 +264,10 @@ macro_rules! snapshot {
                 $(
                     $field_type,
                 )+
+            }
+
+            impl snapshot::ComponentType for ComponentType {
+                type EntitySnapshot = EntitySnapshot;
             }
 
             /// Build an entity with a given list of component types.

@@ -4,21 +4,21 @@ use std::collections::btree_map;
 
 use bit_manager::{BitRead, BitWrite, Error, Result};
 
-use super::entity::{EntityClasses, WorldSnapshot};
 use defs::{TickNum, INVALID_PLAYER_ID};
 use event::{self, EventBox};
+use repl::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
 
-pub struct Data {
+pub struct Data<T: EntitySnapshot> {
     events: Vec<EventBox>,
-    snapshot: Option<WorldSnapshot>,
+    snapshot: Option<WorldSnapshot<T>>,
 }
 
-pub struct History {
+pub struct History<T: EntitySnapshot> {
     event_reg: event::Registry,
-    ticks: BTreeMap<TickNum, Data>,
+    ticks: BTreeMap<TickNum, Data<T>>,
 }
 
-impl History {
+impl<T: EntitySnapshot> History<T> {
     pub fn new(event_reg: event::Registry) -> Self {
         Self {
             event_reg: event_reg,
@@ -38,7 +38,7 @@ impl History {
         self.ticks.len()
     }
 
-    pub fn push_tick(&mut self, data: Data) -> TickNum {
+    pub fn push_tick(&mut self, data: Data<T>) -> TickNum {
         // No gaps in recording snapshots on the server
         let num = self.max_num().unwrap_or(0) + 1;
         self.ticks.insert(num, data);
@@ -65,7 +65,7 @@ impl History {
         &self,
         prev_num: Option<TickNum>,
         cur_num: TickNum,
-        classes: &EntityClasses,
+        classes: &EntityClasses<T>,
         writer: &mut event::Writer,
     ) -> Result<()> {
         writer.write(&cur_num)?;
@@ -127,7 +127,7 @@ impl History {
 
     pub fn delta_read_tick(
         &mut self,
-        classes: &EntityClasses,
+        classes: &EntityClasses<T>,
         reader: &mut event::Reader,
     ) -> Result<Option<TickNum>> {
         let cur_num = reader.read::<TickNum>()?;

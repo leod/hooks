@@ -24,5 +24,7 @@ mod physics;
 #[macro_use]
 mod event;
 mod registry;
+#[macro_use]
 mod repl;
 mod net;
+mod game;
