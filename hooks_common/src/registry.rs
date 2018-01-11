@@ -17,6 +17,10 @@ pub struct Registry {
 }
 
 impl Registry {
+    pub fn world(&self) -> &World {
+        &self.world
+    }
+
     pub fn component<T: Component>(&mut self) {
         self.world.register::<T>();
     }
