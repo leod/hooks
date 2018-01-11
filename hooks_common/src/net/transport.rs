@@ -13,20 +13,20 @@ use enet_sys::peer::{enet_peer_send, ENetPeer};
 // TODO: Error handling (check ENet return values)
 // TODO: Annotate with lifetimes?
 
-struct Address(ENetAddress);
-struct Peer(*mut ENetPeer);
-struct Host(*mut ENetHost);
-struct Packet(*mut ENetPacket);
-struct ReceivedPacket(*mut ENetPacket);
+pub struct Address(ENetAddress);
+pub struct Peer(*mut ENetPeer);
+pub struct Host(*mut ENetHost);
+pub struct Packet(*mut ENetPacket);
+pub struct ReceivedPacket(*mut ENetPacket);
 
-enum Event {
+pub enum Event {
     Connect(Peer),
     Receive(Peer, u8, ReceivedPacket),
     Disconnect(Peer),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum PacketFlag {
+pub enum PacketFlag {
     Reliable,
     Unreliable,
     Unsequenced,
@@ -136,6 +136,18 @@ impl Peer {
     pub fn send(&self, channel_id: u8, packet: Packet) {
         unsafe {
             enet_peer_send(self.0, channel_id, packet.0);
+        }
+    }
+
+    pub fn data(&self) -> usize {
+        unsafe {
+            (*self.0).data as usize
+        }
+    }
+
+    pub fn set_data(&self, n: usize) {
+        unsafe {
+            (*self.0).data = n as *mut c_void;
         }
     }
 }

@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["leod <subtle.frustration@proton.me>"]
 
 [dependencies]
+hooks_common = { path = "../hooks_common" }
