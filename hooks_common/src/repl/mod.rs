@@ -2,6 +2,7 @@
 pub mod snapshot;
 pub mod tick;
 pub mod entity;
+pub mod player;
 
 #[cfg(test)]
 mod tests;
@@ -12,6 +13,13 @@ use specs;
 
 use defs::{EntityClassId, EntityId, PlayerId};
 use registry::Registry;
+
+pub fn register(reg: &mut Registry) {
+    reg.component::<Id>();
+    reg.component::<Entity>();
+
+    reg.resource(EntityMap(BTreeMap::new()));
+}
 
 /// Shared entity Id for replication.
 #[derive(PartialEq, Component)]
@@ -37,11 +45,4 @@ impl EntityMap {
     pub fn get_id_to_entity(&self, id: EntityId) -> Option<specs::Entity> {
         self.0.get(&id).cloned()
     }
-}
-
-pub fn register(reg: &mut Registry) {
-    reg.component::<Id>();
-    reg.component::<Entity>();
-
-    reg.resource(EntityMap(BTreeMap::new()));
 }

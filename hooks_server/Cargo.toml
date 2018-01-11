@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 
 [dependencies]
+hooks_common = { path = "../hooks_common" }

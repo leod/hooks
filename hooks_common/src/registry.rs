@@ -5,15 +5,15 @@ use bit_manager::data::BitStore;
 use shred::Resource;
 use specs::{Component, DispatcherBuilder, System, World};
 
-use event::{self, Event, EventBox};
+use event::{self, Event};
 
-pub type PostTickFn = fn(World, &[EventBox]) -> ();
+pub type EventHandler = fn(&World, &Box<Event>) -> ();
 
 pub struct Registry {
     world: World,
     event_reg: event::Registry,
     tick_systems: DispatcherBuilder<'static, 'static>,
-    post_tick_fns: Vec<PostTickFn>,
+    post_tick_event_handlers: Vec<EventHandler>,
 }
 
 impl Registry {
@@ -46,7 +46,7 @@ impl Registry {
         });
     }
 
-    pub fn post_tick_fn(&mut self, f: PostTickFn) {
-        self.post_tick_fns.push(f);
+    pub fn post_tick_event_handler(&mut self, f: EventHandler) {
+        self.post_tick_event_handlers.push(f);
     }
 }

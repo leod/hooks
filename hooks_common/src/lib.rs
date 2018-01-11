@@ -18,13 +18,15 @@ extern crate specs;
 extern crate specs_derive;
 extern crate take_mut;
 
-mod ordered_join;
-mod defs;
-mod physics;
+pub mod ordered_join;
+pub mod defs;
+pub mod physics;
 #[macro_use]
-mod event;
-mod registry;
+pub mod event;
+pub mod registry;
 #[macro_use]
-mod repl;
-mod net;
-mod game;
+pub mod repl;
+pub mod net;
+pub mod game;
+
+pub use defs::*;
