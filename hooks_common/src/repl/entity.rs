@@ -126,7 +126,7 @@ where
     (id, entity)
 }
 
-fn remove(world: &mut World, id: EntityId) {
+pub(super) fn remove(world: &mut World, id: EntityId) {
     let entity = {
         let mut entity_map = world.write_resource::<repl::EntityMap>();
         entity_map.0.remove(&id);
