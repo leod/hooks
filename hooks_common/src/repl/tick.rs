@@ -1,6 +1,6 @@
-use std::collections::btree_map;
 use std::collections::BTreeMap;
 use std::collections::Bound::{Excluded, Included};
+use std::collections::btree_map;
 
 use bit_manager::{BitRead, BitWrite, Error, Result};
 
@@ -27,11 +27,11 @@ impl History {
     }
 
     pub fn min_num(&self) -> Option<TickNum> {
-        self.ticks.iter().next().map(|(&num, _)| num)
+        self.ticks.keys().next().cloned()
     }
 
     pub fn max_num(&self) -> Option<TickNum> {
-        self.ticks.iter().next_back().map(|(&num, _)| num)
+        self.ticks.keys().next_back().cloned()
     }
 
     pub fn len(&self) -> usize {

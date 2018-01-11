@@ -187,8 +187,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                             assert!(id != INVALID_ENTITY_ID);
 
                             // Update existing entity snapshot with delta from the stream
-                            let components =
-                                &classes.0[&left_entity.class_id].components;
+                            let components = &classes.0[&left_entity.class_id].components;
                             let entity_snapshot = left_snapshot.delta_read(components, reader)?;
 
                             cur_snapshot

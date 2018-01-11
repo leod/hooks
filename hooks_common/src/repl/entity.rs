@@ -7,17 +7,19 @@ use event::{self, Event, EventBox};
 use registry::Registry;
 use repl;
 
-pub use self::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
+pub use self::snapshot::{ComponentType, EntityClasses, EntitySnapshot, WorldSnapshot};
 
 pub fn register(reg: &mut Registry) {
     reg.resource(repl::snapshot::EntityClasses::<EntitySnapshot>(
         BTreeMap::new(),
     ));
-    reg.resource(EntityClassNames(BTreeMap::new()));
+    reg.resource(Ctors(BTreeMap::new()));
+    reg.resource(ClassNames(BTreeMap::new()));
 
     reg.event::<RemoveOrder>();
 }
 
+// TODO: This should move out of here, by making some of the types and functions generic.
 snapshot! {
     use physics::Position;
     use physics::Orientation;
@@ -37,9 +39,64 @@ impl Event for RemoveOrder {
     }
 }
 
+pub type Ctor = fn(specs::EntityBuilder) -> specs::EntityBuilder;
+
+/// Constructors for adding client-side-specific components to replicated entities.
+struct Ctors(pub BTreeMap<EntityClassId, Vec<Ctor>>);
+
 /// Maps from entity class names to their unique id. This map should be exactly the same on server
 /// and clients and not change during a game.
-pub struct EntityClassNames(pub BTreeMap<String, EntityClassId>);
+struct ClassNames(pub BTreeMap<String, EntityClassId>);
+
+/// Register a new entity class. This should only be called in register functions that are used by
+/// both the server and the clients. Server and clients can attach their specific entity
+/// constructors locally via `add_ctor`.
+///
+/// Note that this function must only be called after this module's register function.
+pub fn register_type(
+    reg: &mut Registry,
+    name: &str,
+    components: Vec<ComponentType>,
+    ctor: Ctor,
+) -> EntityClassId {
+    let world = reg.world();
+
+    let mut classes = world.write_resource::<EntityClasses>();
+    let mut ctors = world.write_resource::<Ctors>();
+    let mut class_names = world.write_resource::<ClassNames>();
+
+    let class_id = classes.0.keys().next_back().cloned().unwrap_or(0);
+
+    assert!(!classes.0.contains_key(&class_id));
+    assert!(!ctors.0.contains_key(&class_id));
+    assert!(!class_names.0.values().any(|&id| id == class_id));
+
+    let class = repl::snapshot::EntityClass::<EntitySnapshot> {
+        components: components,
+    };
+
+    classes.0.insert(class_id, class);
+    ctors.0.insert(class_id, vec![ctor]);
+    class_names.0.insert(name.to_string(), class_id);
+
+    assert!(classes.0.len() == ctors.0.len());
+    assert!(ctors.0.len() == class_names.0.len());
+
+    class_id
+}
+
+pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
+    let world = reg.world();
+
+    let class_id = {
+        let class_names = world.read_resource::<ClassNames>();
+        class_names.0[name]
+    };
+
+    let mut ctors = world.write_resource::<Ctors>();
+    let ctor_vec = ctors.0.get_mut(&class_id).unwrap();
+    ctor_vec.push(ctor);
+}
 
 fn create<F>(
     world: &mut World,
@@ -57,6 +114,11 @@ where
         assert!(classes.0.contains_key(&class_id), "unknown entity class");
     }
 
+    let ctors = {
+        let ctors = world.read_resource::<Ctors>();
+        ctors.0[&class_id].clone()
+    };
+
     // Build entity
     let entity = {
         let builder = world
@@ -64,6 +126,9 @@ where
             .with(repl::Id(id))
             .with(repl::Entity { owner, class_id });
 
+        let builder = ctors.iter().fold(builder, |builder, ctor| ctor(builder));
+
+        // Custom constructor
         let builder = ctor(builder);
 
         builder.build()
@@ -122,13 +187,14 @@ mod auth {
         };
 
         let class_id = {
-            let class_names = world.read_resource::<EntityClassNames>();
+            let class_names = world.read_resource::<ClassNames>();
             class_names.0[class]
         };
 
         super::create(world, id, owner, class_id, ctor)
     }
 }
+
 /// Client-side entity management
 mod view {
     use ordered_join;
@@ -136,14 +202,7 @@ mod view {
 
     use super::*;
 
-    pub fn register(reg: &mut Registry) {
-        reg.resource(EntityCtors(BTreeMap::new()));
-    }
-
-    pub type EntityCtor = fn(specs::EntityBuilder) -> specs::EntityBuilder;
-
-    /// Constructors for adding client-side-specific components to replicated entities.
-    pub struct EntityCtors(pub BTreeMap<EntityClassId, EntityCtor>);
+    pub fn register(reg: &mut Registry) {}
 
     /// Create entities that are new in this snapshot. Note that this doesn't mean that the entity
     /// was created in this snapshot, but it is the first time that this client sees it.
@@ -164,17 +223,12 @@ mod view {
         };
 
         for &(id, (ref repl_entity, ref _snapshot)) in &new_entities {
-            let ctor = {
-                let ctors = world.read_resource::<EntityCtors>();
-                ctors.0[&repl_entity.class_id]
-            };
-
             super::create(
                 world,
                 id,
                 repl_entity.owner,
                 repl_entity.class_id,
-                ctor
+                |builder| builder,
             );
         }
     }
