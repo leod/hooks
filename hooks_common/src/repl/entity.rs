@@ -7,27 +7,14 @@ use event::{self, Event, EventBox};
 use registry::Registry;
 use repl;
 
-pub use self::snapshot::{ComponentType, EntityClasses, EntitySnapshot, WorldSnapshot};
+pub use repl::snapshot::{ComponentType, EntityClass, EntityClasses, EntitySnapshot, WorldSnapshot};
 
-pub fn register(reg: &mut Registry) {
-    reg.resource(repl::snapshot::EntityClasses::<EntitySnapshot>(
-        BTreeMap::new(),
-    ));
+pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
+    reg.resource(EntityClasses::<T>(BTreeMap::new()));
     reg.resource(Ctors(BTreeMap::new()));
     reg.resource(ClassNames(BTreeMap::new()));
 
     reg.event::<RemoveOrder>();
-}
-
-// TODO: This should move out of here, by making some of the types and functions generic.
-snapshot! {
-    use physics::Position;
-    use physics::Orientation;
-
-    mod snapshot {
-        position: Position,
-        orientation: Orientation,
-    }
 }
 
 #[derive(Debug, BitStore)]
@@ -53,15 +40,15 @@ struct ClassNames(pub BTreeMap<String, EntityClassId>);
 /// constructors locally via `add_ctor`.
 ///
 /// Note that this function must only be called after this module's register function.
-pub fn register_type(
+pub fn register_type<T: ComponentType>(
     reg: &mut Registry,
     name: &str,
-    components: Vec<ComponentType>,
+    components: Vec<T>,
     ctor: Ctor,
 ) -> EntityClassId {
     let world = reg.world();
 
-    let mut classes = world.write_resource::<EntityClasses>();
+    let mut classes = world.write_resource::<EntityClasses<T::EntitySnapshot>>();
     let mut ctors = world.write_resource::<Ctors>();
     let mut class_names = world.write_resource::<ClassNames>();
 
@@ -71,7 +58,7 @@ pub fn register_type(
     assert!(!ctors.0.contains_key(&class_id));
     assert!(!class_names.0.values().any(|&id| id == class_id));
 
-    let class = repl::snapshot::EntityClass::<EntitySnapshot> {
+    let class = EntityClass::<T::EntitySnapshot> {
         components: components,
     };
 
@@ -108,12 +95,6 @@ fn create<F>(
 where
     F: FnOnce(EntityBuilder) -> EntityBuilder,
 {
-    // Sanity check
-    {
-        let classes = world.read_resource::<EntityClasses>();
-        assert!(classes.0.contains_key(&class_id), "unknown entity class");
-    }
-
     let ctors = {
         let ctors = world.read_resource::<Ctors>();
         ctors.0[&class_id].clone()
@@ -158,8 +139,8 @@ fn remove(world: &mut World, id: EntityId) {
 mod auth {
     use super::*;
 
-    pub fn register(reg: &mut Registry) {
-        super::register(reg);
+    pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
+        super::register::<T>(reg);
 
         reg.resource(IdSource { next_id: 0 });
     }
@@ -208,7 +189,7 @@ mod view {
     /// was created in this snapshot, but it is the first time that this client sees it.
     ///
     /// Snapshot data of new entities is not loaded here.
-    pub fn create_new_entities(world: &mut World, snapshot: &WorldSnapshot) {
+    pub fn create_new_entities<T: EntitySnapshot>(world: &mut World, snapshot: &WorldSnapshot<T>) {
         let new_entities = {
             let entity_map = world.read_resource::<repl::EntityMap>();
 

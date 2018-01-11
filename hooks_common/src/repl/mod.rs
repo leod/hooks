@@ -1,9 +1,10 @@
 #[macro_use]
-mod snapshot;
-mod tick;
+pub mod snapshot;
+pub mod tick;
+pub mod entity;
+
 #[cfg(test)]
 mod tests;
-mod entity;
 
 use std::collections::BTreeMap;
 
@@ -15,7 +16,7 @@ use registry::Registry;
 /// Shared entity Id for replication.
 #[derive(PartialEq, Component)]
 #[component(VecStorage)]
-pub struct Id(EntityId);
+pub struct Id(pub EntityId);
 
 /// Meta-information about replicated entities.
 #[derive(Clone, PartialEq, Component, BitStore)]
