@@ -7,3 +7,4 @@ authors = ["leod <subtle.frustration@proton.me>"]
 hooks_common = { path = "../hooks_common" }
 log = "0.4"
 bit_manager = "*"
+simple_logger = "0.3.1"

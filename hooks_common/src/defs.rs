@@ -14,7 +14,7 @@ pub const INVALID_PLAYER_ID: PlayerId = 0;
 pub const INVALID_ENTITY_ID: EntityId = 0;
 
 #[derive(Debug, Clone, BitStore)]
-pub struct MapInfo {}
+pub struct MapInfo;
 
 #[derive(Debug, Clone, Default, BitStore)]
 pub struct PlayerStats {

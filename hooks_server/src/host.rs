@@ -39,14 +39,14 @@ pub struct Host {
 pub enum Event {
     PlayerConnected(PlayerId, String),
     PlayerDisconnected(PlayerId, LeaveReason),
-    ClientGameMsg(ClientGameMsg),
+    ClientGameMsg(PlayerId, ClientGameMsg),
 }
 
 // TODO
 pub const PEER_COUNT: usize = 32;
 
 impl Host {
-    pub fn new(port: u16, game_info: GameInfo) -> Result<Host, transport::Error> {
+    pub fn create(port: u16, game_info: GameInfo) -> Result<Host, transport::Error> {
         let host = transport::Host::create_server(port, PEER_COUNT, NUM_CHANNELS, 0, 0)?;
 
         Ok(Host {
@@ -144,6 +144,8 @@ impl Host {
         channel: u8,
         packet: transport::ReceivedPacket,
     ) -> Result<Option<Event>, Error> {
+        let player_id = peer.data() as PlayerId;
+
         if channel == CHANNEL_COMM {
             // Communication messages are handled here
             let msg = {
@@ -153,8 +155,6 @@ impl Host {
 
             match msg {
                 ClientCommMsg::WishConnect { name } => {
-                    let player_id = peer.data() as PlayerId;
-
                     if !self.clients.contains_key(&player_id) {
                         // Ok, first connection wish
                         self.clients.insert(player_id, Client::new(peer.clone()));
@@ -178,7 +178,7 @@ impl Host {
                 reader.read::<ClientGameMsg>()?
             };
 
-            Ok(Some(Event::ClientGameMsg(msg)))
+            Ok(Some(Event::ClientGameMsg(player_id, msg)))
         } else {
             Err(Error::InvalidChannel)
         }
