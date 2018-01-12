@@ -10,6 +10,11 @@ use enet_sys::host::{enet_host_broadcast, enet_host_connect, enet_host_create, e
 use enet_sys::packet::{enet_packet_create, enet_packet_destroy, ENetPacket, ENetPacketFlag};
 use enet_sys::peer::{enet_peer_send, ENetPeer};
 
+pub enum Error {
+    NullPointer,
+    Failure
+}
+
 // TODO: Error handling (check ENet return values)
 // TODO: Annotate with lifetimes?
 
@@ -33,7 +38,7 @@ pub enum PacketFlag {
 }
 
 impl Address {
-    pub fn create(host: &str, port: u16) -> Address {
+    pub fn create(host: &str, port: u16) -> Result<Address, Error> {
         let mut address = ENetAddress {
             host: 0,
             port: port,
@@ -41,11 +46,15 @@ impl Address {
 
         let c_host = CString::new(host).unwrap();
 
-        unsafe {
-            enet_address_set_host(&mut address, c_host.as_ptr());
-        }
+        let result = unsafe {
+            enet_address_set_host(&mut address, c_host.as_ptr())
+        };
 
-        Address(address)
+        if result == 0 {
+            Ok(Address(address))
+        } else {
+            Err(Error::Failure)
+        }
     }
 }
 
@@ -56,7 +65,7 @@ impl Host {
         channel_limit: usize,
         incoming_bandwidth: u32,
         outgoing_bandwidth: u32,
-    ) -> Host {
+    ) -> Result<Host, Error> {
         let address = ENetAddress {
             host: ENET_HOST_ANY,
             port: port,
@@ -72,14 +81,18 @@ impl Host {
             )
         };
 
-        Host(host)
+        if host != ptr::null_mut() {
+            Ok(Host(host))
+        } else {
+            Err(Error::NullPointer)
+        }
     }
 
     pub fn create_client(
         channel_limit: usize,
         incoming_bandwidth: u32,
         outgoing_bandwidth: u32,
-    ) -> Host {
+    ) -> Result<Host, Error> {
         let host = unsafe {
             enet_host_create(
                 ptr::null(),
@@ -90,24 +103,36 @@ impl Host {
             )
         };
 
-        Host(host)
+        if host != ptr::null_mut() {
+            Ok(Host(host))
+        } else {
+            Err(Error::NullPointer)
+        }
     }
 
-    pub fn connect(&self, address: &Address, channel_count: usize) -> Peer {
+    pub fn connect(&self, address: &Address, channel_count: usize) -> Result<Peer, Error> {
         let peer = unsafe { enet_host_connect(self.0, &address.0, channel_count, 0) };
 
-        Peer(peer)
+        if peer != ptr::null_mut() {
+            Ok(Peer(peer))
+        } else {
+            Err(Error::NullPointer)
+        }
     }
 
-    pub fn service(&self, timeout_ms: u32) -> Option<Event> {
+    pub fn service(&self, timeout_ms: u32) -> Result<Option<Event>, Error> {
         let mut event: ENetEvent;
 
-        unsafe {
+        let result = unsafe {
             event = mem::uninitialized();
-            enet_host_service(self.0, &mut event, timeout_ms);
+            enet_host_service(self.0, &mut event, timeout_ms)
+        };
+
+        if result < 0 {
+            return Err(Error::Failure);
         }
 
-        match event._type {
+        Ok(match event._type {
             ENetEventType::ENET_EVENT_TYPE_NONE => None,
             ENetEventType::ENET_EVENT_TYPE_CONNECT => Some(Event::Connect(Peer(event.peer))),
             ENetEventType::ENET_EVENT_TYPE_RECEIVE => Some(Event::Receive(
@@ -116,7 +141,7 @@ impl Host {
                 ReceivedPacket(event.packet),
             )),
             ENetEventType::ENET_EVENT_TYPE_DISCONNECT => Some(Event::Disconnect(Peer(event.peer))),
-        }
+        })
     }
 
     pub fn flush(&self) {
@@ -133,9 +158,15 @@ impl Host {
 }
 
 impl Peer {
-    pub fn send(&self, channel_id: u8, packet: Packet) {
-        unsafe {
-            enet_peer_send(self.0, channel_id, packet.0);
+    pub fn send(&self, channel_id: u8, packet: Packet) -> Result<(), Error> {
+        let result = unsafe {
+            enet_peer_send(self.0, channel_id, packet.0)
+        };
+
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(Error::Failure)
         }
     }
 
@@ -161,7 +192,7 @@ impl Drop for Host {
 }
 
 impl Packet {
-    pub fn create(data: &[u8], flag: PacketFlag) -> Packet {
+    pub fn create(data: &[u8], flag: PacketFlag) -> Result<Packet, Error> {
         let flags = match flag {
             PacketFlag::Reliable => ENetPacketFlag::ENET_PACKET_FLAG_RELIABLE as u32,
             PacketFlag::Unreliable => 0, // TODO: Check
@@ -171,7 +202,11 @@ impl Packet {
         let packet =
             unsafe { enet_packet_create(data.as_ptr() as *const c_void, data.len(), flags) };
 
-        Packet(packet)
+        if packet != ptr::null_mut() {
+            Ok(Packet(packet))
+        } else {
+            Err(Error::NullPointer)
+        }
     }
 }
 

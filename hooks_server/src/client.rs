@@ -2,7 +2,7 @@ use common::{PlayerInfo, TickNum};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum State {
-    Connected
+    Connected,
 }
 
 #[derive(Debug)]
