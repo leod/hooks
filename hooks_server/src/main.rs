@@ -2,7 +2,7 @@ extern crate bit_manager;
 extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
-extern crate simple_logger;
+extern crate env_logger;
 
 mod client;
 mod host;
@@ -13,7 +13,7 @@ use common::{GameInfo, MapInfo};
 use server::Server;
 
 fn main() {
-    simple_logger::init().unwrap();
+    env_logger::init();
 
     let map_info = MapInfo;
     let game_info = GameInfo {
