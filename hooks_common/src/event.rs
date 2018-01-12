@@ -4,10 +4,22 @@ use std::fmt::Debug;
 use std::io::Cursor;
 use std::u16;
 
-use bit_manager::{BitRead, BitReader, BitWrite, BitWriter, Result};
+use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 use bit_manager::data::BitStore;
 
 use mopa;
+
+#[derive(Debug)]
+pub enum Error {
+    InvalidTypeIndex(TypeIndex),    
+    BitManager(bit_manager::Error),
+}
+
+impl From<bit_manager::Error> for Error {
+    fn from(error: bit_manager::Error) -> Error {
+        Error::BitManager(error)
+    }
+}
 
 pub type TypeIndex = u16;
 
@@ -21,7 +33,7 @@ pub enum Class {
 
 pub trait EventBase: mopa::Any + Debug + Sync + Send {
     fn type_id(&self) -> any::TypeId;
-    fn write(&self, writer: &mut Writer) -> Result<()>;
+    fn write(&self, writer: &mut Writer) -> bit_manager::Result<()>;
 }
 
 impl<T: Any + Debug + BitStore + Sync + Send> EventBase for T {
@@ -29,7 +41,7 @@ impl<T: Any + Debug + BitStore + Sync + Send> EventBase for T {
         any::TypeId::of::<T>()
     }
 
-    fn write(&self, writer: &mut Writer) -> Result<()> {
+    fn write(&self, writer: &mut Writer) -> bit_manager::Result<()> {
         self.write_to(writer)
     }
 }
@@ -59,10 +71,10 @@ macro_rules! match_event {
 /// Event type
 #[derive(Clone)]
 struct Type {
-    pub read: fn(&mut Reader) -> Result<Box<Event>>,
+    pub read: fn(&mut Reader) -> bit_manager::Result<Box<Event>>,
 }
 
-fn read_event<T: Event + BitStore>(reader: &mut Reader) -> Result<Box<Event>> {
+fn read_event<T: Event + BitStore>(reader: &mut Reader) -> bit_manager::Result<Box<Event>> {
     Ok(Box::new(T::read_from(reader)?))
 }
 
@@ -100,19 +112,22 @@ impl Registry {
         self.type_indices.insert(type_id, type_index);
     }
 
-    pub fn write(&self, event: &Event, writer: &mut Writer) -> Result<()> {
+    pub fn write(&self, event: &Event, writer: &mut Writer) -> Result<(), Error> {
         let type_id = event.type_id();
         let type_index = self.type_indices[&type_id];
 
         writer.write(&type_index)?;
-        event.write(writer)
+        Ok(event.write(writer)?)
     }
 
-    pub fn read(&self, reader: &mut Reader) -> Result<Box<Event>> {
+    pub fn read(&self, reader: &mut Reader) -> Result<Box<Event>, Error> {
         let type_index = reader.read::<TypeIndex>()?;
 
-        let event_type = &self.types[type_index as usize];
-        (event_type.read)(reader)
+        if let Some(event_type) = self.types.get(type_index as usize) {
+            Ok((event_type.read)(reader)?)
+        } else {
+            Err(Error::InvalidTypeIndex(type_index))
+        }
     }
 }
 
