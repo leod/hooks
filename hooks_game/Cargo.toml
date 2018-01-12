@@ -8,3 +8,6 @@ hooks_common = { path = "../hooks_common" }
 ggez = "0.3.4"
 specs = "0.10.0"
 enet-sys = "0.1.4"
+log = "0.4"
+bit_manager = "*"
+simple_logger = "0.3.1"

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use specs::{self, Entity, EntityBuilder, World};
 
-use defs::{EntityClassId, EntityId, PlayerId};
+use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
 use event::{self, Event};
 use registry::Registry;
 use repl;
@@ -142,7 +142,7 @@ mod auth {
     pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
         super::register::<T>(reg);
 
-        reg.resource(IdSource { next_id: 0 });
+        reg.resource(IdSource { next_id: INVALID_ENTITY_ID + 1 });
     }
 
     struct IdSource {
@@ -153,6 +153,8 @@ mod auth {
         fn next_id(&mut self) -> EntityId {
             let id = self.next_id;
             self.next_id += 1;
+
+            assert!(id != INVALID_ENTITY_ID);
 
             id
         }

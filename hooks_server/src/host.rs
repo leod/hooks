@@ -52,7 +52,7 @@ impl Host {
         Ok(Host {
             host,
             game_info,
-            next_player_id: 0,
+            next_player_id: INVALID_PLAYER_ID + 1,
             clients: BTreeMap::new(),
         })
     }
@@ -73,7 +73,6 @@ impl Host {
                 }
                 transport::Event::Receive(peer, channel, packet) => {
                     let player_id = peer.data() as PlayerId;
-                    assert!(self.clients.contains_key(&player_id));
 
                     match self.handle_receive(&peer, channel, packet) {
                         Ok(event) => Ok(event),
@@ -146,7 +145,7 @@ impl Host {
     ) -> Result<Option<Event>, Error> {
         let player_id = peer.data() as PlayerId;
 
-        if self.clients[&player_id].state == client::State::Disconnected {
+        if let Some(&client::State::Disconnected) = self.clients.get(&player_id).map(|client| &client.state) {
             info!(
                 "Received packet from player {}, whom we disconnected. Ignoring.",
                 player_id

@@ -26,5 +26,5 @@ fn main() {
     };
 
     let mut server = Server::create(config).unwrap();
-    server.run();
+    server.run().unwrap();
 }
