@@ -20,7 +20,6 @@ pub struct MapInfo {}
 pub struct PlayerStats {
     pub score: u32,
     pub deaths: u32,
-    pub ping_ms: Option<u32>,
 }
 
 #[derive(Debug, Clone, BitStore)]
@@ -56,6 +55,12 @@ pub struct PlayerInput {
 pub struct TimedPlayerInput {
     pub duration_s: f32,
     pub input: PlayerInput,
+}
+
+#[derive(Debug, Clone, BitStore)]
+pub enum LeaveReason {
+    InvalidMsg,        
+    Disconnected,
 }
 
 #[derive(Debug, Clone, BitStore)]
