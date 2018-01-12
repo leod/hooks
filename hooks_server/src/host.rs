@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use common::{PlayerId, GameInfo};
+use common::{GameInfo, PlayerId};
 use common::net::protocol::{ClientCommMsg, ServerCommMsg};
 use common::net::transport;
 
@@ -28,9 +28,9 @@ impl Host {
         }
     }
 
-    pub fn service(&mut self) -> Option<Event> {
-        if let Some(event) = self.host.service(0) {
-            match event {
+    pub fn service(&mut self) -> Result<Option<Event>, transport::Error> {
+        if let Some(event) = self.host.service(0)? {
+            Ok(match event {
                 transport::Event::Connect(peer) => {
                     let id = self.next_player_id;
                     self.next_player_id += 1;
@@ -39,15 +39,11 @@ impl Host {
 
                     None
                 }
-                transport::Event::Receive(peer, channel, packet) => {
-                    None
-                }
-                transport::Event::Disconnect(peer) => {
-                    None 
-                }
-            }
+                transport::Event::Receive(peer, channel, packet) => None,
+                transport::Event::Disconnect(peer) => None,
+            })
         } else {
-            None
+            Ok(None)
         }
     }
 }
