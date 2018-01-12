@@ -46,3 +46,10 @@ impl EntityMap {
         self.0.get(&id).cloned()
     }
 }
+
+pub enum Error {
+    InvalidPlayerId(PlayerId),
+    InvalidEntityClassId(EntityClassId),
+    InvalidEntityId(EntityId),
+    ReplicationError(String),
+}
