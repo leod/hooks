@@ -2,7 +2,7 @@ extern crate bit_manager;
 extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
-extern crate simple_logger;
+extern crate env_logger;
 
 mod client;
 
@@ -15,7 +15,7 @@ struct Config {
 }
 
 fn main() {
-    simple_logger::init().unwrap();
+    env_logger::init();
 
     let config = Config {
         host: "localhost".to_string(),
