@@ -11,19 +11,26 @@ use repl::snapshot::{self, EntityClasses, EntitySnapshot, WorldSnapshot};
 #[derive(Debug)]
 pub enum Error {
     ReceivedInvalidTick(String),
+    Event(event::Error),
     Snapshot(snapshot::Error),
-    BitManager(bit_manager::Error)
+    BitManager(bit_manager::Error),
 }
 
-impl From<bit_manager::Error> for Error {
-    fn from(error: bit_manager::Error) -> Error {
-        Error::BitManager(error)
+impl From<event::Error> for Error {
+    fn from(error: event::Error) -> Error {
+        Error::Event(error)
     }
 }
 
 impl From<snapshot::Error> for Error {
     fn from(error: snapshot::Error) -> Error {
         Error::Snapshot(error)
+    }
+}
+
+impl From<bit_manager::Error> for Error {
+    fn from(error: bit_manager::Error) -> Error {
+        Error::BitManager(error)
     }
 }
 
