@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
@@ -145,6 +145,14 @@ impl Host {
         packet: transport::ReceivedPacket,
     ) -> Result<Option<Event>, Error> {
         let player_id = peer.data() as PlayerId;
+
+        if self.clients[&player_id].state == client::State::Disconnected {
+            info!(
+                "Received packet from player {}, whom we disconnected. Ignoring.",
+                player_id
+            );
+            return Ok(None);
+        }
 
         if channel == CHANNEL_COMM {
             // Communication messages are handled here
