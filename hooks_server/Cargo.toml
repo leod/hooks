@@ -7,3 +7,4 @@ authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 hooks_common = { path = "../hooks_common" }
 log = "0.4"
 bit_manager = "*"
+simple_logger = "0.3.1"
