@@ -45,17 +45,24 @@ impl Event for LeftEvent {
     }
 }
 
-fn handle_post_tick_event(world: &mut World, event: &Box<Event>) {
+fn handle_post_tick_event(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
     match_event!(event:
         JoinedEvent => {
             let mut players = world.write_resource::<Players>();
-            
-            // TODO: repl error
-            assert!(!players.0.contains_key(&event.id));
 
+            if players.0.contains_key(&event.id) {
+                // Replication error. This should not happen.
+                return Err(repl::Error::InvalidPlayerId(event.id));
+            }
+            
             players.0.insert(event.id, event.info.clone());
         },
         LeftEvent => {
+            if !world.read_resource::<Players>().0.contains_key(&event.id) {
+                // Replication error. This should not happen.
+                return Err(repl::Error::InvalidPlayerId(event.id));
+            }
+
             let owned_ids = {
                 let mut repl_ids = world.read::<repl::Id>();
                 let mut repl_entities = world.read::<repl::Entity>();
@@ -75,8 +82,9 @@ fn handle_post_tick_event(world: &mut World, event: &Box<Event>) {
                 entity::remove(world, id);
             }
 
-            // TODO: repl error
             world.write_resource::<Players>().0.remove(&event.id).unwrap();
         },
     );
+
+    Ok(())
 }

@@ -1,10 +1,22 @@
 use std::collections::BTreeMap;
 
-use bit_manager::{BitRead, BitWrite, Result};
+use bit_manager::{self, BitRead, BitWrite};
 
 use super::Entity;
 use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
 use ordered_join;
+
+#[derive(Debug)]
+pub enum Error {
+    ReceivedInvalidSnapshot(String),
+    BitManagerError(bit_manager::Error) 
+}
+
+impl From<bit_manager::Error> for Error {
+    fn from(error: bit_manager::Error) -> Error {
+        Error::BitManagerError(error)
+    }
+}
 
 /// Trait implemented by the EntitySnapshot struct in the `snapshot!` macro. An EntitySnapshot
 /// stores the state of a set of components of one entity.
@@ -21,14 +33,14 @@ pub trait EntitySnapshot: Clone + PartialEq + 'static {
         cur: &Self,
         components: &[Self::ComponentType],
         writer: &mut W,
-    ) -> Result<()>;
+    ) -> Result<(), Error>;
 
     /// Return updated state with changed components as read in the bitstream.
     fn delta_read<R: BitRead>(
         &self,
         components: &[Self::ComponentType],
         reader: &mut R,
-    ) -> Result<Self>;
+    ) -> Result<Self, Error>;
 }
 
 /// Trait implemented by the component type enum associated with an EntitySnapshot.
@@ -76,7 +88,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         classes: &EntityClasses<T>,
         _recv_player_id: PlayerId,
         writer: &mut W,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         // Iterate entity pairs contained in the previous (left) and the next (right) snapshot
         for join_item in ordered_join::FullJoinIter::new(self.0.iter(), cur.0.iter()) {
             match join_item {
@@ -134,7 +146,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         &self,
         classes: &EntityClasses<T>,
         reader: &mut R,
-    ) -> Result<(Vec<EntityId>, WorldSnapshot<T>)> {
+    ) -> Result<(Vec<EntityId>, WorldSnapshot<T>), Error> {
         let mut new_entities = Vec::new();
         let mut cur_snapshot = WorldSnapshot(BTreeMap::new());
 
@@ -147,14 +159,23 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         loop {
             if delta_id.is_none() && !delta_finished {
                 // Read next entity id from the delta bitstream
-                let id = reader.read()?;
+                let next_id = reader.read()?;
 
-                if id == INVALID_ENTITY_ID {
+                if next_id == INVALID_ENTITY_ID {
                     // End of entity stream
                     delta_id = None;
                     delta_finished = true;
                 } else {
-                    delta_id = Some(id);
+                    // Ids must be sent in sorted order and without duplicates
+                    if let Some(prev_id) = delta_id {
+                        if next_id <= prev_id {
+                            return Err(Error::ReceivedInvalidSnapshot(
+                                "entity ids in snapshot are not sorted".to_string()
+                            ));
+                        }
+                    }
+
+                    delta_id = Some(next_id);
                 }
             }
 
@@ -180,8 +201,16 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                             // Read meta-information
                             let entity: Entity = reader.read()?;
 
+                            // Check that we have this class
+                            let class = classes.0.get(&entity.class_id);
+                            if class.is_none() {
+                                return Err(Error::ReceivedInvalidSnapshot(
+                                    "invalid class id in entity snapshot".to_string()
+                                ));
+                            }
+
                             // Read all components
-                            let components = &classes.0[&entity.class_id].components;
+                            let components = &class.unwrap().components;
                             let left_snapshot = T::none();
                             let entity_snapshot = left_snapshot.delta_read(components, reader)?;
 
@@ -250,7 +279,7 @@ macro_rules! snapshot {
         }
     } => {
         pub mod $name {
-            use bit_manager::{Result, BitRead, BitWrite};
+            use bit_manager::{BitRead, BitWrite};
 
             use specs::{Entities, System, ReadStorage, WriteStorage, Fetch, Join};
 
@@ -309,7 +338,7 @@ macro_rules! snapshot {
                     cur: &Self,
                     components: &[Self::ComponentType],
                     writer: &mut W
-                ) -> Result<()> {
+                ) -> Result<(), snapshot::Error> {
                     for component in components {
                         match *component {
                             $(
@@ -350,7 +379,7 @@ macro_rules! snapshot {
                     &self,
                     components: &[Self::ComponentType],
                     reader: &mut R
-                ) -> Result<Self> {
+                ) -> Result<Self, snapshot::Error> {
                     let mut result = Self::none();
 
                     for component in components {

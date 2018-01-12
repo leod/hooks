@@ -215,7 +215,7 @@ mod view {
     }
 
     /// Remove entities as ordered.
-    pub fn handle_event(world: &mut World, event: &Box<Event>) {
+    pub fn handle_event(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
         match_event!(event:
             RemoveOrder => {
                 let id = event.0;
@@ -230,8 +230,13 @@ mod view {
 
                     let mut entity_map = world.write_resource::<repl::EntityMap>();
                     entity_map.0.remove(&id);
-                }
+                } 
+
+                // TODO: Is it a replication error if we get a RemoveOrder for an entity we don't
+                // have? For now, let's say we can just ignore it.
             },
         );
+
+        Ok(())
     }
 }

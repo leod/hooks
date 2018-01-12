@@ -6,8 +6,9 @@ use shred::Resource;
 use specs::{Component, DispatcherBuilder, System, World};
 
 use event::{self, Event};
+use repl;
 
-pub type EventHandler = fn(&mut World, &Box<Event>) -> ();
+pub type EventHandler = fn(&mut World, &Box<Event>) -> Result<(), repl::Error>;
 
 pub struct Registry {
     world: World,

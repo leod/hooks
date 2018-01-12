@@ -2,11 +2,30 @@ use std::collections::BTreeMap;
 use std::collections::Bound::{Excluded, Included};
 use std::collections::btree_map;
 
-use bit_manager::{BitRead, BitWrite, Error, Result};
+use bit_manager::{self, BitRead, BitWrite};
 
 use defs::{TickNum, INVALID_PLAYER_ID};
 use event::{self, Event};
-use repl::snapshot::{EntityClasses, EntitySnapshot, WorldSnapshot};
+use repl::snapshot::{self, EntityClasses, EntitySnapshot, WorldSnapshot};
+
+#[derive(Debug)]
+pub enum Error {
+    ReceivedInvalidTick(String),
+    SnapshotError(snapshot::Error),
+    BitManagerError(bit_manager::Error)
+}
+
+impl From<bit_manager::Error> for Error {
+    fn from(error: bit_manager::Error) -> Error {
+        Error::BitManagerError(error)
+    }
+}
+
+impl From<snapshot::Error> for Error {
+    fn from(error: snapshot::Error) -> Error {
+        Error::SnapshotError(error)
+    }
+}
 
 pub struct Data<T: EntitySnapshot> {
     events: Vec<Box<Event>>,
@@ -67,7 +86,7 @@ impl<T: EntitySnapshot> History<T> {
         cur_num: TickNum,
         classes: &EntityClasses<T>,
         writer: &mut event::Writer,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         writer.write(&cur_num)?;
 
         let cur_data = &self.ticks[&cur_num];
@@ -129,7 +148,7 @@ impl<T: EntitySnapshot> History<T> {
         &mut self,
         classes: &EntityClasses<T>,
         reader: &mut event::Reader,
-    ) -> Result<Option<TickNum>> {
+    ) -> Result<Option<TickNum>, Error> {
         let cur_num = reader.read::<TickNum>()?;
 
         if self.max_num().is_some() && cur_num < self.max_num().unwrap() {
@@ -152,20 +171,18 @@ impl<T: EntitySnapshot> History<T> {
             }
 
             if prev_num == 0 {
-                return Err(Error::OtherError {
-                    message: Some(String::from("received too many event lists")),
-                });
+                return Err(Error::ReceivedInvalidTick(
+                    "received too many event lists".to_string(),
+                ));
             }
 
             prev_num -= 1;
 
             if self.min_num().is_none() || prev_num < self.min_num().unwrap() {
                 // This should not happen, since it means we can't delta decode
-                return Err(Error::OtherError {
-                    message: Some(String::from(
-                        "`prev_num` for tick delta points beyond our front",
-                    )),
-                });
+                return Err(Error::ReceivedInvalidTick(
+                    "`prev_num` for tick delta points beyond our front".to_string()
+                ));
             }
 
             let events = self.read_events(reader)?;
@@ -197,11 +214,9 @@ impl<T: EntitySnapshot> History<T> {
                 match prev_data.snapshot.as_ref() {
                     Some(prev_snapshot) => prev_snapshot,
                     None => {
-                        return Err(Error::OtherError {
-                            message: Some(String::from(
-                                "don't have previous snapshot data for delta reading",
-                            )),
-                        });
+                        return Err(Error::ReceivedInvalidTick(
+                            "don't have previous snapshot data for delta reading".to_string(),
+                        ));
                     }
                 }
             } else {
@@ -222,7 +237,7 @@ impl<T: EntitySnapshot> History<T> {
         Ok(Some(cur_num))
     }
 
-    fn write_events(&self, events: &[Box<Event>], writer: &mut event::Writer) -> Result<()> {
+    fn write_events(&self, events: &[Box<Event>], writer: &mut event::Writer) -> Result<(), Error> {
         writer.write_bit(!events.is_empty())?;
         if !events.is_empty() {
             writer.write(&(events.len() as u32))?;
@@ -234,7 +249,7 @@ impl<T: EntitySnapshot> History<T> {
         Ok(())
     }
 
-    fn read_events(&self, reader: &mut event::Reader) -> Result<Vec<Box<Event>>> {
+    fn read_events(&self, reader: &mut event::Reader) -> Result<Vec<Box<Event>>, Error> {
         let events = if reader.read_bit()? {
             let len = reader.read::<u32>()?;
             let mut events = Vec::new();
