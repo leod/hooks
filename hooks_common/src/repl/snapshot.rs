@@ -9,12 +9,12 @@ use ordered_join;
 #[derive(Debug)]
 pub enum Error {
     ReceivedInvalidSnapshot(String),
-    BitManagerError(bit_manager::Error) 
+    BitManager(bit_manager::Error) 
 }
 
 impl From<bit_manager::Error> for Error {
     fn from(error: bit_manager::Error) -> Error {
-        Error::BitManagerError(error)
+        Error::BitManager(error)
     }
 }
 

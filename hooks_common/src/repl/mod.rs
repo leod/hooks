@@ -51,5 +51,5 @@ pub enum Error {
     InvalidPlayerId(PlayerId),
     InvalidEntityClassId(EntityClassId),
     InvalidEntityId(EntityId),
-    ReplicationError(String),
+    Replication(String),
 }
