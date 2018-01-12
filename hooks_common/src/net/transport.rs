@@ -8,17 +8,18 @@ use enet_sys::address::{enet_address_set_host, ENetAddress};
 use enet_sys::host::{enet_host_broadcast, enet_host_connect, enet_host_create, enet_host_destroy,
                      enet_host_flush, enet_host_service, ENetHost};
 use enet_sys::packet::{enet_packet_create, enet_packet_destroy, ENetPacket, ENetPacketFlag};
-use enet_sys::peer::{enet_peer_send, ENetPeer};
+use enet_sys::peer::{enet_peer_send, enet_peer_disconnect, ENetPeer};
 
+#[derive(Debug)]
 pub enum Error {
     NullPointer,
     Failure
 }
 
-// TODO: Error handling (check ENet return values)
 // TODO: Annotate with lifetimes?
 
 pub struct Address(ENetAddress);
+#[derive(Clone)]
 pub struct Peer(*mut ENetPeer);
 pub struct Host(*mut ENetHost);
 pub struct Packet(*mut ENetPacket);
@@ -181,6 +182,12 @@ impl Peer {
             (*self.0).data = n as *mut c_void;
         }
     }
+
+    pub fn disconnect(&self, data: u32) {
+        unsafe {
+            enet_peer_disconnect(self.0, data);
+        }
+    }
 }
 
 impl Drop for Host {
@@ -199,6 +206,8 @@ impl Packet {
             PacketFlag::Unsequenced => ENetPacketFlag::ENET_PACKET_FLAG_UNSEQUENCED as u32,
         };
 
+        // NOTE: `enet_packet_create` copies the given data, so we don't need to make sure that the
+        // data lives as long as the returned `Packet`.
         let packet =
             unsafe { enet_packet_create(data.as_ptr() as *const c_void, data.len(), flags) };
 

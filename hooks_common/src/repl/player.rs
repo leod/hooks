@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use specs::{World, Join};
 
-use defs::{PlayerId, PlayerInfo};
+use defs::{PlayerId, PlayerInfo, LeaveReason};
 use registry::Registry;
 use event::{self, Event};
 use repl::{self, entity};
@@ -37,6 +37,7 @@ impl Event for JoinedEvent {
 #[derive(Debug, BitStore)]
 pub struct LeftEvent {
     pub id: PlayerId,
+    pub reason: LeaveReason,
 }
 
 impl Event for LeftEvent {

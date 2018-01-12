@@ -1,3 +1,4 @@
+extern crate bit_manager;
 extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
