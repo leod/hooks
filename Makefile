@@ -20,3 +20,8 @@ server:
 
 game:
 	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_game/Cargo.toml
+
+fmt:
+	cd hooks_common; cargo fmt
+	cd hooks_server; cargo fmt
+	cd hooks_game; cargo fmt
