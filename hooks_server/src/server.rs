@@ -2,6 +2,7 @@ use std::thread;
 
 use common::GameInfo;
 
+use game::Game;
 use host::{self, Host};
 
 #[derive(Debug, Clone)]
@@ -11,8 +12,8 @@ pub struct Config {
 }
 
 pub struct Server {
-    config: Config,
     host: Host,
+    game: Game,
 }
 
 impl Server {
@@ -23,23 +24,14 @@ impl Server {
         );
 
         let host = Host::create(config.port, config.game_info.clone())?;
+        let game = Game::new(config.game_info.clone());
 
-        Ok(Server { config, host })
+        Ok(Server { host, game })
     }
 
     pub fn run(&mut self) -> Result<(), host::Error> {
         loop {
-            if let Some(event) = self.host.service()? {
-                match event {
-                    host::Event::PlayerConnected(player_id, name) => {
-                        info!("Player {} connected with name {}", player_id, name);
-                    }
-                    host::Event::PlayerDisconnected(player_id, reason) => {
-                        info!("Player {} disconnected with reason {:?}", player_id, reason);
-                    }
-                    host::Event::ClientGameMsg(player_id, msg) => {}
-                }
-            }
+            self.game.update(&mut self.host)?;
 
             thread::yield_now();
         }

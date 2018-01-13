@@ -6,6 +6,7 @@ extern crate log;
 
 mod client;
 mod host;
+mod game;
 mod server;
 
 use common::{GameInfo, MapInfo};

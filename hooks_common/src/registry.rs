@@ -10,6 +10,7 @@ use repl;
 
 pub type EventHandler = fn(&mut World, &Box<Event>) -> Result<(), repl::Error>;
 
+#[derive(Default)]
 pub struct Registry {
     // These shouldn't be public, so please be so kind not to modify them:
     pub world: World,
@@ -19,6 +20,10 @@ pub struct Registry {
 }
 
 impl Registry {
+    pub fn new() -> Registry {
+        Default::default()
+    }
+
     pub fn world(&self) -> &World {
         &self.world
     }

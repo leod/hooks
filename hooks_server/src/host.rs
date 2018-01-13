@@ -40,8 +40,8 @@ pub struct Host {
 }
 
 pub enum Event {
-    PlayerConnected(PlayerId, String),
-    PlayerDisconnected(PlayerId, LeaveReason),
+    PlayerJoined(PlayerId, String),
+    PlayerLeft(PlayerId, LeaveReason),
     ClientGameMsg(PlayerId, ClientGameMsg),
 }
 
@@ -74,14 +74,10 @@ impl Host {
 
             if ingame {
                 // The player is already known to the game logic
-                Some(Event::PlayerDisconnected(
-                    player_id,
-                    reason,
-                ))
+                Some(Event::PlayerLeft(player_id, reason))
             } else {
                 None
             }
-
         } else {
             // Player is unknown to game logic
             info!("No event for disconnect from player {}", player_id);
@@ -132,7 +128,7 @@ impl Host {
                 }
             }
         } else {
-            // No enet event
+            // No transport event
             Ok(None)
         }
     }
@@ -171,8 +167,14 @@ impl Host {
             match msg {
                 ClientCommMsg::WishConnect { name } => {
                     if !self.clients.contains_key(&player_id) {
+                        info!(
+                            "Player {} with name {} wishes to connect, accepting",
+                            player_id, name
+                        );
+
                         // Ok, first connection wish
-                        self.clients.insert(player_id, Client::new(peer.clone(), name.clone()));
+                        self.clients
+                            .insert(player_id, Client::new(peer.clone(), name.clone()));
 
                         // Inform the client
                         let reply = ServerCommMsg::AcceptConnect {
@@ -190,7 +192,7 @@ impl Host {
                     if let Some(client) = self.clients.get_mut(&player_id) {
                         if client.state == client::State::Connected {
                             client.state = client::State::Ready;
-                            Ok(Some(Event::PlayerConnected(player_id, client.name.clone())))
+                            Ok(Some(Event::PlayerJoined(player_id, client.name.clone())))
                         } else {
                             Err(Error::InvalidReady)
                         }
@@ -200,6 +202,7 @@ impl Host {
                 }
             }
         } else if channel == CHANNEL_GAME {
+            // Game messages are relayed as events
             match self.clients.get(&player_id) {
                 Some(client) => {
                     if client.ingame() {
@@ -215,7 +218,7 @@ impl Host {
                         Ok(None)
                     }
                 }
-                None => Ok(None)
+                None => Ok(None),
             }
         } else {
             Err(Error::InvalidChannel)

@@ -1,13 +1,17 @@
 extern crate bit_manager;
 extern crate env_logger;
+extern crate ggez;
 extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
-extern crate ggez;
 
 mod client;
+mod game;
+
+use std::thread;
 
 use client::Client;
+use game::Game;
 
 struct Config {
     host: String,
@@ -15,9 +19,7 @@ struct Config {
     name: String,
 }
 
-struct Main {
-
-}
+struct Main {}
 
 fn main() {
     env_logger::init();
@@ -30,6 +32,20 @@ fn main() {
     let timeout_ms = 5000;
 
     let mut client = Client::connect(&config.host, config.port, &config.name, timeout_ms).unwrap();
+    info!(
+        "Connected to {}:{} with player id {} and game info {:?}",
+        config.host,
+        config.port,
+        client.my_player_id(),
+        client.game_info()
+    );
 
-    info!("Connected to {}:{}", config.host, config.port);
+    let mut game = Game::new(client.my_player_id(), client.game_info());
+    client.ready();
+
+    loop {
+        game.update(&mut client);
+
+        thread::yield_now();
+    }
 }

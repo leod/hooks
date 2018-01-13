@@ -29,8 +29,8 @@ pub struct PlayerInfo {
 }
 
 impl PlayerInfo {
-    pub fn new(name: String) -> PlayerInfo {
-        PlayerInfo {
+    pub fn new(name: String) -> Self {
+        Self {
             name: name,
             stats: PlayerStats::default(),
         }
