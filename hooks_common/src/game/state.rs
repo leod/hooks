@@ -19,11 +19,19 @@ impl State {
             event_handlers_post_tick: reg.event_handlers_post_tick
         }
     }
+    
+    pub fn push_events(&self, events: Vec<Box<Event>>) {
+        let mut sink = self.world.write_resource::<event::Sink>();
+
+        for event in events.into_iter() {
+            sink.push_box(event);
+        }
+    }
 
     pub fn run_tick(&mut self) -> Vec<Box<Event>> {
         self.tick_dispatcher.dispatch_seq(&self.world.res);
 
-        let events = self.world.write_resource::<event::Sink>().clear();
+        let mut events = self.world.write_resource::<event::Sink>().clear();
 
         for event in &events {
             for handler in &self.event_handlers_post_tick {

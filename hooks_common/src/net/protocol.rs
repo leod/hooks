@@ -8,6 +8,9 @@ pub const NUM_CHANNELS: usize = 2;
 pub enum ClientCommMsg {
     /// First message that the client should send.
     WishConnect { name: String },
+
+    /// Respone to `AcceptConnect`, after loading the game.
+    Ready,
 }
 
 #[derive(Debug, Clone, BitStore)]
