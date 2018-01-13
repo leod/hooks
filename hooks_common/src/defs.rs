@@ -44,6 +44,12 @@ pub struct GameInfo {
     pub map_info: MapInfo,
 }
 
+impl GameInfo {
+    pub fn tick_duration_s(&self) -> f32 {
+        1.0 / (self.ticks_per_second as f32)
+    }
+}
+
 #[derive(Debug, Clone, BitStore)]
 pub struct PlayerInput {
     pub rot_angle: f32,

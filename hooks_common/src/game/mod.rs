@@ -1,3 +1,5 @@
+mod test_entity;
+
 use registry::Registry;
 use repl;
 

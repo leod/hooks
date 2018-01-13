@@ -41,10 +41,10 @@ struct ClassNames(pub BTreeMap<String, EntityClassId>);
 ///
 /// Note that this function must only be called after this module's register function.
 pub fn register_type<T: ComponentType>(
-    reg: &mut Registry,
     name: &str,
     components: Vec<T>,
     ctor: Ctor,
+    reg: &mut Registry,
 ) -> EntityClassId {
     let world = reg.world();
 
@@ -72,7 +72,7 @@ pub fn register_type<T: ComponentType>(
     class_id
 }
 
-pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
+pub fn add_ctor(name: &str, ctor: Ctor, reg: &mut Registry) {
     let world = reg.world();
 
     let class_id = {
