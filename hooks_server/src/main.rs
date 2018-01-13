@@ -1,8 +1,8 @@
 extern crate bit_manager;
+extern crate env_logger;
 extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 
 mod client;
 mod host;

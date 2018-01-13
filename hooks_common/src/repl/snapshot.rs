@@ -9,7 +9,7 @@ use ordered_join;
 #[derive(Debug)]
 pub enum Error {
     ReceivedInvalidSnapshot(String),
-    BitManager(bit_manager::Error) 
+    BitManager(bit_manager::Error),
 }
 
 impl From<bit_manager::Error> for Error {
@@ -170,7 +170,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                     if let Some(prev_id) = delta_id {
                         if next_id <= prev_id {
                             return Err(Error::ReceivedInvalidSnapshot(
-                                "entity ids in snapshot are not sorted".to_string()
+                                "entity ids in snapshot are not sorted".to_string(),
                             ));
                         }
                     }
@@ -205,7 +205,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                             let class = classes.0.get(&entity.class_id);
                             if class.is_none() {
                                 return Err(Error::ReceivedInvalidSnapshot(
-                                    "invalid class id in entity snapshot".to_string()
+                                    "invalid class id in entity snapshot".to_string(),
                                 ));
                             }
 

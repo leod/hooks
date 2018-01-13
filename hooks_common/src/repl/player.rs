@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use specs::{World, Join};
+use specs::{Join, World};
 
-use defs::{PlayerId, PlayerInfo, LeaveReason};
-use registry::Registry;
+use defs::{LeaveReason, PlayerId, PlayerInfo};
 use event::{self, Event};
+use registry::Registry;
 use repl::{self, entity};
 
 pub fn register(reg: &mut Registry) {
@@ -25,7 +25,7 @@ impl Players {
 #[derive(Debug, BitStore)]
 pub struct JoinedEvent {
     pub id: PlayerId,
-    pub info: PlayerInfo
+    pub info: PlayerInfo,
 }
 
 impl Event for JoinedEvent {
@@ -55,7 +55,7 @@ fn handle_event_post_tick(world: &mut World, event: &Box<Event>) -> Result<(), r
                 // Replication error. This should not happen.
                 return Err(repl::Error::InvalidPlayerId(event.id));
             }
-            
+
             players.0.insert(event.id, event.info.clone());
         },
         LeftEvent => {
@@ -64,6 +64,7 @@ fn handle_event_post_tick(world: &mut World, event: &Box<Event>) -> Result<(), r
                 return Err(repl::Error::InvalidPlayerId(event.id));
             }
 
+            // Remove all entities owned by the disconnected player
             let owned_ids = {
                 let mut repl_ids = world.read::<repl::Id>();
                 let mut repl_entities = world.read::<repl::Entity>();
