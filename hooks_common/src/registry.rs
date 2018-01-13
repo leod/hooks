@@ -11,10 +11,11 @@ use repl;
 pub type EventHandler = fn(&mut World, &Box<Event>) -> Result<(), repl::Error>;
 
 pub struct Registry {
-    world: World,
-    event_reg: event::Registry,
-    tick_systems: DispatcherBuilder<'static, 'static>,
-    event_handlers_post_tick: Vec<EventHandler>,
+    // These shouldn't be public, so please be so kind not to modify them:
+    pub world: World,
+    pub event_reg: event::Registry,
+    pub tick_systems: DispatcherBuilder<'static, 'static>,
+    pub event_handlers_post_tick: Vec<EventHandler>,
 }
 
 impl Registry {

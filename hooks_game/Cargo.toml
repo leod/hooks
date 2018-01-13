@@ -5,7 +5,7 @@ authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 
 [dependencies]
 hooks_common = { path = "../hooks_common" }
-ggez = "0.3.4"
+ggez = "0.4.0"
 specs = "0.10.0"
 enet-sys = "0.1.4"
 log = "0.4"

@@ -2,6 +2,7 @@ use std::any::{self, Any};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::io::Cursor;
+use std::mem;
 use std::u16;
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
@@ -148,8 +149,8 @@ impl Sink {
         self.events.push(event);
     }
 
-    pub fn into_inner(self) -> Vec<Box<Event>> {
-        self.events
+    pub fn clear(&mut self) -> Vec<Box<Event>> {
+        mem::replace(&mut self.events, Vec::new())
     }
 }
 

@@ -1,9 +1,11 @@
 mod test_entity;
+pub mod state;
 
 use registry::Registry;
 use repl::entity;
 
 pub use self::snapshot::{ComponentType, EntitySnapshot, WorldSnapshot};
+pub use self::state::State;
 
 fn register(_: &mut Registry) {}
 

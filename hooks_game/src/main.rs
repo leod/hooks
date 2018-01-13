@@ -3,6 +3,7 @@ extern crate env_logger;
 extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
+extern crate ggez;
 
 mod client;
 
@@ -12,6 +13,10 @@ struct Config {
     host: String,
     port: u16,
     name: String,
+}
+
+struct Main {
+
 }
 
 fn main() {
