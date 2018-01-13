@@ -30,3 +30,27 @@ pub mod net;
 pub mod game;
 
 pub use defs::*;
+
+use registry::Registry;
+
+fn register(game_info: &GameInfo, reg: &mut Registry) {
+    reg.resource(game_info.clone());
+}
+
+pub mod auth {
+    use super::*;
+
+    pub fn register(game_info: &GameInfo, reg: &mut Registry) {
+        super::register(game_info, reg);
+        game::auth::register(reg);
+    }
+}
+
+pub mod view {
+    use super::*;
+
+    pub fn register(game_info: &GameInfo, reg: &mut Registry) {
+        super::register(game_info, reg);
+        game::view::register(reg);
+    }
+}

@@ -17,7 +17,7 @@ pub fn register(reg: &mut Registry) {
     );
 }
 
-mod auth {
+pub mod auth {
     use super::*;
 
     pub fn register(reg: &mut Registry) {

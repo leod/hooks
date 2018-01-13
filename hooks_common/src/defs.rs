@@ -2,8 +2,8 @@ use nalgebra::Vector2;
 
 pub type PlayerId = u32;
 
-// Global Ids for entities shared between server and clients.
-// Note that the zero Id is reserved.
+/// Global Ids for entities shared between server and clients.
+/// Note that the zero id is reserved.
 pub type EntityId = u32;
 
 pub type EntityClassId = u32;
@@ -37,7 +37,7 @@ impl PlayerInfo {
     }
 }
 
-/// Sent to the clients by the server after connecting
+/// Sent to the clients by the server after connecting.
 #[derive(Debug, Clone, BitStore)]
 pub struct GameInfo {
     pub ticks_per_second: u32,
