@@ -11,7 +11,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(Players(BTreeMap::new()));
     reg.event::<JoinedEvent>();
     reg.event::<LeftEvent>();
-    reg.post_tick_event_handler(handle_post_tick_event);
+    reg.event_handler_post_tick(handle_event_post_tick);
 }
 
 pub struct Players(BTreeMap<PlayerId, PlayerInfo>);
@@ -46,7 +46,7 @@ impl Event for LeftEvent {
     }
 }
 
-fn handle_post_tick_event(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
+fn handle_event_post_tick(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
     match_event!(event:
         JoinedEvent => {
             let mut players = world.write_resource::<Players>();

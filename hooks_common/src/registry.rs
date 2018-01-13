@@ -14,7 +14,7 @@ pub struct Registry {
     world: World,
     event_reg: event::Registry,
     tick_systems: DispatcherBuilder<'static, 'static>,
-    post_tick_event_handlers: Vec<EventHandler>,
+    event_handlers_post_tick: Vec<EventHandler>,
 }
 
 impl Registry {
@@ -47,7 +47,7 @@ impl Registry {
         });
     }
 
-    pub fn post_tick_event_handler(&mut self, f: EventHandler) {
-        self.post_tick_event_handlers.push(f);
+    pub fn event_handler_post_tick(&mut self, f: EventHandler) {
+        self.event_handlers_post_tick.push(f);
     }
 }
