@@ -9,6 +9,8 @@ use common::net::transport;
 pub enum Error {
     FailedToConnect(String),
     InvalidChannel(u8),
+    UnexpectedConnect,
+    UnexpectedCommMsg,
     Transport(transport::Error),
     BitManager(bit_manager::Error),
 }
@@ -28,8 +30,14 @@ impl From<bit_manager::Error> for Error {
 pub struct Client {
     host: transport::Host,
     peer: transport::Peer,
-    my_id: PlayerId,
+    my_player_id: PlayerId,
     game_info: GameInfo,
+    ready: bool,
+}
+
+pub enum Event {
+    Disconnected,
+    ServerGameMsg(Vec<u8>),
 }
 
 impl Client {
@@ -53,6 +61,9 @@ impl Client {
                     // Thus, it can happen that we receive a game message before receiving the
                     // acknowledgement of our connection request. So, what should we do here? Queue
                     // the game messages and loop until we get a comm message?
+                    //
+                    // UPDATE: no, of course we can just ignore the game messages since they are
+                    // sent unreliably (TODO).
                     return Err(Error::InvalidChannel(channel));
                 }
 
@@ -60,15 +71,16 @@ impl Client {
 
                 match reply {
                     ServerCommMsg::AcceptConnect {
-                        your_id: my_id,
+                        your_id: my_player_id,
                         game_info,
                     } => {
                         // We are in!
                         Ok(Client {
                             host,
                             peer,
-                            my_id,
+                            my_player_id,
                             game_info,
+                            ready: false,
                         })
                     }
                     reply => Err(Error::FailedToConnect(format!(
@@ -85,6 +97,50 @@ impl Client {
             Err(Error::FailedToConnect(
                 "could not connect to server".to_string(),
             ))
+        }
+    }
+
+    pub fn my_player_id(&self) -> PlayerId {
+        self.my_player_id
+    }
+
+    pub fn game_info(&self) -> &GameInfo {
+        &self.game_info
+    }
+
+    pub fn ready(&mut self) -> Result<(), Error> {
+        assert!(!self.ready, "already ready");
+
+        self.ready = true;
+        Self::send_comm(&self.peer, ClientCommMsg::Ready)
+    }
+
+    pub fn service(&mut self) -> Result<Option<Event>, Error> {
+        assert!(self.ready, "must be ready to service");
+
+        if let Some(event) = self.host.service(0)? {
+            match event {
+                transport::Event::Connect(peer) => Err(Error::UnexpectedConnect),
+                transport::Event::Receive(_peer, channel, packet) => {
+                    if channel == CHANNEL_COMM {
+                        // Communication messages are handled here
+                        let msg = Self::read_comm(packet)?;
+
+                        match msg {
+                            ServerCommMsg::AcceptConnect { .. } => Err(Error::UnexpectedCommMsg),
+                        }
+                    } else if channel == CHANNEL_GAME {
+                        // Game messages
+                        Ok(Some(Event::ServerGameMsg(packet.data().to_vec())))
+                    } else {
+                        Err(Error::InvalidChannel(channel))
+                    }
+                }
+                transport::Event::Disconnect(peer) => Ok(Some(Event::Disconnected)),
+            }
+        } else {
+            // No transport event
+            Ok(None)
         }
     }
 

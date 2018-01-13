@@ -79,7 +79,7 @@ fn read_event<T: Event + BitStore>(reader: &mut Reader) -> bit_manager::Result<B
     Ok(Box::new(T::read_from(reader)?))
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Registry {
     /// Event types, indexed by TypeIndex
     types: Vec<Type>,
@@ -90,10 +90,7 @@ pub struct Registry {
 
 impl Registry {
     pub fn new() -> Self {
-        Self {
-            types: Vec::new(),
-            type_indices: BTreeMap::new(),
-        }
+        Default::default()
     }
 
     pub fn register<T: Event + BitStore>(&mut self) {
@@ -151,6 +148,10 @@ impl Sink {
 
     pub fn clear(&mut self) -> Vec<Box<Event>> {
         mem::replace(&mut self.events, Vec::new())
+    }
+
+    pub fn into_inner(self) -> Vec<Box<Event>> {
+        self.events
     }
 }
 

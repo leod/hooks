@@ -38,6 +38,7 @@ fn register(game_info: &GameInfo, reg: &mut Registry) {
 
     physics::register(reg);
     repl::register(reg);
+    repl::player::register(reg);
 }
 
 pub mod auth {
