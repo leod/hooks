@@ -188,7 +188,7 @@ impl<T: EntitySnapshot> History<T> {
             if self.min_num().is_none() || prev_num < self.min_num().unwrap() {
                 // This should not happen, since it means we can't delta decode
                 return Err(Error::ReceivedInvalidTick(
-                    "`prev_num` for tick delta points beyond our front".to_string()
+                    "`prev_num` for tick delta points beyond our front".to_string(),
                 ));
             }
 

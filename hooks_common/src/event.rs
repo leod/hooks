@@ -11,7 +11,7 @@ use mopa;
 
 #[derive(Debug)]
 pub enum Error {
-    InvalidTypeIndex(TypeIndex),    
+    InvalidTypeIndex(TypeIndex),
     BitManager(bit_manager::Error),
 }
 

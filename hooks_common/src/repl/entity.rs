@@ -142,7 +142,9 @@ mod auth {
     pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
         super::register::<T>(reg);
 
-        reg.resource(IdSource { next_id: INVALID_ENTITY_ID + 1 });
+        reg.resource(IdSource {
+            next_id: INVALID_ENTITY_ID + 1,
+        });
     }
 
     struct IdSource {
@@ -232,7 +234,7 @@ mod view {
 
                     let mut entity_map = world.write_resource::<repl::EntityMap>();
                     entity_map.0.remove(&id);
-                } 
+                }
 
                 // TODO: Is it a replication error if we get a RemoveOrder for an entity we don't
                 // have? For now, let's say we can just ignore it.

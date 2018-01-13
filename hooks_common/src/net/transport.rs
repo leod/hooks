@@ -8,12 +8,12 @@ use enet_sys::address::{enet_address_set_host, ENetAddress};
 use enet_sys::host::{enet_host_broadcast, enet_host_connect, enet_host_create, enet_host_destroy,
                      enet_host_flush, enet_host_service, ENetHost};
 use enet_sys::packet::{enet_packet_create, enet_packet_destroy, ENetPacket, ENetPacketFlag};
-use enet_sys::peer::{enet_peer_send, enet_peer_disconnect, ENetPeer};
+use enet_sys::peer::{enet_peer_disconnect, enet_peer_send, ENetPeer};
 
 #[derive(Debug)]
 pub enum Error {
     NullPointer,
-    Failure
+    Failure,
 }
 
 // TODO: Annotate with lifetimes?
@@ -47,9 +47,7 @@ impl Address {
 
         let c_host = CString::new(host).unwrap();
 
-        let result = unsafe {
-            enet_address_set_host(&mut address, c_host.as_ptr())
-        };
+        let result = unsafe { enet_address_set_host(&mut address, c_host.as_ptr()) };
 
         if result == 0 {
             Ok(Address(address))
@@ -160,9 +158,7 @@ impl Host {
 
 impl Peer {
     pub fn send(&self, channel_id: u8, packet: Packet) -> Result<(), Error> {
-        let result = unsafe {
-            enet_peer_send(self.0, channel_id, packet.0)
-        };
+        let result = unsafe { enet_peer_send(self.0, channel_id, packet.0) };
 
         if result == 0 {
             Ok(())
@@ -172,9 +168,7 @@ impl Peer {
     }
 
     pub fn data(&self) -> usize {
-        unsafe {
-            (*self.0).data as usize
-        }
+        unsafe { (*self.0).data as usize }
     }
 
     pub fn set_data(&self, n: usize) {

@@ -27,5 +27,5 @@ pub enum ClientGameMsg {
 
 #[derive(Debug, Clone, BitStore)]
 pub enum ServerGameMsg {
-    Dummy, 
+    Dummy,
 }

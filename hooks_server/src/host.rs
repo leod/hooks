@@ -145,7 +145,9 @@ impl Host {
     ) -> Result<Option<Event>, Error> {
         let player_id = peer.data() as PlayerId;
 
-        if let Some(&client::State::Disconnected) = self.clients.get(&player_id).map(|client| &client.state) {
+        if let Some(&client::State::Disconnected) =
+            self.clients.get(&player_id).map(|client| &client.state)
+        {
             info!(
                 "Received packet from player {}, whom we disconnected. Ignoring.",
                 player_id

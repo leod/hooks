@@ -41,7 +41,7 @@ impl Client {
         if let Some(transport::Event::Connect(_)) = host.service(timeout_ms)? {
             // Send connection request
             let msg = ClientCommMsg::WishConnect {
-                name: name.to_string()
+                name: name.to_string(),
             };
             Self::send_comm(&peer, msg)?;
 
@@ -56,31 +56,35 @@ impl Client {
                     return Err(Error::InvalidChannel(channel));
                 }
 
-                let reply = Self::read_comm(packet)?; 
+                let reply = Self::read_comm(packet)?;
 
                 match reply {
-                    ServerCommMsg::AcceptConnect { your_id: my_id, game_info } => {
+                    ServerCommMsg::AcceptConnect {
+                        your_id: my_id,
+                        game_info,
+                    } => {
                         // We are in!
                         Ok(Client {
                             host,
                             peer,
                             my_id,
-                            game_info
+                            game_info,
                         })
                     }
-                    reply => {
-                        Err(Error::FailedToConnect(
-                            format!("received message {:?} instead of accepted connection", reply)
-                        ))
-                    }
+                    reply => Err(Error::FailedToConnect(format!(
+                        "received message {:?} instead of accepted connection",
+                        reply
+                    ))),
                 }
             } else {
                 Err(Error::FailedToConnect(
-                    "did not receive message after connection wish".to_string()
+                    "did not receive message after connection wish".to_string(),
                 ))
             }
         } else {
-            Err(Error::FailedToConnect("could not connect to server".to_string()))
+            Err(Error::FailedToConnect(
+                "could not connect to server".to_string(),
+            ))
         }
     }
 
