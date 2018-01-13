@@ -5,8 +5,7 @@ use repl::entity;
 
 pub use self::snapshot::{ComponentType, EntitySnapshot, WorldSnapshot};
 
-fn register(_: &mut Registry) {
-}
+fn register(_: &mut Registry) {}
 
 pub mod auth {
     use super::*;
@@ -15,7 +14,7 @@ pub mod auth {
         super::register(reg);
         entity::auth::register::<EntitySnapshot>(reg);
         test_entity::auth::register(reg);
-    } 
+    }
 }
 
 pub mod view {
