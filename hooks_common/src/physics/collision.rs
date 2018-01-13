@@ -4,7 +4,15 @@ use specs::{BTreeStorage, Entities, Entity, FetchMut, Join, NullStorage, ReadSto
 use nalgebra::Isometry2;
 use ncollide::world::{CollisionGroups, CollisionWorld2, GeometricQueryType};
 
-use super::{CollisionShape, Orientation, Position};
+use physics::{CollisionShape, Orientation, Position};
+use registry::Registry;
+
+pub fn register(reg: &mut Registry) {
+    reg.component::<CreateCollisionObject>();
+    reg.component::<RemoveCollisionObject>();
+    reg.component::<CollisionObjectUid>();
+    // TODO
+}
 
 // Tag components
 #[derive(Component)]

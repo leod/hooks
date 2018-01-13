@@ -35,6 +35,9 @@ use registry::Registry;
 
 fn register(game_info: &GameInfo, reg: &mut Registry) {
     reg.resource(game_info.clone());
+
+    physics::register(reg);
+    repl::register(reg);
 }
 
 pub mod auth {

@@ -5,6 +5,14 @@ use nalgebra::Point2;
 use ncollide::shape::ShapeHandle2;
 use specs::VecStorage;
 
+use registry::Registry;
+
+pub fn register(reg: &mut Registry) {
+    reg.component::<Position>();
+    reg.component::<Orientation>();
+    reg.component::<CollisionShape>();
+}
+
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(VecStorage)]
 pub struct Position {
