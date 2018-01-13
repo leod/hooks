@@ -9,7 +9,7 @@ use repl;
 
 pub use repl::snapshot::{ComponentType, EntityClass, EntityClasses, EntitySnapshot, WorldSnapshot};
 
-pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
+fn register<T: EntitySnapshot>(reg: &mut Registry) {
     reg.resource(EntityClasses::<T>(BTreeMap::new()));
     reg.resource(Ctors(BTreeMap::new()));
     reg.resource(ClassNames(BTreeMap::new()));
@@ -136,7 +136,7 @@ pub(super) fn remove(world: &mut World, id: EntityId) {
 }
 
 /// Server-side entity management
-mod auth {
+pub mod auth {
     use super::*;
 
     pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
@@ -181,13 +181,15 @@ mod auth {
 }
 
 /// Client-side entity management
-mod view {
+pub mod view {
     use ordered_join;
     use repl;
 
     use super::*;
 
-    pub fn register(reg: &mut Registry) {}
+    pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
+        super::register::<T>(reg);
+    }
 
     /// Create entities that are new in this snapshot. Note that this doesn't mean that the entity
     /// was created in this snapshot, but it is the first time that this client sees it.
