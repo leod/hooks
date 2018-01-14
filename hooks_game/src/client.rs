@@ -130,7 +130,7 @@ impl Client {
                             ServerCommMsg::AcceptConnect { .. } => Err(Error::UnexpectedCommMsg),
                         }
                     } else if channel == CHANNEL_GAME {
-                        // Game messages
+                        // Game messages are relayed
                         Ok(Some(Event::ServerGameMsg(packet.data().to_vec())))
                     } else {
                         Err(Error::InvalidChannel(channel))
@@ -142,6 +142,18 @@ impl Client {
             // No transport event
             Ok(None)
         }
+    }
+
+    pub fn send_game(&self, msg: ClientGameMsg) -> Result<(), Error> {
+        let data = {
+            let mut writer = BitWriter::new(Vec::new());
+            writer.write(&msg)?;
+            writer.into_inner()?
+        };
+
+        let packet = transport::Packet::create(&data, transport::PacketFlag::Unreliable)?;
+
+        Ok(self.peer.send(CHANNEL_GAME, packet)?)
     }
 
     fn send_comm(peer: &transport::Peer, msg: ClientCommMsg) -> Result<(), Error> {

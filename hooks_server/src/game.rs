@@ -9,7 +9,7 @@ use shred::RunNow;
 use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, TickNum};
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
-use common::repl::{player, tick};
+use common::repl::{entity, player, tick};
 use common::timer::{self, Timer};
 
 use host::{self, Host};
@@ -60,13 +60,15 @@ fn register(game_info: &GameInfo, reg: &mut Registry) {
 
 impl Game {
     pub fn new(game_info: GameInfo) -> Game {
-        let state = {
+        let mut state = {
             let mut reg = Registry::new();
 
             register(&game_info, &mut reg);
 
             game::State::from_registry(reg)
         };
+
+        entity::auth::create(&mut state.world, 0, "test", |builder| builder);
 
         Game {
             state,

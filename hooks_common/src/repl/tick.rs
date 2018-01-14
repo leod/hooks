@@ -87,7 +87,7 @@ impl<T: EntitySnapshot> History<T> {
             }
         }
 
-        assert!(self.min_num().is_none() || new_min_num < self.min_num().unwrap());
+        assert!(self.min_num().is_none() || new_min_num <= self.min_num().unwrap());
     }
 
     pub fn delta_write_tick(
@@ -154,11 +154,13 @@ impl<T: EntitySnapshot> History<T> {
         Ok(())
     }
 
+    /// Decode tick data. If the tick was new to use, returns a pair of tick nums, where the first
+    /// element is the reference tick num and the second element is the new tick num.
     pub fn delta_read_tick(
         &mut self,
         classes: &EntityClasses<T>,
         reader: &mut event::Reader,
-    ) -> Result<Option<TickNum>, Error> {
+    ) -> Result<Option<(TickNum, TickNum)>, Error> {
         let cur_num = reader.read::<TickNum>()?;
 
         if self.max_num().is_some() && cur_num < self.max_num().unwrap() {
@@ -213,7 +215,7 @@ impl<T: EntitySnapshot> History<T> {
         }
 
         // Finally, we are done with events and can delta read the snapshot
-        assert!(prev_num < cur_num);
+        assert!(prev_num <= cur_num);
 
         let (_new_entities, cur_snapshot) = {
             let empty_snapshot = WorldSnapshot::new();
@@ -244,7 +246,7 @@ impl<T: EntitySnapshot> History<T> {
 
         self.ticks.insert(cur_num, cur_data);
 
-        Ok(Some(cur_num))
+        Ok(Some((prev_num, cur_num)))
     }
 
     fn write_events(
