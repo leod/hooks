@@ -1,5 +1,8 @@
 use std::collections::BTreeMap;
+use std::mem;
 use std::time;
+
+use bit_manager::BitWriter;
 
 use shred::RunNow;
 
@@ -69,7 +72,7 @@ impl Game {
             state,
             players: BTreeMap::new(),
             tick_timer: Timer::new(game_info.tick_duration()),
-            last_tick: 1,
+            last_tick: 0,
             last_update_instant: None,
             queued_events: event::Sink::new(),
         }
@@ -166,24 +169,58 @@ impl Game {
 
         // 4. Run a tick periodically
         if self.tick_timer.trigger() {
+            // 4.1. Run tick
+            self.last_tick += 1;
+
             // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
             self.state.push_events(self.queued_events.clear());
 
-            // Run tick
-            let events = self.state.run_tick();
+            let tick_events = self.state.run_tick();
 
             // Can unwrap here, since replication errors should at most happen on the client-side
-            let events = events.unwrap();
+            let tick_events = tick_events.unwrap();
 
-            // Create snapshot for every player.
-            for player in self.players.iter_mut() {
+            // 4.2. Create snapshot for every player.
+            for (_player_id, player) in self.players.iter_mut() {
                 // We don't do this yet, but here the snapshot will be filtered differently for
                 // every player.
                 let mut sys = game::StoreSnapshotSys(game::WorldSnapshot::new());
                 sys.run_now(&self.state.world.res);
+
+                let snapshot = sys.0;
+
+                // Events for this player are the special queued events as well as the shared
+                // events of this tick
+                let mut player_events = mem::replace(&mut player.queued_events, event::Sink::new());
+                for event in &tick_events {
+                    player_events.push_box((**event).clone());
+                }
+
+                let tick_data = tick::Data {
+                    events: player_events.into_inner(),
+                    snapshot: Some(snapshot),
+                };
+
+                player.tick_history.push_tick(self.last_tick, tick_data);
             }
 
-            self.last_tick += 1
+            // 4.3. Send delta snapshot to every player
+            let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
+
+            for (&player_id, player) in self.players.iter_mut() {
+                let mut writer = BitWriter::new(Vec::new());
+
+                player.tick_history.delta_write_tick(
+                    player.last_ack_tick,
+                    self.last_tick,
+                    &entity_classes,
+                    &mut writer,
+                )?;
+
+                let data = writer.into_inner()?;
+
+                host.send_game(player_id, &data)?;
+            }
         }
 
         Ok(())

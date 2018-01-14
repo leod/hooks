@@ -35,8 +35,8 @@ impl From<bit_manager::Error> for Error {
 }
 
 pub struct Data<T: EntitySnapshot> {
-    events: Vec<Box<Event>>,
-    snapshot: Option<WorldSnapshot<T>>,
+    pub events: Vec<Box<Event>>,
+    pub snapshot: Option<WorldSnapshot<T>>,
 }
 
 pub struct History<T: EntitySnapshot> {
@@ -64,9 +64,12 @@ impl<T: EntitySnapshot> History<T> {
         self.ticks.len()
     }
 
-    pub fn push_tick(&mut self, data: Data<T>) -> TickNum {
+    pub fn push_tick(&mut self, num: TickNum, data: Data<T>) -> TickNum {
         // No gaps in recording snapshots on the server
-        let num = self.max_num().unwrap_or(0) + 1;
+        if let Some(max_num) = self.max_num() {
+            assert!(max_num + 1 == num);
+        }
+
         self.ticks.insert(num, data);
         num
     }
@@ -93,7 +96,7 @@ impl<T: EntitySnapshot> History<T> {
         cur_num: TickNum,
         classes: &EntityClasses<T>,
         writer: &mut event::Writer,
-    ) -> Result<(), Error> {
+    ) -> Result<(), bit_manager::Error> {
         writer.write(&cur_num)?;
 
         let cur_data = &self.ticks[&cur_num];
@@ -244,7 +247,11 @@ impl<T: EntitySnapshot> History<T> {
         Ok(Some(cur_num))
     }
 
-    fn write_events(&self, events: &[Box<Event>], writer: &mut event::Writer) -> Result<(), Error> {
+    fn write_events(
+        &self,
+        events: &[Box<Event>],
+        writer: &mut event::Writer,
+    ) -> Result<(), bit_manager::Error> {
         writer.write_bit(!events.is_empty())?;
         if !events.is_empty() {
             writer.write(&(events.len() as u32))?;

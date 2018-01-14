@@ -37,7 +37,7 @@ pub trait EventBase: mopa::Any + Debug + Sync + Send {
     fn write(&self, writer: &mut Writer) -> bit_manager::Result<()>;
 }
 
-impl<T: Any + Debug + BitStore + Sync + Send> EventBase for T {
+impl<T: Any + Debug + Clone + BitStore + Sync + Send> EventBase for T {
     fn type_id(&self) -> any::TypeId {
         any::TypeId::of::<T>()
     }
@@ -47,8 +47,18 @@ impl<T: Any + Debug + BitStore + Sync + Send> EventBase for T {
     }
 }
 
-pub trait Event: EventBase {
+pub trait Event: EventBase + EventClone {
     fn class(&self) -> Class;
+}
+
+pub trait EventClone {
+    fn clone(&self) -> Box<Event>;
+}
+
+impl<T: Clone + Event> EventClone for T {
+    fn clone(&self) -> Box<Event> {
+        Box::new(Clone::clone(self))
+    }
 }
 
 mopafy!(Event);
@@ -110,7 +120,7 @@ impl Registry {
         self.type_indices.insert(type_id, type_index);
     }
 
-    pub fn write(&self, event: &Event, writer: &mut Writer) -> Result<(), Error> {
+    pub fn write(&self, event: &Event, writer: &mut Writer) -> Result<(), bit_manager::Error> {
         let type_id = event.type_id();
         let type_index = self.type_indices[&type_id];
 
