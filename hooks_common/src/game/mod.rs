@@ -26,6 +26,7 @@ pub mod view {
     pub fn register(reg: &mut Registry) {
         super::register(reg);
         entity::view::register::<EntitySnapshot>(reg);
+        test_entity::register(reg);
     }
 }
 

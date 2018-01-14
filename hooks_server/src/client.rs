@@ -1,4 +1,3 @@
-use common::TickNum;
 use common::net::transport;
 
 #[derive(PartialEq, Eq, Clone, Debug)]

@@ -210,6 +210,8 @@ pub mod view {
         };
 
         for &(id, (ref repl_entity, ref _snapshot)) in &new_entities {
+            debug!("Replicating entity {} of type {}", id, repl_entity.class_id);
+
             super::create(
                 world,
                 id,
@@ -232,6 +234,8 @@ pub mod view {
                 };
 
                 if let Some(entity) = entity {
+                    debug!("Removing entity {}", id);
+
                     world.delete_entity(entity).unwrap();
 
                     let mut entity_map = world.write_resource::<repl::EntityMap>();
