@@ -4,6 +4,7 @@ extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
 extern crate shred;
+extern crate rand;
 
 mod client;
 mod host;

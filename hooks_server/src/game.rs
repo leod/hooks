@@ -2,6 +2,9 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::time;
 
+use rand::Rng;
+use rand;
+
 use bit_manager::BitWriter;
 
 use shred::RunNow;
@@ -210,6 +213,11 @@ impl Game {
             let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
 
             for (&player_id, player) in self.players.iter_mut() {
+                // TMP: For testing delta encoding/decoding!
+                if rand::thread_rng().gen() {
+                    continue;
+                }
+
                 let mut writer = BitWriter::new(Vec::new());
 
                 player.tick_history.delta_write_tick(

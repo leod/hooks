@@ -2,6 +2,7 @@ use std::io::Cursor;
 use std::time;
 
 use shred::RunNow;
+use specs::Join;
 
 use bit_manager::BitReader;
 
@@ -10,6 +11,8 @@ use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
 use common::repl::{self, entity, tick};
 use common::timer::{self, Timer};
+
+use common::physics::Position; // TMP
 
 use client::{self, Client};
 
@@ -114,7 +117,9 @@ impl Game {
                         // The fact that we have received a new tick means that the server knows
                         // that we have the tick w.r.t. which it was encoded, so we can remove
                         // older ticks from our history
-                        self.tick_history.prune_older_ticks(old_tick_num);
+                        if self.last_tick.is_some() && old_tick_num <= self.last_tick.unwrap() {
+                            self.tick_history.prune_older_ticks(old_tick_num);
+                        }
                     }
                 }
             }
@@ -152,6 +157,10 @@ impl Game {
 
                     let mut sys = game::LoadSnapshotSys(snapshot);
                     sys.run_now(&self.state.world.res);
+                }
+
+                for pos in self.state.world.read::<Position>().join() {
+                    debug!("pos: {}", pos.pos);
                 }
 
                 self.state.push_events(events);
