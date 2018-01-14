@@ -1,4 +1,3 @@
-extern crate bincode;
 extern crate bit_manager;
 #[macro_use]
 extern crate bit_manager_derive;
@@ -10,8 +9,6 @@ extern crate log;
 extern crate mopa;
 extern crate nalgebra;
 extern crate ncollide;
-#[macro_use]
-extern crate serde;
 extern crate shred;
 #[macro_use]
 extern crate shred_derive;

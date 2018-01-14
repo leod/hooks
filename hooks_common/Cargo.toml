@@ -4,18 +4,16 @@ version = "0.1.0"
 authors = ["leod <subtle.frustration@proton.me>"]
 
 [dependencies]
-serde = { version = "1.0", features = ["serde_derive"] }
-bincode = "*"
 bit_manager = "*"
 bit_manager_derive = "*"
 shred = "0.5.0"
 shred-derive = "0.3.0"
 specs = "0.10.0"
 specs-derive = "0.1.0"
-nalgebra = { version = "*", features = ["serde-serialize"] }
+nalgebra = { version = "0.13.1" }
 ncollide = { git = "https://github.com/sebcrozet/ncollide.git", branch = "send_sync" }
-libc = "*"
+libc = "0.2"
 enet-sys = "0.1.4"
-mopa = "*"
-take_mut = "*"
+mopa = "0.2.2"
+take_mut = "0.2.0"
 log = "0.4"
