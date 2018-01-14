@@ -19,6 +19,7 @@ extern crate specs_derive;
 extern crate take_mut;
 
 pub mod ordered_join;
+pub mod timer;
 pub mod defs;
 pub mod physics;
 #[macro_use]
