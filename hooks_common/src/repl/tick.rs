@@ -74,6 +74,10 @@ impl<T: EntitySnapshot> History<T> {
         num
     }
 
+    pub fn get(&self, num: TickNum) -> Option<&Data<T>> {
+        self.ticks.get(&num)
+    }
+
     pub fn prune_older_ticks(&mut self, new_min_num: TickNum) {
         if let Some(min_num) = self.min_num() {
             let range = (Included(min_num), Excluded(new_min_num));

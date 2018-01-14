@@ -1,11 +1,15 @@
 use std::io::Cursor;
+use std::time;
+
+use shred::RunNow;
 
 use bit_manager::BitReader;
 
-use common::{self, event, game, GameInfo, PlayerId};
+use common::{self, event, game, GameInfo, PlayerId, TickNum};
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
-use common::repl::tick;
+use common::repl::{self, entity, tick};
+use common::timer::{self, Timer};
 
 use client::{self, Client};
 
@@ -38,6 +42,15 @@ pub struct Game {
     my_player_id: PlayerId,
     state: game::State,
     tick_history: tick::History<game::EntitySnapshot>,
+
+    /// Timer to start the next tick.
+    tick_timer: Timer,
+
+    /// Number of last started tick.
+    last_tick: Option<TickNum>,
+
+    /// Time that the last update call occured.
+    last_update_instant: Option<time::Instant>,
 }
 
 fn register(game_info: &GameInfo, reg: &mut Registry) {
@@ -65,10 +78,21 @@ impl Game {
             my_player_id,
             state,
             tick_history,
+            tick_timer: Timer::new(game_info.tick_duration()),
+            last_tick: None,
+            last_update_instant: None,
         }
     }
 
     pub fn update(&mut self, client: &mut Client) -> Result<Option<Event>, Error> {
+        // Advance timers
+        if let Some(instant) = self.last_update_instant {
+            let duration = instant.elapsed();
+
+            self.tick_timer += duration;
+        }
+
+        self.last_update_instant = Some(time::Instant::now());
         while let Some(event) = client.service()? {
             match event {
                 client::Event::Disconnected => {
@@ -96,12 +120,45 @@ impl Game {
             }
         }
 
-        // For testing, start ticks immediately
-        while let Some(min_num) = self.tick_history.min_num() {
-            //debug!("Starting tick {}", min_num);
+        // Start ticks
+        if self.tick_timer.trigger() {
+            let tick = 
+                if let Some(last_tick) = self.last_tick {
+                    let next_tick = last_tick + 1;
+                    self.tick_history.get(next_tick).map(|_| next_tick)
+                } else {
+                    self.tick_history.min_num()
+                };
 
-            // TODO
-            break;
+            if let Some(tick) = tick {
+                self.last_tick = Some(tick);
+
+                let tick_data = self.tick_history.get(tick).unwrap();
+
+                debug!("Starting tick {}", tick);
+
+                let events = {
+                    let mut events = Vec::new();
+                    for event in &tick_data.events {
+                        events.push((**event).clone());
+                    }
+                    events
+                };
+
+                if let &Some(ref snapshot) = &tick_data.snapshot {
+                    debug!("Loading snapshot");
+
+                    entity::view::create_new_entities(&mut self.state.world, snapshot); 
+
+                    let mut sys = game::LoadSnapshotSys(snapshot);
+                    sys.run_now(&self.state.world.res);
+                }
+
+                self.state.push_events(events);
+                self.state.run_tick()?;
+            } else {
+                warn!("Waiting for tick...");
+            }
         }
 
         Ok(None)

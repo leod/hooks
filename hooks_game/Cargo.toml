@@ -7,6 +7,7 @@ authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 hooks_common = { path = "../hooks_common" }
 ggez = "0.4.0"
 specs = "0.10.0"
+shred = "0.5.0"
 enet-sys = "0.1.4"
 log = "0.4"
 bit_manager = "*"
