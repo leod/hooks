@@ -32,7 +32,7 @@ impl State {
     pub fn run_tick(&mut self) -> Result<Vec<Box<Event>>, repl::Error> {
         self.tick_dispatcher.dispatch_seq(&self.world.res);
 
-        let mut events = self.world.write_resource::<event::Sink>().clear();
+        let events = self.world.write_resource::<event::Sink>().clear();
 
         for event in &events {
             for handler in &self.event_handlers_post_tick {

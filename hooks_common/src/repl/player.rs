@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::btree_map;
 
 use specs::{Join, World};
 
@@ -20,6 +21,10 @@ impl Players {
     pub fn get(&self, id: PlayerId) -> Option<&PlayerInfo> {
         self.0.get(&id)
     }
+
+    pub fn iter(&self) -> btree_map::Iter<PlayerId, PlayerInfo> {
+        self.0.iter()
+    }
 }
 
 #[derive(Debug, BitStore)]
@@ -39,7 +44,6 @@ pub struct LeftEvent {
     pub id: PlayerId,
     pub reason: LeaveReason,
 }
-
 impl Event for LeftEvent {
     fn class(&self) -> event::Class {
         event::Class::Order
@@ -49,6 +53,8 @@ impl Event for LeftEvent {
 fn handle_event_post_tick(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
     match_event!(event:
         JoinedEvent => {
+            info!("Player {} with name {} joined", event.id, event.info.name);
+
             let mut players = world.write_resource::<Players>();
 
             if players.0.contains_key(&event.id) {
@@ -59,9 +65,15 @@ fn handle_event_post_tick(world: &mut World, event: &Box<Event>) -> Result<(), r
             players.0.insert(event.id, event.info.clone());
         },
         LeftEvent => {
-            if !world.read_resource::<Players>().0.contains_key(&event.id) {
-                // Replication error. This should not happen.
-                return Err(repl::Error::InvalidPlayerId(event.id));
+            {
+                let players = world.read_resource::<Players>();
+
+                if !players.0.contains_key(&event.id) {
+                    // Replication error. This should not happen.
+                    return Err(repl::Error::InvalidPlayerId(event.id));
+                }
+
+                info!("Player {} with name {} left", event.id, players.0[&event.id].name);
             }
 
             // Remove all entities owned by the disconnected player

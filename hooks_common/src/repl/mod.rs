@@ -47,6 +47,7 @@ impl EntityMap {
     }
 }
 
+#[derive(Debug)]
 pub enum Error {
     InvalidPlayerId(PlayerId),
     InvalidEntityClassId(EntityClassId),

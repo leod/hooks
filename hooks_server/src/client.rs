@@ -14,7 +14,6 @@ pub struct Client {
     pub peer: transport::Peer,
     pub name: String,
     pub state: State,
-    pub last_ack_tick: Option<TickNum>,
 }
 
 impl Client {
@@ -23,7 +22,6 @@ impl Client {
             peer,
             name,
             state: State::Connected,
-            last_ack_tick: None,
         }
     }
 
