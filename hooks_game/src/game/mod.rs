@@ -40,7 +40,9 @@ impl Game {
                 client::Event::Disconnected => {
                     return Ok(Some(Event::Disconnected));
                 }
-                client::Event::ServerGameMsg(data) => {}
+                client::Event::ServerGameMsg(data) => {
+                    info!("Received game msg");
+                }
             }
         }
 

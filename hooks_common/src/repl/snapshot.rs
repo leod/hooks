@@ -33,7 +33,7 @@ pub trait EntitySnapshot: Clone + PartialEq + 'static {
         cur: &Self,
         components: &[Self::ComponentType],
         writer: &mut W,
-    ) -> Result<(), Error>;
+    ) -> Result<(), bit_manager::Error>;
 
     /// Return updated state with changed components as read in the bitstream.
     fn delta_read<R: BitRead>(
@@ -88,7 +88,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         classes: &EntityClasses<T>,
         _recv_player_id: PlayerId,
         writer: &mut W,
-    ) -> Result<(), Error> {
+    ) -> Result<(), bit_manager::Error> {
         // Iterate entity pairs contained in the previous (left) and the next (right) snapshot
         for join_item in ordered_join::FullJoinIter::new(self.0.iter(), cur.0.iter()) {
             match join_item {
@@ -279,7 +279,7 @@ macro_rules! snapshot {
         }
     } => {
         pub mod $name {
-            use bit_manager::{BitRead, BitWrite};
+            use bit_manager::{self, BitRead, BitWrite};
 
             use specs::{Entities, System, ReadStorage, WriteStorage, Fetch, Join};
 
@@ -338,7 +338,7 @@ macro_rules! snapshot {
                     cur: &Self,
                     components: &[Self::ComponentType],
                     writer: &mut W
-                ) -> Result<(), snapshot::Error> {
+                ) -> Result<(), bit_manager::Error> {
                     for component in components {
                         match *component {
                             $(

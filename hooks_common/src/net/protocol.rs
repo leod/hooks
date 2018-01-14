@@ -1,7 +1,7 @@
 use defs::{GameInfo, LeaveReason, PlayerId, PlayerInput, TickNum, TimedPlayerInput};
 
 pub const CHANNEL_COMM: u8 = 0;
-pub const CHANNEL_GAME: u8 = 0;
+pub const CHANNEL_GAME: u8 = 1;
 pub const NUM_CHANNELS: usize = 2;
 
 pub fn leave_reason_to_u32(reason: LeaveReason) -> u32 {

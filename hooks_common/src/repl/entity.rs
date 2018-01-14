@@ -17,7 +17,7 @@ fn register<T: EntitySnapshot>(reg: &mut Registry) {
     reg.event::<RemoveOrder>();
 }
 
-#[derive(Debug, BitStore)]
+#[derive(Debug, Clone, BitStore)]
 pub struct RemoveOrder(pub EntityId);
 
 impl Event for RemoveOrder {

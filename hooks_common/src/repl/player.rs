@@ -27,7 +27,7 @@ impl Players {
     }
 }
 
-#[derive(Debug, BitStore)]
+#[derive(Debug, Clone, BitStore)]
 pub struct JoinedEvent {
     pub id: PlayerId,
     pub info: PlayerInfo,
@@ -39,7 +39,7 @@ impl Event for JoinedEvent {
     }
 }
 
-#[derive(Debug, BitStore)]
+#[derive(Debug, Clone, BitStore)]
 pub struct LeftEvent {
     pub id: PlayerId,
     pub reason: LeaveReason,

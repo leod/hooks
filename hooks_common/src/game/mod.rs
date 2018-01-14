@@ -4,8 +4,8 @@ pub mod state;
 use registry::Registry;
 use repl::entity;
 
-pub use self::snapshot::{ComponentType, EntitySnapshot, LoadSnapshotSys, StoreSnapshotSys,
-                         WorldSnapshot};
+pub use self::snapshot::{ComponentType, EntityClasses, EntitySnapshot, LoadSnapshotSys,
+                         StoreSnapshotSys, WorldSnapshot};
 pub use self::state::State;
 
 fn register(_: &mut Registry) {}

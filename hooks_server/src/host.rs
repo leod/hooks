@@ -162,6 +162,17 @@ impl Host {
         }
     }
 
+    pub fn send_game(&self, receiver_id: PlayerId, data: &[u8]) -> Result<(), Error> {
+        assert!(self.clients[&receiver_id].ingame());
+
+        let packet = transport::Packet::create(data, transport::PacketFlag::Unreliable)?;
+
+        self.clients[&receiver_id]
+            .peer
+            .send(CHANNEL_GAME, packet)
+            .map_err(|error| Error::Transport(error))
+    }
+
     fn send_comm(&self, receiver_id: PlayerId, msg: ServerCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
