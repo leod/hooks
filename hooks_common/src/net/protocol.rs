@@ -1,8 +1,25 @@
-use defs::{GameInfo, PlayerId, PlayerInput, TickNum, TimedPlayerInput};
+use defs::{GameInfo, LeaveReason, PlayerId, PlayerInput, TickNum, TimedPlayerInput};
 
 pub const CHANNEL_COMM: u8 = 0;
 pub const CHANNEL_GAME: u8 = 0;
 pub const NUM_CHANNELS: usize = 2;
+
+pub fn leave_reason_to_u32(reason: LeaveReason) -> u32 {
+    match reason {
+        LeaveReason::Disconnected => 0,
+        LeaveReason::InvalidMsg => 666,
+        LeaveReason::Lagged => 420,
+    }
+}
+
+pub fn u32_to_leave_reason(n: u32) -> Option<LeaveReason> {
+    match n {
+        0 => Some(LeaveReason::Disconnected),
+        666 => Some(LeaveReason::InvalidMsg),
+        420 => Some(LeaveReason::Lagged),
+        _ => None,
+    }
+}
 
 #[derive(Debug, Clone, BitStore)]
 pub enum ClientCommMsg {

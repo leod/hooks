@@ -3,6 +3,7 @@ extern crate env_logger;
 extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
+extern crate shred;
 
 mod client;
 mod host;

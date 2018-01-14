@@ -70,7 +70,7 @@ impl<T: EntitySnapshot> EntityClasses<T> {
 /// Snapshot of a set of entities at one point in time. In addition to the EntitySnapshot, we store
 /// the entities' meta-information `repl::Entity` here as well, so that we know which components
 /// should be replicated.
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct WorldSnapshot<T: EntitySnapshot>(pub BTreeMap<EntityId, (Entity, T)>);
 
 impl<T: EntitySnapshot> WorldSnapshot<T> {
@@ -424,9 +424,9 @@ macro_rules! snapshot {
             );
 
             /// Store World state of entities with ReplId component in a Snapshot.
-            pub struct StoreSnapshotSys<'a>(pub &'a mut WorldSnapshot);
+            pub struct StoreSnapshotSys(pub WorldSnapshot);
 
-            impl<'a> System<'a> for StoreSnapshotSys<'a> {
+            impl<'a> System<'a> for StoreSnapshotSys {
                 type SystemData = (
                     Fetch<'a, EntityClasses>,
                     Entities<'a>,

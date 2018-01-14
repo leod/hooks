@@ -1,5 +1,4 @@
 use common::{self, event, game, GameInfo, PlayerId};
-use common::event::Event;
 use common::registry::Registry;
 
 use client::{self, Client};
@@ -11,6 +10,12 @@ pub struct Game {
 
 fn register(game_info: &GameInfo, reg: &mut Registry) {
     common::view::register(game_info, reg);
+}
+
+#[derive(Debug)]
+pub enum Event {
+    Disconnected,
+    TickStarted(Vec<Box<event::Event>>),
 }
 
 impl Game {
@@ -29,9 +34,16 @@ impl Game {
         }
     }
 
-    pub fn update(&mut self, client: &mut Client) -> Result<Vec<Box<Event>>, client::Error> {
-        while let Some(event) = client.service()? {}
+    pub fn update(&mut self, client: &mut Client) -> Result<Option<Event>, client::Error> {
+        while let Some(event) = client.service()? {
+            match event {
+                client::Event::Disconnected => {
+                    return Ok(Some(Event::Disconnected));
+                }
+                client::Event::ServerGameMsg(data) => {}
+            }
+        }
 
-        Ok(Vec::new())
+        Ok(None)
     }
 }

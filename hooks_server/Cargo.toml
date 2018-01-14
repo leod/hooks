@@ -5,6 +5,7 @@ authors = ["leod <subtle.frustration@proton.me>"]
 
 [dependencies]
 hooks_common = { path = "../hooks_common" }
+shred = "0.5.0"
 log = "0.4"
 bit_manager = "*"
 env_logger = "0.5.0-rc.2"

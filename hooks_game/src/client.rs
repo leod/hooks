@@ -1,7 +1,7 @@
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
-use common::{GameInfo, PlayerId};
-use common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
+use common::{GameInfo, LeaveReason, PlayerId};
+use common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                             CHANNEL_GAME, NUM_CHANNELS};
 use common::net::transport;
 
@@ -159,5 +159,12 @@ impl Client {
     fn read_comm(packet: transport::ReceivedPacket) -> Result<ServerCommMsg, bit_manager::Error> {
         let mut reader = BitReader::new(packet.data());
         reader.read::<ServerCommMsg>()
+    }
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        self.peer
+            .disconnect(protocol::leave_reason_to_u32(LeaveReason::Disconnected));
     }
 }

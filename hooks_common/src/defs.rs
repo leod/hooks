@@ -71,10 +71,11 @@ pub struct TimedPlayerInput {
     pub input: PlayerInput,
 }
 
-#[derive(Debug, Clone, BitStore)]
+#[derive(Debug, Copy, Clone, BitStore)]
 pub enum LeaveReason {
-    InvalidMsg,
     Disconnected,
+    InvalidMsg,
+    Lagged,
 }
 
 #[derive(Debug, Clone, BitStore)]

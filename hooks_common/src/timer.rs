@@ -29,6 +29,10 @@ impl Timer {
         }
     }
 
+    pub fn period(&self) -> Duration {
+        self.period
+    }
+
     /// Has the timer accumulated enough time for one period?
     /// If yes, subtract the period from the timer.
     pub fn trigger(&mut self) -> bool {
