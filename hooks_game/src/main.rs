@@ -41,10 +41,10 @@ fn main() {
     );
 
     let mut game = Game::new(client.my_player_id(), client.game_info());
-    client.ready();
+    client.ready().unwrap();
 
     loop {
-        game.update(&mut client);
+        game.update(&mut client).unwrap();
 
         thread::yield_now();
     }

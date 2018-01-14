@@ -41,7 +41,7 @@ pub mod auth {
 
     #[derive(Component)]
     #[component(BTreeStorage)]
-    struct Test(f32);
+    struct Test(f64);
 
     struct TickSys;
 
@@ -54,8 +54,8 @@ pub mod auth {
 
         fn run(&mut self, (game_info, mut position, mut test): Self::SystemData) {
             for (position, test) in (&mut position, &mut test).join() {
-                position.pos.x = test.0.sin() * 5.0;
-                test.0 += game_info.tick_duration_s();
+                position.pos.x = (test.0.sin() * 5.0) as f32;
+                test.0 += game_info.tick_duration_secs();
             }
         }
     }

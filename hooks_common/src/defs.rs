@@ -1,4 +1,8 @@
+use std::time::Duration;
+
 use nalgebra::Vector2;
+
+use timer;
 
 pub type PlayerId = u32;
 
@@ -45,8 +49,12 @@ pub struct GameInfo {
 }
 
 impl GameInfo {
-    pub fn tick_duration_s(&self) -> f32 {
-        1.0 / (self.ticks_per_second as f32)
+    pub fn tick_duration(&self) -> Duration {
+        timer::secs_to_duration(self.tick_duration_secs())
+    }
+
+    pub fn tick_duration_secs(&self) -> f64 {
+        1.0 / (self.ticks_per_second as f64)
     }
 }
 
