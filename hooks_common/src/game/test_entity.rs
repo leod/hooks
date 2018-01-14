@@ -1,6 +1,6 @@
 use nalgebra::Point2;
 
-use specs::{BTreeStorage, Fetch, Join, System, WriteStorage};
+use specs::{BTreeStorage, Fetch, System, WriteStorage};
 
 use defs::GameInfo;
 use game::ComponentType;
@@ -18,6 +18,8 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub mod auth {
+    use specs::Join;
+
     use super::*;
 
     pub fn register(reg: &mut Registry) {

@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
+use std::collections::VecDeque;
 use std::collections::btree_map;
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use common::{GameInfo, LeaveReason, PlayerId, INVALID_PLAYER_ID};
-use common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
+use common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                             CHANNEL_GAME, NUM_CHANNELS};
 use common::net::transport;
 
@@ -37,8 +38,10 @@ pub struct Host {
     game_info: GameInfo,
     next_player_id: PlayerId,
     clients: BTreeMap<PlayerId, Client>,
+    queued_events: VecDeque<Event>,
 }
 
+#[derive(Debug, Clone)]
 pub enum Event {
     PlayerJoined(PlayerId, String),
     PlayerLeft(PlayerId, LeaveReason),
@@ -57,10 +60,11 @@ impl Host {
             game_info,
             next_player_id: INVALID_PLAYER_ID + 1,
             clients: BTreeMap::new(),
+            queued_events: VecDeque::new(),
         })
     }
 
-    fn disconnect(&mut self, peer: &transport::Peer, reason: LeaveReason) -> Option<Event> {
+    fn on_disconnect(&mut self, peer: &transport::Peer, reason: LeaveReason) -> Option<Event> {
         let player_id = peer.data() as PlayerId;
 
         // This allows us to identify that the peer has been disconnected
@@ -86,7 +90,30 @@ impl Host {
         }
     }
 
+    pub fn force_disconnect(
+        &mut self,
+        player_id: PlayerId,
+        reason: LeaveReason,
+    ) -> Result<(), Error> {
+        let peer = self.clients[&player_id].peer.clone();
+
+        peer.disconnect(protocol::leave_reason_to_u32(reason));
+
+        if let Some(event) = self.on_disconnect(&peer, reason) {
+            // Let game logic handle this `PlayerLeft` event with the next `service` calls
+            self.queued_events.push_back(event.clone());
+        }
+
+        Ok(())
+    }
+
     pub fn service(&mut self) -> Result<Option<Event>, Error> {
+        // If we have some queued events, use them first. Currently, these are queued only if a
+        // player has been forcefully disconnected.
+        if let Some(event) = self.queued_events.pop_front() {
+            return Ok(Some(event));
+        }
+
         if let Some(event) = self.host.service(0)? {
             match event {
                 transport::Event::Connect(peer) => {
@@ -116,15 +143,17 @@ impl Host {
                                     player_id, error
                                 );
 
-                                peer.disconnect(666);
+                                peer.disconnect(protocol::leave_reason_to_u32(
+                                    LeaveReason::InvalidMsg,
+                                ));
 
-                                Ok(self.disconnect(&peer, LeaveReason::InvalidMsg))
+                                Ok(self.on_disconnect(&peer, LeaveReason::InvalidMsg))
                             }
                         }
                     }
                 }
                 transport::Event::Disconnect(peer) => {
-                    Ok(self.disconnect(&peer, LeaveReason::Disconnected))
+                    Ok(self.on_disconnect(&peer, LeaveReason::Disconnected))
                 }
             }
         } else {

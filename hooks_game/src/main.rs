@@ -44,7 +44,14 @@ fn main() {
     client.ready().unwrap();
 
     loop {
-        game.update(&mut client).unwrap();
+        match game.update(&mut client).unwrap() {
+            Some(game::Event::Disconnected) => {
+                info!("Got disconnected! Bye.");
+                return;
+            }
+            Some(game::Event::TickStarted(events)) => {}
+            None => {}
+        }
 
         thread::yield_now();
     }
