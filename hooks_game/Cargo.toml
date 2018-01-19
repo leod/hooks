@@ -3,6 +3,10 @@ name = "hooks_game"
 version = "0.1.0"
 authors = ["leod <subtle.frustration@proton.me>"]
 
+[lib]
+name = "hooks_game"
+path = "src/lib.rs"
+
 [dependencies]
 hooks_common = { path = "../hooks_common" }
 ggez = "0.4.0"
@@ -12,3 +16,7 @@ enet-sys = "0.1.4"
 log = "0.4"
 bit_manager = "*"
 env_logger = "0.5.0-rc.2"
+rand = "0.4"
+
+[[example]]
+name = "random_bot"

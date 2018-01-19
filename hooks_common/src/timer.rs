@@ -1,5 +1,5 @@
 use std::ops::AddAssign;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub fn duration_to_secs(d: Duration) -> f64 {
     let seconds = d.as_secs() as f64;
@@ -64,5 +64,27 @@ impl Timer {
 impl AddAssign<Duration> for Timer {
     fn add_assign(&mut self, other: Duration) {
         self.accum = self.accum.checked_add(other).unwrap();
+    }
+}
+
+/// A stopwatch for repeatedly measuring time intervals.
+pub struct Stopwatch {
+    last_reset: Option<Instant>,
+}
+
+impl Stopwatch {
+    pub fn new() -> Stopwatch {
+        Stopwatch { last_reset: None }
+    }
+
+    pub fn get_reset(&mut self) -> Duration {
+        let duration = if let Some(last_reset) = self.last_reset {
+            last_reset.elapsed()
+        } else {
+            Duration::from_secs(0)
+        };
+
+        self.last_reset = Some(Instant::now());
+        duration
     }
 }

@@ -176,7 +176,9 @@ impl Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
+        // TODO: Should perhaps instead disconnect reliably in a separate function
         self.peer
             .disconnect(protocol::leave_reason_to_u32(LeaveReason::Disconnected));
+        self.host.flush();
     }
 }

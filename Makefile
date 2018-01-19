@@ -1,4 +1,5 @@
-TARGET := "target/"
+TARGET="target/"
+N_STRESS=10
 
 all: build
 
@@ -11,6 +12,16 @@ run: build
 
 run-game:
 	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game
+
+random-bot:
+	CARGO_TARGET_DIR=${TARGET} cargo run -j4 --manifest-path=hooks_game/Cargo.toml --example random_bot
+
+stress: build
+	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_game/Cargo.toml --example random_bot
+	tmux \
+		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server; cat"' \; \
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"' \; \
+		split-window -h 'bash -c "for i in {1..'${N_STRESS}'}; do echo $i; make random-bot & done ; cat"' \; \
 
 common:
 	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_common/Cargo.toml
