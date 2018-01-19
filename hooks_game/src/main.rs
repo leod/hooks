@@ -4,8 +4,8 @@ extern crate ggez;
 extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
-extern crate specs;
 extern crate shred;
+extern crate specs;
 
 mod client;
 mod game;
