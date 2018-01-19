@@ -10,7 +10,7 @@ run: build
 		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"'
 
 run-game:
-	RUST_BACKTRACE=1 target/debug/hooks_game
+	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game
 
 common:
 	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_common/Cargo.toml

@@ -2,22 +2,20 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::time;
 
-use rand::Rng;
 use rand;
+use rand::Rng;
 
 use bit_manager::BitWriter;
 
-use shred::RunNow;
+use shred::{Fetch, RunNow};
 
-use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, TickNum};
+use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, TickDeltaNum, TickNum};
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
 use common::repl::{entity, player, tick};
 use common::timer::{self, Timer};
 
 use host::{self, Host};
-
-pub const MAX_LAG_SECS: f64 = 5.0;
 
 struct Player {
     join_tick: TickNum,
@@ -47,8 +45,8 @@ pub struct Game {
     /// Timer to start the next tick.
     tick_timer: Timer,
 
-    /// Number of last started tick.
-    last_tick: TickNum,
+    /// Number of tick we will start next.
+    next_tick: TickNum,
 
     /// Time that the last update call occured.
     last_update_instant: Option<time::Instant>,
@@ -77,10 +75,14 @@ impl Game {
             state,
             players: BTreeMap::new(),
             tick_timer: Timer::new(game_info.tick_duration()),
-            last_tick: 0,
+            next_tick: 0,
             last_update_instant: None,
             queued_events: event::Sink::new(),
         }
+    }
+
+    pub fn game_info(&self) -> Fetch<GameInfo> {
+        self.state.world.read_resource::<GameInfo>()
     }
 
     pub fn update(&mut self, host: &mut Host) -> Result<(), host::Error> {
@@ -97,17 +99,21 @@ impl Game {
 
         // 2. Detect players that are lagged too far behind
         for (&player_id, player) in self.players.iter() {
-            let last_ack_tick = player.last_ack_tick.unwrap_or(player.join_tick);
-            assert!(last_ack_tick <= self.last_tick);
+            let num_delta = if let Some(last_ack_tick) = player.last_ack_tick {
+                assert!(last_ack_tick < self.next_tick);
+                self.next_tick - last_ack_tick
+            } else {
+                // Player has not acknowledged a tick yet
+                self.next_tick - player.join_tick + 1
+            };
 
-            let tick_duration_sec = timer::duration_to_secs(self.tick_timer.period());
-            let last_ack_elapsed = (self.last_tick - last_ack_tick) as f64 * tick_duration_sec;
-
-            if last_ack_elapsed > MAX_LAG_SECS {
+            if num_delta > TickDeltaNum::max_value() as TickNum {
                 info!(
-                    "Player {}'s last acknowledged tick is {:.2} seconds in the past. \
+                    "Player {}'s last acknowledged tick is {} ticks (ca. {:?}) in the past. \
                      Forcefully disconnecting.",
-                    player_id, last_ack_elapsed
+                    player_id,
+                    num_delta,
+                    self.tick_timer.period() * num_delta
                 );
                 host.force_disconnect(player_id, LeaveReason::Lagged)?;
             }
@@ -126,7 +132,7 @@ impl Game {
 
                     assert!(!self.players.contains_key(&player_id));
 
-                    let mut player = Player::new(self.last_tick, self.state.event_reg.clone());
+                    let mut player = Player::new(self.next_tick, self.state.event_reg.clone());
                     self.send_player_list(&mut player);
 
                     self.players.insert(player_id, player);
@@ -151,8 +157,10 @@ impl Game {
                             // Client has acknowledged a tick
                             let player = self.players.get_mut(&player_id).unwrap();
 
-                            if tick_num > self.last_tick {
+                            if tick_num >= self.next_tick {
                                 // Invalid tick number! Forcefully disconnect the client.
+                                // NOTE: The corresponding `host::Event::PlayerLeft` event will be
+                                //       handled in the next iteration of the while loop.
                                 host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
                             }
 
@@ -175,7 +183,6 @@ impl Game {
         // 4. Run a tick periodically
         if self.tick_timer.trigger() {
             // 4.1. Run tick
-            self.last_tick += 1;
 
             // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
             self.state.push_events(self.queued_events.clear());
@@ -198,15 +205,15 @@ impl Game {
                 // events of this tick
                 let mut player_events = mem::replace(&mut player.queued_events, event::Sink::new());
                 for event in &tick_events {
-                    player_events.push_box((**event).clone());
+                    player_events.push_box(event.clone_event());
                 }
 
                 let tick_data = tick::Data {
-                    events: player_events.into_inner(),
+                    events: player_events.into_vec(),
                     snapshot: Some(snapshot),
                 };
 
-                player.tick_history.push_tick(self.last_tick, tick_data);
+                player.tick_history.push_tick(self.next_tick, tick_data);
             }
 
             // 4.3. Send delta snapshot to every player
@@ -222,7 +229,7 @@ impl Game {
 
                 player.tick_history.delta_write_tick(
                     player.last_ack_tick,
-                    self.last_tick,
+                    self.next_tick,
                     &entity_classes,
                     &mut writer,
                 )?;
@@ -231,6 +238,9 @@ impl Game {
 
                 host.send_game(player_id, &data)?;
             }
+
+            // 4.4. Advance counter
+            self.next_tick += 1;
         }
 
         Ok(())

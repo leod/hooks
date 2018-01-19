@@ -52,11 +52,11 @@ pub trait Event: EventBase + EventClone {
 }
 
 pub trait EventClone {
-    fn clone(&self) -> Box<Event>;
+    fn clone_event(&self) -> Box<Event>;
 }
 
 impl<T: Clone + Event> EventClone for T {
-    fn clone(&self) -> Box<Event> {
+    fn clone_event(&self) -> Box<Event> {
         Box::new(Clone::clone(self))
     }
 }
@@ -144,8 +144,13 @@ pub struct Sink {
 }
 
 impl Sink {
-    pub fn new() -> Self {
-        Self { events: Vec::new() }
+    pub fn new() -> Sink {
+        Sink { events: Vec::new() }
+    }
+
+    pub fn clone_from_vec(events: &Vec<Box<Event>>) -> Sink {
+        let events = events.iter().map(|event| (**event).clone_event()).collect();
+        Sink { events }
     }
 
     pub fn push<T: Event + Send>(&mut self, event: T) {
@@ -160,8 +165,14 @@ impl Sink {
         mem::replace(&mut self.events, Vec::new())
     }
 
-    pub fn into_inner(self) -> Vec<Box<Event>> {
+    pub fn into_vec(self) -> Vec<Box<Event>> {
         self.events
+    }
+}
+
+impl Clone for Sink {
+    fn clone(self: &Sink) -> Sink {
+        Sink::clone_from_vec(&self.events)
     }
 }
 

@@ -52,6 +52,9 @@ pub struct Game {
     /// Number of last started tick.
     last_tick: Option<TickNum>,
 
+    /// Newest tick of which we know that the server knows that we have received it.
+    server_recv_ack_tick: Option<TickNum>,
+
     /// Time that the last update call occured.
     last_update_instant: Option<time::Instant>,
 }
@@ -83,6 +86,7 @@ impl Game {
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
             last_tick: None,
+            server_recv_ack_tick: None,
             last_update_instant: None,
         }
     }
@@ -109,64 +113,68 @@ impl Game {
                         .delta_read_tick(&entity_classes, &mut reader)?;
 
                     if let Some((old_tick_num, new_tick_num)) = tick_nums {
-                        debug!("New tick {} w.r.t. {}", new_tick_num, old_tick_num);
+                        debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
 
                         let reply = ClientGameMsg::ReceivedTick(new_tick_num);
                         client.send_game(reply)?;
 
-                        // The fact that we have received a new tick means that the server knows
-                        // that we have the tick w.r.t. which it was encoded, so we can remove
-                        // older ticks from our history
-                        if self.last_tick.is_some() && old_tick_num <= self.last_tick.unwrap() {
-                            self.tick_history.prune_older_ticks(old_tick_num);
+                        if let Some(old_tick_num) = old_tick_num {
+                            // The fact that we have received a new delta encoded tick means that
+                            // the server knows that we have the tick w.r.t. which it was encoded.
+                            self.server_recv_ack_tick = Some(old_tick_num);
                         }
                     }
                 }
             }
         }
 
+        // Remove ticks from our history that:
+        // 1. We know for sure will not be used by the server as a reference for delta encoding.
+        // 2. We have already started.
+        match (self.last_tick, self.server_recv_ack_tick) {
+            (Some(last_tick), Some(server_recv_ack_tick)) => {
+                if last_tick >= server_recv_ack_tick {
+                    self.tick_history.prune_older_ticks(server_recv_ack_tick);
+                }
+            }
+            _ => {}
+        }
+
         // Start ticks
         if self.tick_timer.trigger() {
-            let tick = 
-                if let Some(last_tick) = self.last_tick {
-                    let next_tick = last_tick + 1;
-                    self.tick_history.get(next_tick).map(|_| next_tick)
-                } else {
-                    self.tick_history.min_num()
-                };
+            let tick = if let Some(last_tick) = self.last_tick {
+                let next_tick = last_tick + 1;
+                self.tick_history.get(next_tick).map(|_| next_tick)
+            } else {
+                // Start our first tick
+                self.tick_history.min_num()
+            };
 
             if let Some(tick) = tick {
                 self.last_tick = Some(tick);
 
                 let tick_data = self.tick_history.get(tick).unwrap();
 
-                debug!("Starting tick {}", tick);
-
-                let events = {
-                    let mut events = Vec::new();
-                    for event in &tick_data.events {
-                        events.push((**event).clone());
-                    }
-                    events
-                };
+                //debug!("Starting tick {}", tick);
 
                 if let &Some(ref snapshot) = &tick_data.snapshot {
-                    debug!("Loading snapshot");
+                    //debug!("Loading snapshot");
 
-                    entity::view::create_new_entities(&mut self.state.world, snapshot); 
+                    entity::view::create_new_entities(&mut self.state.world, snapshot);
 
                     let mut sys = game::LoadSnapshotSys(snapshot);
                     sys.run_now(&self.state.world.res);
                 }
 
                 for pos in self.state.world.read::<Position>().join() {
-                    debug!("pos: {}", pos.pos);
+                    //debug!("pos: {}", pos.pos);
                 }
 
-                self.state.push_events(events);
+                let events = event::Sink::clone_from_vec(&tick_data.events);
+                self.state.push_events(events.into_vec());
                 self.state.run_tick()?;
             } else {
-                warn!("Waiting for tick...");
+                //warn!("Waiting for tick...");
             }
         }
 

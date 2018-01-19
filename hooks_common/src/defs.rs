@@ -14,6 +14,11 @@ pub type EntityClassId = u32;
 
 pub type TickNum = u32;
 
+pub type TickDeltaNum = u8;
+
+/// Tick is not sent as a delta snapshot
+pub const NO_DELTA_TICK: TickDeltaNum = 0;
+
 pub const INVALID_PLAYER_ID: PlayerId = 0;
 pub const INVALID_ENTITY_ID: EntityId = 0;
 
