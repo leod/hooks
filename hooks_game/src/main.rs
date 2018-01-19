@@ -1,19 +1,12 @@
-extern crate bit_manager;
-extern crate env_logger;
-extern crate ggez;
-extern crate hooks_common as common;
 #[macro_use]
 extern crate log;
-extern crate shred;
-extern crate specs;
-
-mod client;
-mod game;
+extern crate env_logger;
+extern crate hooks_game;
 
 use std::thread;
 
-use client::Client;
-use game::Game;
+use hooks_game::client::Client;
+use hooks_game::game::{self, Game};
 
 struct Config {
     host: String,

@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::time;
 
-use rand;
-use rand::Rng;
+use rand::{self, Rng};
 
 use bit_manager::BitWriter;
 
@@ -13,7 +12,7 @@ use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, Tic
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
 use common::repl::{entity, player, tick};
-use common::timer::{self, Timer};
+use common::timer::{self, Timer, Stopwatch};
 
 use host::{self, Host};
 
@@ -48,8 +47,8 @@ pub struct Game {
     /// Number of tick we will start next.
     next_tick: TickNum,
 
-    /// Time that the last update call occured.
-    last_update_instant: Option<time::Instant>,
+    /// Stopwatch for advancing timers
+    update_stopwatch: Stopwatch,
 
     /// Events queued for the next tick.
     queued_events: event::Sink,
@@ -76,7 +75,7 @@ impl Game {
             players: BTreeMap::new(),
             tick_timer: Timer::new(game_info.tick_duration()),
             next_tick: 0,
-            last_update_instant: None,
+            update_stopwatch: Stopwatch::new(),
             queued_events: event::Sink::new(),
         }
     }
@@ -87,15 +86,10 @@ impl Game {
 
     pub fn update(&mut self, host: &mut Host) -> Result<(), host::Error> {
         // 1. Advance timers
-        if let Some(instant) = self.last_update_instant {
-            // TODO: When no tick is run, iterations of `update` might be immeasurable, causing
-            // timing errors.
-            let duration = instant.elapsed();
-
+        {
+            let duration = self.update_stopwatch.get_reset();
             self.tick_timer += duration;
         }
-
-        self.last_update_instant = Some(time::Instant::now());
 
         // 2. Detect players that are lagged too far behind
         for (&player_id, player) in self.players.iter() {
