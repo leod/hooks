@@ -4,13 +4,16 @@ mod entity_types;
 
 use nalgebra::Point2;
 
-use specs::World;
+use specs::{self, World};
 
 use ggez;
 use ggez::graphics::{self, DrawMode, Mesh};
 
-use self::camera::Camera;
 use common::{self, Event, GameInfo, PlayerId};
+use common::physics::Position;
+use common::repl::player::Players;
+
+use self::camera::Camera;
 
 pub fn register(game_info: &GameInfo, reg: &mut common::Registry) {
     rect::register(reg);
@@ -113,7 +116,14 @@ impl View {
     pub fn draw(&mut self, ctx: &mut ggez::Context, world: &World) -> ggez::error::GameResult<()> {
         let delta = ggez::timer::get_delta(ctx);
 
+        let positions = world.read::<Position>();
+
+        if let Some(my_entity) = self.my_player_entity(world) {
+            self.camera.set_pos(positions.get(my_entity).unwrap().pos);
+        }
+
         self.camera.update(delta);
+
         graphics::push_transform(ctx, Some(self.camera.transform()));
         graphics::apply_transformations(ctx)?;
 
@@ -129,5 +139,17 @@ impl View {
     /// Once the game is finished, move the `Assets` so that we don't reload things unnecessarily.
     pub fn into_assets(self) -> Assets {
         self.assets
+    }
+
+    fn my_player_entity(&self, world: &World) -> Option<specs::Entity> {
+        let players = world.read_resource::<Players>();
+
+        if let Some(&(ref _info, entity)) = players.get(self.my_player_id) {
+            entity
+        } else {
+            // We are connected, but have not received the first tick yet...
+            // ... or the server isn't doing its job.
+            None
+        }
     }
 }

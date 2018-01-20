@@ -22,7 +22,7 @@ impl Camera {
     pub fn update(&mut self, delta: Duration) {}
 
     pub fn transform(&self) -> Matrix4<f32> {
-        let coords = self.pos.coords + self.window_size / 2.0;
+        let coords = -self.pos.coords + self.window_size / 2.0;
 
         Translation3::from_vector(Vector3::new(coords.x, coords.y, 0.0)).to_homogeneous()
     }
