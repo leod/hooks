@@ -4,7 +4,7 @@ use std::time::Duration;
 use rand::{self, Rng};
 
 use shred::RunNow;
-use specs::Join;
+use specs::{Join, World};
 
 use bit_manager::BitReader;
 
@@ -89,6 +89,14 @@ impl Game {
             last_tick: None,
             server_recv_ack_tick: None,
         }
+    }
+
+    pub fn world(&self) -> &World {
+        &self.state.world
+    }
+
+    pub fn world_mut(&mut self) -> &mut World {
+        &mut self.state.world
     }
 
     pub fn update(&mut self, client: &mut Client, delta: Duration) -> Result<Option<Event>, Error> {

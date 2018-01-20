@@ -8,6 +8,7 @@ use std::{env, path, thread};
 
 use hooks_game::client::Client;
 use hooks_game::game::{self, Game};
+use hooks_game::view::{Assets, View};
 
 struct Config {
     host: String,
@@ -18,6 +19,7 @@ struct Config {
 struct MainState {
     client: Client,
     game: Game,
+    view: View,
 }
 
 impl ggez::event::EventHandler for MainState {
@@ -29,7 +31,9 @@ impl ggez::event::EventHandler for MainState {
                 info!("Got disconnected! Bye.");
                 ctx.quit()?;
             }
-            Some(game::Event::TickStarted(events)) => {}
+            Some(game::Event::TickStarted(ref events)) => {
+                self.view.handle_events(self.game.world_mut(), events)?;
+            }
             None => {}
         }
 
@@ -38,6 +42,8 @@ impl ggez::event::EventHandler for MainState {
 
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::error::GameResult<()> {
         ggez::graphics::clear(ctx);
+
+        self.view.draw(ctx, self.game.world_mut())?;
 
         ggez::graphics::present(ctx);
 
@@ -113,7 +119,6 @@ fn main() {
     );
 
     let game = Game::new(client.my_player_id(), client.game_info());
-    client.ready().unwrap();
 
     // Initialize ggez
     let ctx = &mut ggez::Context::load_from_conf("hooks", "leod", ggez::conf::Conf::new()).unwrap();
@@ -126,7 +131,11 @@ fn main() {
         info!("Loading resources from {:?}", path);
     }
 
-    let mut state = MainState { client, game };
+    let view = View::load(client.my_player_id(), client.game_info(), Assets::default()).unwrap();
 
+    // Inform the server that we are good to go
+    client.ready().unwrap();
+
+    let mut state = MainState { client, game, view };
     ggez::event::run(ctx, &mut state).unwrap();
 }
