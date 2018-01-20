@@ -1,6 +1,6 @@
-extern crate rand;
-extern crate hooks_game; 
 extern crate hooks_common;
+extern crate hooks_game;
+extern crate rand;
 
 use std::thread;
 use std::time::Duration;
@@ -10,7 +10,7 @@ use rand::Rng;
 use hooks_game::client::Client;
 use hooks_game::game::{self, Game};
 
-use hooks_common::timer::{Timer, Stopwatch};
+use hooks_common::timer::{Stopwatch, Timer};
 
 fn main() {
     let host = "localhost".to_string();

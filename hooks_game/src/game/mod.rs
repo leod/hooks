@@ -1,6 +1,8 @@
 use std::io::Cursor;
 use std::time;
 
+use rand::{self, Rng};
+
 use shred::RunNow;
 use specs::Join;
 
@@ -115,8 +117,11 @@ impl Game {
                     if let Some((old_tick_num, new_tick_num)) = tick_nums {
                         debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
 
-                        let reply = ClientGameMsg::ReceivedTick(new_tick_num);
-                        client.send_game(reply)?;
+                        if rand::thread_rng().gen() {
+                            // TMP: For testing delta encoding/decoding!
+                            let reply = ClientGameMsg::ReceivedTick(new_tick_num);
+                            client.send_game(reply)?;
+                        }
 
                         if let Some(old_tick_num) = old_tick_num {
                             // The fact that we have received a new delta encoded tick means that

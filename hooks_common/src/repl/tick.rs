@@ -64,14 +64,15 @@ impl<T: EntitySnapshot> History<T> {
         self.ticks.len()
     }
 
-    pub fn push_tick(&mut self, num: TickNum, data: Data<T>) -> TickNum {
+    pub fn push_tick(&mut self, num: TickNum, data: Data<T>) {
+        assert!(!self.ticks.contains_key(&num));
+
         // No gaps in recording snapshots on the server
         if let Some(max_num) = self.max_num() {
             assert!(max_num + 1 == num);
         }
 
         self.ticks.insert(num, data);
-        num
     }
 
     pub fn get(&self, num: TickNum) -> Option<&Data<T>> {
@@ -304,6 +305,7 @@ impl<T: EntitySnapshot> History<T> {
         writer.write_bit(!events.is_empty())?;
         if !events.is_empty() {
             // TODO: u16 should be enough here right?
+            //       How about using variable-length integer encodings for such things?
             writer.write(&(events.len() as u32))?;
             for event in events {
                 self.event_reg.write(&**event, writer)?;
