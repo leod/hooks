@@ -9,3 +9,4 @@ extern crate specs;
 
 pub mod client;
 pub mod game;
+pub mod view;

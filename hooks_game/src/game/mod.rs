@@ -14,9 +14,8 @@ use common::registry::Registry;
 use common::repl::{self, entity, tick};
 use common::timer::{self, Timer};
 
-use common::physics::Position; // TMP
-
 use client::{self, Client};
+use view;
 
 #[derive(Debug)]
 pub enum Error {
@@ -74,6 +73,9 @@ impl Game {
             let mut reg = Registry::new();
 
             register(game_info, &mut reg);
+
+            // TODO: Might be cleaner to create the `Registry` outside of `Game`
+            view::register(game_info, &mut reg);
 
             game::State::from_registry(reg)
         };
@@ -161,10 +163,6 @@ impl Game {
 
                     let mut sys = game::LoadSnapshotSys(snapshot);
                     sys.run_now(&self.state.world.res);
-                }
-
-                for pos in self.state.world.read::<Position>().join() {
-                    //debug!("pos: {}", pos.pos);
                 }
 
                 let events = event::Sink::clone_from_vec(&tick_data.events);

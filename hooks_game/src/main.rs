@@ -112,7 +112,7 @@ fn main() {
         client.game_info()
     );
 
-    let mut game = Game::new(client.my_player_id(), client.game_info());
+    let game = Game::new(client.my_player_id(), client.game_info());
     client.ready().unwrap();
 
     // Initialize ggez
