@@ -1,4 +1,4 @@
-use defs::{GameInfo, LeaveReason, PlayerId, PlayerInput, TickNum, TimedPlayerInput};
+use defs::{GameInfo, LeaveReason, PlayerId, PlayerInput, TickNum};
 
 pub const CHANNEL_COMM: u8 = 0;
 pub const CHANNEL_GAME: u8 = 1;
@@ -47,6 +47,9 @@ pub enum ClientGameMsg {
 
     /// Client acknowledges having received a tick.
     ReceivedTick(TickNum),
+
+    /// Client started a tick.
+    StartedTick(TickNum, PlayerInput),
 }
 
 #[derive(Debug, Clone, BitStore)]
