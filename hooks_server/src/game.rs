@@ -68,7 +68,7 @@ impl Game {
             game::State::from_registry(reg)
         };
 
-        entity::auth::create(&mut state.world, 0, "test", |builder| builder);
+        game::init::auth::create_state(&mut state.world);
 
         Game {
             state,

@@ -1,22 +1,50 @@
 mod camera;
+mod rect;
+mod entity_types;
+
+use nalgebra::Point2;
 
 use specs::World;
 
 use ggez;
-
-use common::{self, Event, GameInfo, PlayerId};
+use ggez::graphics::{self, DrawMode, Mesh};
 
 use self::camera::Camera;
+use common::{self, Event, GameInfo, PlayerId};
 
-pub fn register(game_info: &GameInfo, reg: &mut common::Registry) {}
+pub fn register(game_info: &GameInfo, reg: &mut common::Registry) {
+    rect::register(reg);
+    entity_types::register(reg);
+}
 
-pub fn register_load(game_info: &GameInfo, view: &mut Registry) {}
+pub fn register_load(game_info: &GameInfo, reg: &mut Registry) {
+    rect::register_load(reg);
+}
 
-#[derive(Default)]
-pub struct Assets {}
+pub struct Assets {
+    pub rect: Mesh,
+}
+
+impl Assets {
+    pub fn new(ctx: &mut ggez::Context) -> ggez::error::GameResult<Assets> {
+        // TODO: Better place to put this
+        let rect = Mesh::new_polygon(
+            ctx,
+            DrawMode::Fill,
+            &[
+                Point2::new(-0.5, -0.5),
+                Point2::new(0.5, -0.5),
+                Point2::new(0.5, 0.5),
+                Point2::new(-0.5, 0.5),
+            ],
+        )?;
+
+        Ok(Assets { rect })
+    }
+}
 
 pub type EventHandler = fn(&Assets, &mut World, &Vec<Box<Event>>) -> ggez::error::GameResult<()>;
-pub type DrawFn = fn(&Assets, &mut ggez::Context, &mut World) -> ggez::error::GameResult<()>;
+pub type DrawFn = fn(&mut ggez::Context, &Assets, &World) -> ggez::error::GameResult<()>;
 
 #[derive(Default)]
 pub struct Registry {
@@ -49,6 +77,7 @@ pub struct View {
 impl View {
     /// Load all assets for a game info and create a `View`.
     pub fn load(
+        view_size: (u32, u32),
         my_player_id: PlayerId,
         game_info: &GameInfo,
         assets: Assets,
@@ -63,7 +92,7 @@ impl View {
             assets,
             reg,
 
-            camera: Camera::new(),
+            camera: Camera::new(view_size),
         })
     }
 
@@ -81,18 +110,18 @@ impl View {
     }
 
     /// Draw the game.
-    pub fn draw(
-        &mut self,
-        ctx: &mut ggez::Context,
-        world: &mut World,
-    ) -> ggez::error::GameResult<()> {
+    pub fn draw(&mut self, ctx: &mut ggez::Context, world: &World) -> ggez::error::GameResult<()> {
         let delta = ggez::timer::get_delta(ctx);
 
         self.camera.update(delta);
+        graphics::push_transform(ctx, Some(self.camera.transform()));
+        graphics::apply_transformations(ctx)?;
 
         for draw_fn in &self.reg.draw_fns {
-            draw_fn(&self.assets, ctx, world)?;
+            draw_fn(ctx, &self.assets, world)?;
         }
+
+        graphics::pop_transform(ctx);
 
         Ok(())
     }
