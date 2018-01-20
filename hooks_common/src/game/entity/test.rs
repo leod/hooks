@@ -1,7 +1,5 @@
 use nalgebra::Point2;
 
-use specs::{BTreeStorage, Fetch, System, WriteStorage};
-
 use defs::GameInfo;
 use game::ComponentType;
 use physics::{Orientation, Position};
@@ -18,7 +16,7 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub mod auth {
-    use specs::Join;
+    use specs::{BTreeStorage, Fetch, Join, System, WriteStorage};
 
     use super::*;
 
@@ -30,11 +28,7 @@ pub mod auth {
 
         entity::add_ctor(
             "test",
-            |builder| {
-                builder
-                    .with(Orientation { angle: 0.0 })
-                    .with(Test(0.0))
-            },
+            |builder| builder.with(Orientation { angle: 0.0 }).with(Test(0.0)),
             reg,
         );
     }

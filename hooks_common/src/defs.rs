@@ -51,6 +51,7 @@ impl PlayerInfo {
 pub struct GameInfo {
     pub ticks_per_second: u32,
     pub map_info: MapInfo,
+    pub player_entity_class: String,
 }
 
 impl GameInfo {

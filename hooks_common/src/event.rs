@@ -165,6 +165,10 @@ impl Sink {
         mem::replace(&mut self.events, Vec::new())
     }
 
+    pub fn iter(&self) -> &[Box<Event>] {
+        &self.events
+    }
+
     pub fn into_vec(self) -> Vec<Box<Event>> {
         self.events
     }

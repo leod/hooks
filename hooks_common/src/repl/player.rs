@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map;
 
-use specs::{Join, World};
+use specs::{self, Entity, Join, World};
 
 use defs::{LeaveReason, PlayerId, PlayerInfo};
 use event::{self, Event};
@@ -12,17 +12,21 @@ pub fn register(reg: &mut Registry) {
     reg.resource(Players(BTreeMap::new()));
     reg.event::<JoinedEvent>();
     reg.event::<LeftEvent>();
-    reg.event_handler_post_tick(handle_event_post_tick);
+    reg.event_handler_pre_tick(handle_event_pre_tick);
 }
 
-pub struct Players(BTreeMap<PlayerId, PlayerInfo>);
+/// For each player, store information (like the name and statistics) and the current main entity
+/// of the player, if it exists. Management of the player's entity handle is currently handled by
+/// the `repl::entity` mod.
+#[derive(Clone)]
+pub struct Players(pub BTreeMap<PlayerId, (PlayerInfo, Option<specs::Entity>)>);
 
 impl Players {
-    pub fn get(&self, id: PlayerId) -> Option<&PlayerInfo> {
+    pub fn get(&self, id: PlayerId) -> Option<&(PlayerInfo, Option<specs::Entity>)> {
         self.0.get(&id)
     }
 
-    pub fn iter(&self) -> btree_map::Iter<PlayerId, PlayerInfo> {
+    pub fn iter(&self) -> btree_map::Iter<PlayerId, (PlayerInfo, Option<specs::Entity>)> {
         self.0.iter()
     }
 }
@@ -44,13 +48,16 @@ pub struct LeftEvent {
     pub id: PlayerId,
     pub reason: LeaveReason,
 }
+
 impl Event for LeftEvent {
     fn class(&self) -> event::Class {
         event::Class::Order
     }
 }
 
-fn handle_event_post_tick(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
+/// Handle events regarding player creation. Note that, both on the server and the clients, this
+/// event comes from the outside. Thus, we want to handle these before starting the tick.
+fn handle_event_pre_tick(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
     match_event!(event:
         JoinedEvent => {
             info!("Player {} with name {} joined", event.id, event.info.name);
@@ -62,7 +69,7 @@ fn handle_event_post_tick(world: &mut World, event: &Box<Event>) -> Result<(), r
                 return Err(repl::Error::InvalidPlayerId(event.id));
             }
 
-            players.0.insert(event.id, event.info.clone());
+            players.0.insert(event.id, (event.info.clone(), None));
         },
         LeftEvent => {
             {
@@ -73,7 +80,7 @@ fn handle_event_post_tick(world: &mut World, event: &Box<Event>) -> Result<(), r
                     return Err(repl::Error::InvalidPlayerId(event.id));
                 }
 
-                info!("Player {} with name {} left", event.id, players.0[&event.id].name);
+                info!("Player {} with name {} left", event.id, players.0[&event.id].0.name);
             }
 
             // Remove all entities owned by the disconnected player

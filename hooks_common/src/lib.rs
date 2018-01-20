@@ -9,6 +9,7 @@ extern crate log;
 extern crate mopa;
 extern crate nalgebra;
 extern crate ncollide;
+extern crate rand;
 extern crate shred;
 #[macro_use]
 extern crate shred_derive;

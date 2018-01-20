@@ -1,4 +1,5 @@
 mod test;
+mod player;
 
 use registry::Registry;
 
@@ -7,6 +8,7 @@ pub mod auth {
 
     pub fn register(reg: &mut Registry) {
         test::auth::register(reg);
+        player::register(reg);
     }
 }
 
@@ -15,5 +17,6 @@ pub mod view {
 
     pub fn register(reg: &mut Registry) {
         test::register(reg);
+        player::register(reg);
     }
 }

@@ -6,6 +6,7 @@ use bit_manager::{self, BitRead, BitWrite};
 
 use defs::{TickDeltaNum, TickNum, INVALID_PLAYER_ID, NO_DELTA_TICK};
 use event::{self, Event};
+use repl::{entity, player};
 use repl::snapshot::{self, EntityClasses, EntitySnapshot, WorldSnapshot};
 
 #[derive(Debug)]
@@ -268,7 +269,7 @@ impl<T: EntitySnapshot> History<T> {
         }
 
         // Finally, we are done with events and can delta read the snapshot
-        let (_new_entities, cur_snapshot) = {
+        let (_new_entities, mut cur_snapshot) = {
             let empty_snapshot = WorldSnapshot::new();
             let prev_snapshot = if let Some(prev_num) = prev_num {
                 // We have an entry for `prev_num` due to the loop for reading events
@@ -290,6 +291,39 @@ impl<T: EntitySnapshot> History<T> {
 
             prev_snapshot.delta_read(classes, reader)?
         };
+
+        // In case we receive an `entity::RemoveOrder`, we have to make sure not to carry around
+        // that entity's snapshot anymore --- otherwise, the local world snapshots could grow
+        // indefinitely. I didn't consider this at first, which led to removed entities immediately
+        // being recreated on the next tick. Putting this special case here feels like a bit of a
+        // hack, I need to think about the repercussions.
+        for (_num, tick_data) in self.ticks
+            .range((Included(event_tick_num), Included(cur_num)))
+        {
+            for event in &tick_data.events {
+                match_event!(event:
+                    entity::RemoveOrder => {
+                        cur_snapshot.0.remove(&event.0);
+                    },
+                    player::LeftEvent => {
+                        // Player entities are removed implicitly on disconnect, so we have to do
+                        // this here as well...
+                        let ids = cur_snapshot.0.iter()
+                            .filter_map(|(&id, &(ref entity, ref _snapshot))| {
+                                if entity.owner == event.id {
+                                    Some(id)
+                                } else {
+                                    None
+                                }
+                            }).collect::<Vec<_>>();
+
+                        for id in &ids {
+                            cur_snapshot.0.remove(id);
+                        }
+                    },
+                );
+            }
+        }
 
         // Finally, add the new snapshot in the history
         self.ticks.get_mut(&cur_num).unwrap().snapshot = Some(cur_snapshot);

@@ -22,6 +22,7 @@ fn main() {
     let game_info = GameInfo {
         ticks_per_second: 20,
         map_info,
+        player_entity_class: "player".to_string(),
     };
     let config = server::Config {
         port: 32444,

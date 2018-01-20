@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 
 use specs::{self, Entity, EntityBuilder, World};
 
-use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
+use defs::{EntityClassId, EntityId, GameInfo, PlayerId, INVALID_ENTITY_ID, INVALID_PLAYER_ID};
 use event::{self, Event};
 use registry::Registry;
-use repl;
+use repl::{self, player};
 
 pub use repl::snapshot::{ComponentType, EntityClass, EntityClasses, EntitySnapshot, WorldSnapshot};
 
@@ -17,6 +17,7 @@ fn register<T: EntitySnapshot>(reg: &mut Registry) {
     reg.event::<RemoveOrder>();
 }
 
+/// Event to remove entities, broadcast to clients
 #[derive(Debug, Clone, BitStore)]
 pub struct RemoveOrder(pub EntityId);
 
@@ -52,7 +53,12 @@ pub fn register_type<T: ComponentType>(
     let mut ctors = world.write_resource::<Ctors>();
     let mut class_names = world.write_resource::<ClassNames>();
 
-    let class_id = classes.0.keys().next_back().cloned().unwrap_or(0);
+    let class_id = classes.0.keys().next_back().map(|&id| id + 1).unwrap_or(0);
+
+    info!(
+        "Registering entity type {} with id {} and repl components {:?}",
+        name, class_id, components,
+    );
 
     assert!(!classes.0.contains_key(&class_id));
     assert!(!ctors.0.contains_key(&class_id));
@@ -91,13 +97,23 @@ fn create<F>(
     owner: PlayerId,
     class_id: EntityClassId,
     ctor: F,
-) -> (EntityId, specs::Entity)
+) -> Result<(EntityId, specs::Entity), repl::Error>
 where
     F: FnOnce(EntityBuilder) -> EntityBuilder,
 {
+    debug!(
+        "Creating entity {} for player {} of type {}",
+        id, owner, class_id
+    );
+
     let ctors = {
         let ctors = world.read_resource::<Ctors>();
-        ctors.0[&class_id].clone()
+
+        if let Some(ctor) = ctors.0.get(&class_id) {
+            ctor.clone()
+        } else {
+            return Err(repl::Error::InvalidEntityClassId(class_id));
+        }
     };
 
     // Build entity
@@ -115,6 +131,46 @@ where
         builder.build()
     };
 
+    // Remember player-controlled main entity
+    // TODO: Should this be here? First, I thought I could handle this in the `player` mod by
+    //       emitting a local `Created` event here. However, this leads to some headaches due to
+    //       event orders. Consider e.g. the situation that we spawn an entity for a player,
+    //       but then during the same tick that player disconnects. Then we would need to take care
+    //       to somehow insert the `Created` event *inbetween* the `player::JoinedEvent` and
+    //       `player::LeftEvent` (or ignore `Created` events with invalid player ids).
+    //       For now, let's just handle this immediately when the entity is created or removed.
+    if owner != INVALID_PLAYER_ID {
+        let game_info = world.read_resource::<GameInfo>();
+        let class_names = world.read_resource::<ClassNames>();
+
+        let mut players = world.write_resource::<player::Players>();
+
+        let player = if let Some(player) = players.0.get_mut(&owner) {
+            player
+        } else {
+            return Err(repl::Error::InvalidPlayerId(owner));
+        };
+        let player_class_id =
+            if let Some(&player_class_id) = class_names.0.get(&game_info.player_entity_class) {
+                player_class_id
+            } else {
+                return Err(repl::Error::InvalidEntityClass(
+                    game_info.player_entity_class.clone(),
+                ));
+            };
+
+        if class_id == player_class_id {
+            if player.1.is_some() {
+                return Err(repl::Error::Replication(format!(
+                    "player {} already has a main entity with id",
+                    id
+                )));
+            }
+
+            player.1 = Some(entity);
+        }
+    }
+
     // Map from shared id to ECS handle
     {
         let mut entity_map = world.write_resource::<repl::EntityMap>();
@@ -123,16 +179,56 @@ where
         entity_map.0.insert(id, entity);
     }
 
-    (id, entity)
+    Ok((id, entity))
 }
 
-pub(super) fn remove(world: &mut World, id: EntityId) {
+pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error> {
+    debug!("Removing entity {}", id);
+
     let entity = {
         let mut entity_map = world.write_resource::<repl::EntityMap>();
+        let entity = entity_map.id_to_entity(id);
         entity_map.0.remove(&id);
-        entity_map.id_to_entity(id)
+        entity
     };
+
+    // Remember player-controlled main entity
+    let repl_entity = world.read::<repl::Entity>().get(entity).unwrap().clone();
+    if repl_entity.owner != INVALID_PLAYER_ID {
+        let game_info = world.read_resource::<GameInfo>();
+        let class_names = world.read_resource::<ClassNames>();
+
+        let mut players = world.write_resource::<player::Players>();
+
+        let player = if let Some(player) = players.0.get_mut(&repl_entity.owner) {
+            player
+        } else {
+            return Err(repl::Error::InvalidPlayerId(repl_entity.owner));
+        };
+        let player_class_id =
+            if let Some(player_class_id) = class_names.0.get(&game_info.player_entity_class) {
+                *player_class_id
+            } else {
+                return Err(repl::Error::InvalidEntityClass(
+                    game_info.player_entity_class.clone(),
+                ));
+            };
+
+        if repl_entity.class_id == player_class_id {
+            if player.1.is_none() {
+                return Err(repl::Error::Replication(format!(
+                    "player {} has no main entity to remove",
+                    repl_entity.owner
+                )));
+            }
+
+            player.1 = None;
+        }
+    }
+
     world.delete_entity(entity).unwrap();
+
+    Ok(())
 }
 
 /// Server-side entity management
@@ -176,7 +272,7 @@ pub mod auth {
             class_names.0[class]
         };
 
-        super::create(world, id, owner, class_id, ctor)
+        super::create(world, id, owner, class_id, ctor).unwrap() // On the server, replication errors are definitely a bug
     }
 }
 
@@ -195,7 +291,10 @@ pub mod view {
     /// was created in this snapshot, but it is the first time that this client sees it.
     ///
     /// Snapshot data of new entities is not loaded here.
-    pub fn create_new_entities<T: EntitySnapshot>(world: &mut World, snapshot: &WorldSnapshot<T>) {
+    pub fn create_new_entities<T: EntitySnapshot>(
+        world: &mut World,
+        snapshot: &WorldSnapshot<T>,
+    ) -> Result<(), repl::Error> {
         let new_entities = {
             let entity_map = world.read_resource::<repl::EntityMap>();
 
@@ -218,8 +317,10 @@ pub mod view {
                 repl_entity.owner,
                 repl_entity.class_id,
                 |builder| builder,
-            );
+            )?;
         }
+
+        Ok(())
     }
 
     /// Remove entities as ordered.
@@ -233,17 +334,23 @@ pub mod view {
                     entity_map.get_id_to_entity(id)
                 };
 
-                if let Some(entity) = entity {
+                if let Some(_) = entity {
                     debug!("Removing entity {}", id);
 
-                    world.delete_entity(entity).unwrap();
-
-                    let mut entity_map = world.write_resource::<repl::EntityMap>();
-                    entity_map.0.remove(&id);
+                    super::remove(world, id)?;
+                } else {
+                    // TODO: Is it a replication error if we get a `RemoveOrder` for an entity we 
+                    //       don't have? This really depends on if we do both of the following:
+                    //       1. Only send a subset of entities to clients.
+                    //       2. Send `RemoveOrder` even if we have never shown this entity to the
+                    //          client.
+                    //       For now, let's say we can just ignore it.
+                    //
+                    //       On second thought, this can also happen if we get the `RemoveOrder`
+                    //       for an entity in an intermediate tick that we did not receive.
+                    //       Could the server filter for this as well?
+                    warn!("Received `RemoveOrder` for entity {}, which we do not have", id);
                 }
-
-                // TODO: Is it a replication error if we get a RemoveOrder for an entity we don't
-                // have? For now, let's say we can just ignore it.
             },
         );
 
