@@ -41,12 +41,15 @@ pub mod auth {
         type SystemData = (
             Fetch<'a, GameInfo>,
             WriteStorage<'a, Position>,
+            WriteStorage<'a, Orientation>,
             WriteStorage<'a, Test>,
         );
 
-        fn run(&mut self, (game_info, mut position, mut test): Self::SystemData) {
-            for (position, test) in (&mut position, &mut test).join() {
+        fn run(&mut self, (game_info, mut position, mut orientation, mut test): Self::SystemData) {
+            for (position, orientation, test) in (&mut position, &mut orientation, &mut test).join()
+            {
                 position.pos.x = (test.0.sin() * 100.0) as f32;
+                orientation.angle = test.0 as f32;
                 test.0 += game_info.tick_duration_secs();
             }
         }
