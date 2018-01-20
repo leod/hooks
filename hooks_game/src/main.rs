@@ -1,10 +1,18 @@
 extern crate env_logger;
 extern crate ggez;
-extern crate hooks_game;
+extern crate hooks_common as common;
+extern crate hooks_game as hooks_game;
 #[macro_use]
 extern crate log;
+extern crate nalgebra;
+extern crate specs;
 
 use std::{env, path};
+
+use ggez::event::Keycode;
+use nalgebra::Vector2;
+
+use common::defs::PlayerInput;
 
 use hooks_game::client::Client;
 use hooks_game::game::{self, Game};
@@ -20,13 +28,18 @@ struct MainState {
     client: Client,
     game: Game,
     view: View,
+
+    next_player_input: PlayerInput,
 }
 
 impl ggez::event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::error::GameResult<()> {
         let delta = ggez::timer::get_delta(ctx);
 
-        match self.game.update(&mut self.client, delta).unwrap() {
+        match self.game
+            .update(&mut self.client, &self.next_player_input, delta)
+            .unwrap()
+        {
             Some(game::Event::Disconnected) => {
                 info!("Got disconnected! Bye.");
                 ctx.quit()?;
@@ -70,31 +83,50 @@ impl ggez::event::EventHandler for MainState {
 
     fn mouse_motion_event(
         &mut self,
-        _ctx: &mut ggez::Context,
+        ctx: &mut ggez::Context,
         _state: ggez::event::MouseState,
-        _x: i32,
-        _y: i32,
+        x: i32,
+        y: i32,
         _xrel: i32,
         _yrel: i32,
     ) {
+        let (size_x, size_y) = ggez::graphics::get_size(ctx);
+        let size = Vector2::new(size_x as f32, size_y as f32);
+        let clip = Vector2::new(
+            x.max(0).min(size_x as i32) as f32,
+            y.max(0).min(size_y as i32) as f32,
+        );
+        let shift = clip - size / 2.0;
+
+        self.next_player_input.rot_angle = shift.y.atan2(shift.x)
     }
 
     fn key_down_event(
         &mut self,
         _ctx: &mut ggez::Context,
-        _keycode: ggez::event::Keycode,
+        keycode: Keycode,
         _keymod: ggez::event::Mod,
         _repeat: bool,
     ) {
+        match keycode {
+            Keycode::W => self.next_player_input.move_forward = true,
+            Keycode::S => self.next_player_input.move_backward = true,
+            _ => {}
+        }
     }
 
     fn key_up_event(
         &mut self,
         _ctx: &mut ggez::Context,
-        _keycode: ggez::event::Keycode,
+        keycode: ggez::event::Keycode,
         _keymod: ggez::event::Mod,
         _repeat: bool,
     ) {
+        match keycode {
+            Keycode::W => self.next_player_input.move_forward = false,
+            Keycode::S => self.next_player_input.move_backward = false,
+            _ => {}
+        }
     }
 }
 
@@ -142,6 +174,11 @@ fn main() {
     // Inform the server that we are good to go
     client.ready().unwrap();
 
-    let mut state = MainState { client, game, view };
+    let mut state = MainState {
+        client,
+        game,
+        view,
+        next_player_input: PlayerInput::default(),
+    };
     ggez::event::run(ctx, &mut state).unwrap();
 }

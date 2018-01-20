@@ -5,7 +5,7 @@ use bit_manager::BitReader;
 use rand::{self, Rng};
 use specs::World;
 
-use common::{self, event, game, GameInfo, PlayerId, TickNum};
+use common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
 use common::repl::{self, tick};
@@ -99,7 +99,12 @@ impl Game {
         &mut self.state.world
     }
 
-    pub fn update(&mut self, client: &mut Client, delta: Duration) -> Result<Option<Event>, Error> {
+    pub fn update(
+        &mut self,
+        client: &mut Client,
+        player_input: &PlayerInput,
+        delta: Duration,
+    ) -> Result<Option<Event>, Error> {
         // Advance timers
         self.tick_timer += delta;
 
@@ -117,7 +122,7 @@ impl Game {
                         .delta_read_tick(&entity_classes, &mut reader)?;
 
                     if let Some((old_tick_num, new_tick_num)) = tick_nums {
-                        debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
+                        //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
 
                         if rand::thread_rng().gen() {
                             // TMP: For testing delta encoding/decoding!
@@ -159,6 +164,9 @@ impl Game {
 
             if let Some(tick) = tick {
                 self.last_tick = Some(tick);
+
+                // Inform the server
+                client.send_game(ClientGameMsg::StartedTick(tick, player_input.clone()))?;
 
                 let tick_data = self.tick_history.get(tick).unwrap();
 

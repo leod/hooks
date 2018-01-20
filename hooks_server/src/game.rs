@@ -258,6 +258,15 @@ impl Game {
             // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
             self.state.push_events(self.queued_events.clear());
 
+            // For now, just run everyone's queued inputs. This will need to be refined!
+            for (&player_id, player) in self.players.iter_mut() {
+                for (_tick_num, input) in &player.queued_inputs {
+                    game::input::auth::run_player_input(&mut self.state.world, player_id, input);
+                }
+
+                player.queued_inputs.clear();
+            }
+
             let tick_events = self.state.run_tick_auth();
 
             // Can unwrap here, since replication errors should at most happen on the client-side
