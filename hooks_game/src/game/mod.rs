@@ -69,7 +69,7 @@ pub enum Event {
 
 impl Game {
     pub fn new(my_player_id: PlayerId, game_info: &GameInfo) -> Game {
-        let state = {
+        let mut state = {
             let mut reg = Registry::new();
 
             register(game_info, &mut reg);
@@ -79,6 +79,9 @@ impl Game {
 
             game::State::from_registry(reg)
         };
+
+        game::init::view::create_state(&mut state.world);
+
         let tick_history = tick::History::new(state.event_reg.clone());
 
         Game {

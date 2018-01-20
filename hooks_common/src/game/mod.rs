@@ -1,5 +1,6 @@
 mod test_entity;
 pub mod state;
+pub mod init;
 
 use registry::Registry;
 use repl::entity;

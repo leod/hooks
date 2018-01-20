@@ -43,7 +43,7 @@ impl ggez::event::EventHandler for MainState {
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::error::GameResult<()> {
         ggez::graphics::clear(ctx);
 
-        self.view.draw(ctx, self.game.world_mut())?;
+        self.view.draw(ctx, self.game.world())?;
 
         ggez::graphics::present(ctx);
 
@@ -131,7 +131,13 @@ fn main() {
         info!("Loading resources from {:?}", path);
     }
 
-    let view = View::load(client.my_player_id(), client.game_info(), Assets::default()).unwrap();
+    let assets = Assets::new(ctx).unwrap();
+    let view = View::load(
+        ggez::graphics::get_size(ctx),
+        client.my_player_id(),
+        client.game_info(),
+        assets,
+    ).unwrap();
 
     // Inform the server that we are good to go
     client.ready().unwrap();
