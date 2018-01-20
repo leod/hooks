@@ -14,4 +14,15 @@ pub fn register(reg: &mut common::Registry) {
         },
         reg,
     );
+
+    entity::add_ctor(
+        "player",
+        |builder| {
+            builder.with(view::rect::Draw {
+                width: 40.0,
+                height: 40.0,
+            })
+        },
+        reg,
+    );
 }

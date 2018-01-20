@@ -30,16 +30,14 @@ fn main() {
         let mut update_stopwatch = Stopwatch::new();
 
         loop {
-            {
-                let duration = update_stopwatch.get_reset();
-                quit_timer += duration;
-            }
+            let update_duration = update_stopwatch.get_reset();
+            quit_timer += update_duration;
 
             if quit_timer.trigger() && rand::thread_rng().gen::<f64>() <= quit_prob {
                 break;
             }
 
-            match game.update(&mut client).unwrap() {
+            match game.update(&mut client, update_duration).unwrap() {
                 Some(game::Event::Disconnected) => {
                     return;
                 }
@@ -48,7 +46,7 @@ fn main() {
 
             // TODO: Send random input
 
-            thread::yield_now();
+            thread::sleep(Duration::from_millis(1));
         }
     }
 }

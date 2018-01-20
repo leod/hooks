@@ -8,7 +8,9 @@ build: common server game
 run: build
 	tmux \
 		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server; cat"' \; \
-		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"'
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"' \; \
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"' \; \
+		select-layout even-horizontal
 
 run-game:
 	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game

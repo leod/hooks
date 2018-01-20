@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Debug;
 
 use bit_manager::{self, BitRead, BitWrite};
 
@@ -44,7 +45,7 @@ pub trait EntitySnapshot: Clone + PartialEq + 'static {
 }
 
 /// Trait implemented by the component type enum associated with an EntitySnapshot.
-pub trait ComponentType: Sync + Send + Sized {
+pub trait ComponentType: Debug + Sync + Send + Sized {
     type EntitySnapshot: EntitySnapshot<ComponentType = Self>;
 }
 

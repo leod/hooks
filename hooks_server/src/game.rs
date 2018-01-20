@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::mem;
-use std::time;
 
 use rand::{self, Rng};
 
@@ -185,7 +184,7 @@ impl Game {
             // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
             self.state.push_events(self.queued_events.clear());
 
-            let tick_events = self.state.run_tick();
+            let tick_events = self.state.run_tick_auth();
 
             // Can unwrap here, since replication errors should at most happen on the client-side
             let tick_events = tick_events.unwrap();
@@ -225,6 +224,7 @@ impl Game {
 
                 let mut writer = BitWriter::new(Vec::new());
 
+                //println!("Sending tick {} with entities {:?}", self.next_tick, player.tick_history.get(self.next_tick).as_ref().unwrap().snapshot.as_ref().unwrap().0.keys());
                 player.tick_history.delta_write_tick(
                     player.last_ack_tick,
                     self.next_tick,
@@ -251,7 +251,7 @@ impl Game {
         // events have not been processed in a tick yet) with the regular shared events.
         let other_players = self.state.world.read_resource::<player::Players>();
 
-        for (&other_id, other_info) in other_players.iter() {
+        for (&other_id, &(ref other_info, _entity)) in other_players.iter() {
             new_player.queued_events.push(player::JoinedEvent {
                 id: other_id,
                 info: other_info.clone(),

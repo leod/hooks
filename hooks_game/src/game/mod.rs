@@ -165,20 +165,12 @@ impl Game {
 
                 let tick_data = self.tick_history.get(tick).unwrap();
 
-                //debug!("Starting tick {}", tick);
+                /*debug!("Starting tick {}", tick);
+                if tick_data.snapshot.is_some() {
+                    debug!("Entities {:?}", tick_data.snapshot.as_ref().unwrap().0.keys());
+                }*/
 
-                if let &Some(ref snapshot) = &tick_data.snapshot {
-                    //debug!("Loading snapshot");
-
-                    entity::view::create_new_entities(&mut self.state.world, snapshot);
-
-                    let mut sys = game::LoadSnapshotSys(snapshot);
-                    sys.run_now(&self.state.world.res);
-                }
-
-                let events = event::Sink::clone_from_vec(&tick_data.events);
-                self.state.push_events(events.into_vec());
-                self.state.run_tick()?;
+                self.state.run_tick_view(tick_data)?;
             } else {
                 //warn!("Waiting for tick...");
             }

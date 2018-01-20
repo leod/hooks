@@ -47,10 +47,14 @@ impl EntityMap {
     }
 }
 
+/// An `Error` indicates that something went seriously wrong in replication. Either we have a bug,
+/// or the server sent us an invalid snapshot. It is not possible to recover from this, so we
+/// should disconnect if such an error occurs.
 #[derive(Debug)]
 pub enum Error {
     InvalidPlayerId(PlayerId),
     InvalidEntityClassId(EntityClassId),
+    InvalidEntityClass(String),
     InvalidEntityId(EntityId),
     Replication(String),
 }

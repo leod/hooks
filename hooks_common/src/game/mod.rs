@@ -1,6 +1,7 @@
 pub mod entity;
 pub mod state;
 pub mod init;
+pub mod catch;
 
 use registry::Registry;
 use repl;
@@ -18,6 +19,7 @@ pub mod auth {
         super::register(reg);
         repl::entity::auth::register::<EntitySnapshot>(reg);
         entity::auth::register(reg);
+        catch::auth::register(reg);
     }
 }
 
