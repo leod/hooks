@@ -32,9 +32,6 @@ pub mod auth {
             "test",
             |builder| {
                 builder
-                    .with(Position {
-                        pos: Point2::origin(),
-                    })
                     .with(Orientation { angle: 0.0 })
                     .with(Test(0.0))
             },

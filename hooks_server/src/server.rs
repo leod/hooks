@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::thread;
 
 use common::GameInfo;
@@ -33,7 +34,7 @@ impl Server {
         loop {
             self.game.update(&mut self.host)?;
 
-            thread::yield_now();
+            thread::sleep(Duration::from_millis(1));
         }
     }
 }
