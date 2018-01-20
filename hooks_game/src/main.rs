@@ -4,7 +4,7 @@ extern crate hooks_game;
 #[macro_use]
 extern crate log;
 
-use std::{env, path, thread};
+use std::{env, path};
 
 use hooks_game::client::Client;
 use hooks_game::game::{self, Game};

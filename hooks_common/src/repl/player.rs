@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map;
 
-use specs::{self, Entity, Join, World};
+use specs::{self, Join, World};
 
 use defs::{LeaveReason, PlayerId, PlayerInfo};
 use event::{self, Event};

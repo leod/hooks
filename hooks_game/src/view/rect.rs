@@ -1,6 +1,6 @@
 use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
-use shred::{RunNow, SystemData};
-use specs::{Join, ReadStorage, System, VecStorage, World};
+use shred::SystemData;
+use specs::{Join, ReadStorage, VecStorage, World};
 
 use ggez;
 use ggez::graphics::{self, Drawable};

@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-use nalgebra::Vector2;
-
 use timer;
 
 pub type PlayerId = u32;

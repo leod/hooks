@@ -10,8 +10,8 @@ use shred::{Fetch, RunNow};
 use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, TickDeltaNum, TickNum};
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
-use common::repl::{entity, player, tick};
-use common::timer::{self, Stopwatch, Timer};
+use common::repl::{player, tick};
+use common::timer::{Stopwatch, Timer};
 
 use host::{self, Host};
 
@@ -219,7 +219,7 @@ impl Game {
             for (&player_id, player) in self.players.iter_mut() {
                 // TMP: For testing delta encoding/decoding!
                 if rand::thread_rng().gen() {
-                    continue;
+                    //continue;
                 }
 
                 let mut writer = BitWriter::new(Vec::new());
