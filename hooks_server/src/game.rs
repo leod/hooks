@@ -12,7 +12,7 @@ use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, Tic
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
 use common::repl::{entity, player, tick};
-use common::timer::{self, Timer, Stopwatch};
+use common::timer::{self, Stopwatch, Timer};
 
 use host::{self, Host};
 
@@ -102,6 +102,10 @@ impl Game {
             };
 
             if num_delta > TickDeltaNum::max_value() as TickNum {
+                // NOTE: In the future, if we have a higher tick rate, it might be better to send
+                //       a full snapshot to players who are lagged too far behind to use delta
+                //       encoding. Then, a different mechanism will need to be used to force
+                //       disconnect lagged clients.
                 info!(
                     "Player {}'s last acknowledged tick is {} ticks (ca. {:?}) in the past. \
                      Forcefully disconnecting.",
