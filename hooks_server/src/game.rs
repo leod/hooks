@@ -26,7 +26,7 @@ struct Player {
     /// joined players of existing players, with a stack of `PlayerJoined` events.
     queued_events: event::Sink,
 
-    /// Inputs received by the client.
+    /// Inputs received from the client.
     queued_inputs: BTreeMap<TickNum, PlayerInput>,
 }
 
@@ -184,6 +184,28 @@ impl Game {
                                 // The server will always try to delta encode with respect to the
                                 // last tick acknowledged by the client.
                                 player.tick_history.prune_older_ticks(tick_num);
+
+                                // We should have data for every tick in
+                                // [player.last_ack_tick, self.next_tick - 1]
+                                assert!(player.tick_history.get(tick_num).is_some());
+
+                                if player
+                                    .tick_history
+                                    .get(tick_num)
+                                    .as_ref()
+                                    .unwrap()
+                                    .snapshot
+                                    .is_none()
+                                {
+                                    warn!(
+                                        "Player {} has acknowledged the non-snapshot tick {},\
+                                         disconnecting",
+                                        player_id, tick_num
+                                    );
+
+                                    host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
+                                    continue;
+                                }
                             }
                         }
                         ClientGameMsg::StartedTick(started_tick_num, player_input) => {
@@ -241,15 +263,11 @@ impl Game {
             // Can unwrap here, since replication errors should at most happen on the client-side
             let tick_events = tick_events.unwrap();
 
-            // 4.2. Create snapshot for every player.
-            for (_player_id, player) in self.players.iter_mut() {
-                // We don't do this yet, but here the snapshot will be filtered differently for
-                // every player.
-                let mut sys = game::StoreSnapshotSys(game::WorldSnapshot::new());
-                sys.run_now(&self.state.world.res);
+            // 4.2. Record events for every player in tick history and send snapshots
+            let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
+            let send_snapshot = self.next_tick % self.game_info().ticks_per_snapshot == 0;
 
-                let snapshot = sys.0;
-
+            for (&player_id, player) in self.players.iter_mut() {
                 // Events for this player are the special queued events as well as the shared
                 // events of this tick
                 let mut player_events = mem::replace(&mut player.queued_events, event::Sink::new());
@@ -257,39 +275,44 @@ impl Game {
                     player_events.push_box(event.clone_event());
                 }
 
+                let snapshot = if send_snapshot {
+                    // We don't do this yet, but here the snapshot will be filtered differently for
+                    // every player.
+                    let mut sys = game::StoreSnapshotSys(game::WorldSnapshot::new());
+                    sys.run_now(&self.state.world.res);
+                    Some(sys.0)
+                } else {
+                    None
+                };
+
                 let tick_data = tick::Data {
                     events: player_events.into_vec(),
-                    snapshot: Some(snapshot),
+                    snapshot: snapshot,
                 };
 
                 player.tick_history.push_tick(self.next_tick, tick_data);
-            }
 
-            // 4.3. Send delta snapshot to every player
-            let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
+                if send_snapshot {
+                    if rand::thread_rng().gen() {
+                        // TMP: For testing delta encoding/decoding!
+                        //continue;
+                    }
 
-            for (&player_id, player) in self.players.iter_mut() {
-                // TMP: For testing delta encoding/decoding!
-                if rand::thread_rng().gen() {
-                    //continue;
+                    let mut writer = BitWriter::new(Vec::new());
+
+                    player.tick_history.delta_write_tick(
+                        player.last_ack_tick,
+                        self.next_tick,
+                        &entity_classes,
+                        &mut writer,
+                    )?;
+
+                    let data = writer.into_inner()?;
+                    host.send_game(player_id, &data)?;
                 }
-
-                let mut writer = BitWriter::new(Vec::new());
-
-                //println!("Sending tick {} with entities {:?}", self.next_tick, player.tick_history.get(self.next_tick).as_ref().unwrap().snapshot.as_ref().unwrap().0.keys());
-                player.tick_history.delta_write_tick(
-                    player.last_ack_tick,
-                    self.next_tick,
-                    &entity_classes,
-                    &mut writer,
-                )?;
-
-                let data = writer.into_inner()?;
-
-                host.send_game(player_id, &data)?;
             }
 
-            // 4.4. Advance counter
+            // 4.3. Advance counter
             self.next_tick += 1;
         }
 
