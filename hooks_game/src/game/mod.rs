@@ -1,5 +1,5 @@
 use std::io::Cursor;
-use std::time;
+use std::time::Duration;
 
 use rand::{self, Rng};
 
@@ -56,9 +56,6 @@ pub struct Game {
 
     /// Newest tick of which we know that the server knows that we have received it.
     server_recv_ack_tick: Option<TickNum>,
-
-    /// Time that the last update call occured.
-    last_update_instant: Option<time::Instant>,
 }
 
 fn register(game_info: &GameInfo, reg: &mut Registry) {
@@ -89,19 +86,14 @@ impl Game {
             tick_timer: Timer::new(game_info.tick_duration()),
             last_tick: None,
             server_recv_ack_tick: None,
-            last_update_instant: None,
         }
     }
 
-    pub fn update(&mut self, client: &mut Client) -> Result<Option<Event>, Error> {
+    pub fn update(&mut self, client: &mut Client, delta: Duration) -> Result<Option<Event>, Error> {
         // Advance timers
-        if let Some(instant) = self.last_update_instant {
-            let duration = instant.elapsed();
+        self.tick_timer += delta;
 
-            self.tick_timer += duration;
-        }
-
-        self.last_update_instant = Some(time::Instant::now());
+        // Handle network events
         while let Some(event) = client.service()? {
             match event {
                 client::Event::Disconnected => {
