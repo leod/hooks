@@ -1,18 +1,15 @@
 use std::io::Cursor;
 use std::time::Duration;
 
-use rand::{self, Rng};
-
-use shred::RunNow;
-use specs::{Join, World};
-
 use bit_manager::BitReader;
+use rand::{self, Rng};
+use specs::World;
 
 use common::{self, event, game, GameInfo, PlayerId, TickNum};
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
-use common::repl::{self, entity, tick};
-use common::timer::{self, Timer};
+use common::repl::{self, tick};
+use common::timer::Timer;
 
 use client::{self, Client};
 use view;

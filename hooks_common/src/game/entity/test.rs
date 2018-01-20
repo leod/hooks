@@ -1,5 +1,3 @@
-use nalgebra::Point2;
-
 use defs::GameInfo;
 use game::ComponentType;
 use physics::{Orientation, Position};
