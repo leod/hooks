@@ -30,8 +30,8 @@ pub mod net;
 pub mod game;
 
 pub use defs::*;
-
-use registry::Registry;
+pub use event::Event;
+pub use registry::Registry;
 
 fn register(game_info: &GameInfo, reg: &mut Registry) {
     reg.resource(game_info.clone());
