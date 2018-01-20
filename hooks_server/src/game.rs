@@ -7,7 +7,8 @@ use bit_manager::BitWriter;
 
 use shred::{Fetch, RunNow};
 
-use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, TickDeltaNum, TickNum};
+use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
+             TickDeltaNum, TickNum};
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
 use common::repl::{player, tick};
@@ -18,11 +19,15 @@ use host::{self, Host};
 struct Player {
     join_tick: TickNum,
     last_ack_tick: Option<TickNum>,
+    last_started_tick: Option<TickNum>,
     tick_history: tick::History<game::EntitySnapshot>,
 
     /// Events queued only for this player for the next tick. We currently use this to inform newly
     /// joined players of existing players, with a stack of `PlayerJoined` events.
     queued_events: event::Sink,
+
+    /// Inputs received by the client.
+    queued_inputs: BTreeMap<TickNum, PlayerInput>,
 }
 
 impl Player {
@@ -30,8 +35,10 @@ impl Player {
         Player {
             join_tick: join_tick,
             last_ack_tick: None,
+            last_started_tick: None,
             tick_history: tick::History::new(event_reg),
             queued_events: event::Sink::new(),
+            queued_inputs: BTreeMap::new(),
         }
     }
 }
@@ -158,7 +165,14 @@ impl Game {
                                 // Invalid tick number! Forcefully disconnect the client.
                                 // NOTE: The corresponding `host::Event::PlayerLeft` event will be
                                 //       handled in the next iteration of the while loop.
+                                warn!(
+                                    "Player {} says he received tick {}, but we will start\
+                                     tick {} next, disconnecting",
+                                    player_id, tick_num, self.next_tick
+                                );
+
                                 host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
+                                continue;
                             }
 
                             // Since game messages are unreliable, it is possible that we receive
@@ -171,6 +185,44 @@ impl Game {
                                 // last tick acknowledged by the client.
                                 player.tick_history.prune_older_ticks(tick_num);
                             }
+                        }
+                        ClientGameMsg::StartedTick(started_tick_num, player_input) => {
+                            if started_tick_num >= self.next_tick {
+                                // Got input for a tick that we haven't even started yet!
+                                warn!(
+                                    "Player {} says he started tick {}, but we will start\
+                                     tick {} next, disconnecting",
+                                    player_id, started_tick_num, self.next_tick
+                                );
+
+                                host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
+                                continue;
+                            }
+
+                            let player = self.players.get_mut(&player_id).unwrap();
+
+                            player.last_started_tick = Some(match player.last_started_tick {
+                                Some(last_started_tick) => {
+                                    if last_started_tick == started_tick_num {
+                                        // Player started tick twice!
+                                        warn!(
+                                            "Player {} started tick {} twice, disconnecting",
+                                            player_id, started_tick_num
+                                        );
+
+                                        host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
+                                        continue;
+                                    } else {
+                                        // Input might have been received out of order
+                                        last_started_tick.max(started_tick_num)
+                                    }
+                                }
+                                None => started_tick_num,
+                            });
+
+                            player
+                                .queued_inputs
+                                .insert(started_tick_num, player_input.clone());
                         }
                     }
                 }

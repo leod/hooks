@@ -69,12 +69,6 @@ pub struct PlayerInput {
     pub shoot_two: bool,
 }
 
-#[derive(Debug, Clone, BitStore)]
-pub struct TimedPlayerInput {
-    pub duration_s: f32,
-    pub input: PlayerInput,
-}
-
 #[derive(Debug, Copy, Clone, BitStore)]
 pub enum LeaveReason {
     Disconnected,
