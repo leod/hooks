@@ -18,6 +18,11 @@ fn register(reg: &mut Registry) {
         "collision::CreateObjectSys",
         &[],
     );
+    reg.tick_system(
+        collision::UpdateSys,
+        "collision::UpdateSys",
+        &["collision::CreateObjectSys"],
+    );
 }
 
 pub mod auth {

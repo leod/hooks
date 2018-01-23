@@ -1,5 +1,4 @@
-use specs::{BTreeStorage, Entities, Entity, FetchMut, Join, NullStorage, ReadStorage, System,
-            VecStorage, WriteStorage};
+use specs::{Entities, Entity, FetchMut, Join, ReadStorage, System, WriteStorage};
 
 use nalgebra::Isometry2;
 use ncollide::shape::ShapeHandle2;
@@ -26,13 +25,15 @@ type CollisionWorld = CollisionWorld2<f32, Entity>;
 pub const GROUP_WALL: usize = 0;
 pub const GROUP_PLAYER: usize = 1;
 
+/// Collision shape.
 #[derive(Clone, Component)]
 #[component(VecStorage)]
 pub struct Shape {
     pub shape: ShapeHandle2<f32>,
 }
 
-// Tag components
+/// Tag component which indicates that we should inform the collision world of this entity. The
+/// component is removed from the entity after that.
 #[derive(Component)]
 #[component(BTreeStorage)]
 pub struct CreateObject {
@@ -44,16 +45,28 @@ pub struct CreateObject {
 //       to handle the removal of entitites. Alternatively... we could use local events for this
 //       somehow? But then again, this would mean that entity removal would not be handled in
 //       batches.
+/// Tag component which indicates that we should remove the collision object.
 #[derive(Component, Default)]
 #[component(NullStorage)]
 pub struct RemoveObject;
 
-// Handle of a ncollide CollisionObject
+/// Handle of an ncollide CollisionObject.
 #[derive(Component)]
 #[component(VecStorage)]
 pub struct ObjectUid(usize);
 
-// System for creating collision objects for entities tagged with CreateObject
+/// System for running the collision pipeline.
+pub struct UpdateSys;
+
+impl<'a> System<'a> for UpdateSys {
+    type SystemData = (FetchMut<'a, CollisionWorld>,);
+
+    fn run(&mut self, (mut collision_world,): Self::SystemData) {
+        collision_world.update();
+    }
+}
+
+/// System for creating collision objects for entities tagged with CreateObject.
 pub struct CreateObjectSys {
     next_uid: usize,
 }
@@ -122,7 +135,7 @@ impl<'a> System<'a> for CreateObjectSys {
     }
 }
 
-// System for removing collision objects for entities tagged with RemoveObject
+/// System for removing collision objects for entities tagged with RemoveObject.
 struct RemoveObjectSys;
 
 impl<'a> System<'a> for RemoveObjectSys {
