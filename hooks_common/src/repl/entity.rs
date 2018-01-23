@@ -43,10 +43,10 @@ struct ClassNames(pub BTreeMap<String, EntityClassId>);
 ///
 /// Note that this function must only be called after this module's register function.
 pub fn register_type<T: ComponentType>(
-    name: &str,
-    components: Vec<T>,
-    ctor: Ctor,
     reg: &mut Registry,
+    name: &str,
+    components: &[T],
+    ctor: Ctor,
 ) -> EntityClassId {
     let world = reg.world();
 
@@ -66,7 +66,7 @@ pub fn register_type<T: ComponentType>(
     assert!(!class_names.0.values().any(|&id| id == class_id));
 
     let class = EntityClass::<T::EntitySnapshot> {
-        components: components,
+        components: components.to_vec(),
     };
 
     classes.0.insert(class_id, class);
@@ -79,7 +79,7 @@ pub fn register_type<T: ComponentType>(
     class_id
 }
 
-pub fn add_ctor(name: &str, ctor: Ctor, reg: &mut Registry) {
+pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
     let world = reg.world();
 
     let class_id = {

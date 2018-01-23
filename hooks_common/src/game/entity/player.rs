@@ -11,8 +11,9 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Player>();
 
     entity::register_type(
+        reg,
         "player",
-        vec![ComponentType::Position, ComponentType::Orientation],
+        &[ComponentType::Position, ComponentType::Orientation],
         |builder| {
             let shape = Cuboid::new(Vector2::new(10.0, 10.0));
             let mut groups = CollisionGroups::new();
@@ -26,7 +27,6 @@ pub fn register(reg: &mut Registry) {
                 })
                 .with(collision::CreateObject { groups, query_type })
         },
-        reg,
     );
 }
 

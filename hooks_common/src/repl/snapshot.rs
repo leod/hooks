@@ -45,7 +45,7 @@ pub trait EntitySnapshot: Clone + PartialEq + 'static {
 }
 
 /// Trait implemented by the component type enum associated with an EntitySnapshot.
-pub trait ComponentType: Debug + Sync + Send + Sized {
+pub trait ComponentType: Debug + Clone + Sync + Send + Sized {
     type EntitySnapshot: EntitySnapshot<ComponentType = Self>;
 }
 

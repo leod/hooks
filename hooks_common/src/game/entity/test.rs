@@ -6,10 +6,10 @@ use repl::entity;
 
 pub fn register(reg: &mut Registry) {
     entity::register_type(
-        "test",
-        vec![ComponentType::Position, ComponentType::Orientation],
-        |builder| builder,
         reg,
+        "test",
+        &[ComponentType::Position, ComponentType::Orientation],
+        |builder| builder,
     );
 }
 
@@ -24,11 +24,9 @@ pub mod auth {
         reg.component::<Test>();
         reg.tick_system(TickSys, "test", &[]);
 
-        entity::add_ctor(
-            "test",
-            |builder| builder.with(Orientation { angle: 0.0 }).with(Test(0.0)),
-            reg,
-        );
+        entity::add_ctor(reg, "test", |builder| {
+            builder.with(Orientation { angle: 0.0 }).with(Test(0.0))
+        });
     }
 
     #[derive(Component)]
