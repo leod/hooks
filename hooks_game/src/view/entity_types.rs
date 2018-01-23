@@ -19,8 +19,8 @@ pub fn register(reg: &mut common::Registry) {
         "player",
         |builder| {
             builder.with(view::rect::Draw {
-                width: 40.0,
-                height: 40.0,
+                width: 20.0,
+                height: 20.0,
             })
         },
         reg,

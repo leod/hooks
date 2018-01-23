@@ -153,7 +153,7 @@ impl Game {
         }
 
         // Start ticks
-        if self.tick_timer.trigger() {
+        while self.tick_timer.trigger() {
             let tick = if let Some(last_tick) = self.last_tick {
                 let next_tick = last_tick + 1;
                 self.tick_history.get(next_tick).map(|_| next_tick)
