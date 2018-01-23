@@ -254,6 +254,7 @@ impl Game {
         // 4. Run a tick periodically
         if self.tick_timer.trigger() {
             // 4.1. Run tick
+            //debug!("Starting tick {}", self.next_tick);
 
             // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
             self.state.push_events(self.queued_events.clear());
@@ -272,7 +273,7 @@ impl Game {
             // Can unwrap here, since replication errors should at most happen on the client-side
             let tick_events = tick_events.unwrap();
 
-            // 4.2. Record events for every player in tick history and send snapshots
+            // 4.2. Record tick in history and send snapshots for every player
             let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
             let send_snapshot = self.next_tick % self.game_info().ticks_per_snapshot == 0;
 

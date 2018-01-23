@@ -2,57 +2,77 @@ use specs::{BTreeStorage, Entities, Entity, FetchMut, Join, NullStorage, ReadSto
             VecStorage, WriteStorage};
 
 use nalgebra::Isometry2;
-use ncollide::world::{CollisionGroups, CollisionWorld2, GeometricQueryType};
+use ncollide::shape::ShapeHandle2;
+use ncollide::world::CollisionWorld2;
 
-use physics::{CollisionShape, Orientation, Position};
+use physics::{Orientation, Position};
 use registry::Registry;
 
+pub use ncollide::shape::{Cuboid, ShapeHandle};
+pub use ncollide::world::{CollisionGroups, GeometricQueryType};
+
 pub fn register(reg: &mut Registry) {
-    reg.component::<CreateCollisionObject>();
-    reg.component::<RemoveCollisionObject>();
-    reg.component::<CollisionObjectUid>();
-    // TODO
+    reg.component::<Shape>();
+    reg.component::<CreateObject>();
+    reg.component::<RemoveObject>();
+    reg.component::<ObjectUid>();
+
+    reg.resource(CollisionWorld2::<f32, Entity>::new(0.02, false));
+}
+
+type CollisionWorld = CollisionWorld2<f32, Entity>;
+
+// Collision groups. Put them here for now.
+pub const GROUP_WALL: usize = 0;
+pub const GROUP_PLAYER: usize = 1;
+
+#[derive(Clone, Component)]
+#[component(VecStorage)]
+pub struct Shape {
+    pub shape: ShapeHandle2<f32>,
 }
 
 // Tag components
 #[derive(Component)]
 #[component(BTreeStorage)]
-pub struct CreateCollisionObject {
-    pub collision_groups: CollisionGroups,
+pub struct CreateObject {
+    pub groups: CollisionGroups,
     pub query_type: GeometricQueryType<f32>,
 }
 
+// TODO: Let's make `RemoveEntity` a thing independent of collision, and allow registering systems
+//       to handle the removal of entitites. Alternatively... we could use local events for this
+//       somehow? But then again, this would mean that entity removal would not be handled in
+//       batches.
 #[derive(Component, Default)]
 #[component(NullStorage)]
-pub struct RemoveCollisionObject;
+pub struct RemoveObject;
 
 // Handle of a ncollide CollisionObject
 #[derive(Component)]
 #[component(VecStorage)]
-pub struct CollisionObjectUid(usize);
+pub struct ObjectUid(usize);
 
-// System for creating collision objects for entities tagged with CreateCollisionObject
-pub struct CreateCollisionObjectSys {
+// System for creating collision objects for entities tagged with CreateObject
+pub struct CreateObjectSys {
     next_uid: usize,
 }
 
-impl CreateCollisionObjectSys {
+impl CreateObjectSys {
     pub fn new() -> Self {
         Self { next_uid: 0 }
     }
 }
 
-type CollisionWorld = CollisionWorld2<f32, Entity>;
-
-impl<'a> System<'a> for CreateCollisionObjectSys {
+impl<'a> System<'a> for CreateObjectSys {
     type SystemData = (
         FetchMut<'a, CollisionWorld>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Orientation>,
-        ReadStorage<'a, CollisionShape>,
-        WriteStorage<'a, CreateCollisionObject>,
-        WriteStorage<'a, CollisionObjectUid>,
+        ReadStorage<'a, Shape>,
+        WriteStorage<'a, CreateObject>,
+        WriteStorage<'a, ObjectUid>,
     );
 
     fn run(
@@ -78,12 +98,12 @@ impl<'a> System<'a> for CreateCollisionObjectSys {
                     uid,
                     isometry,
                     shape.shape.clone(),
-                    create_object.collision_groups,
+                    create_object.groups,
                     create_object.query_type,
                     entity,
                 );
 
-                object_uid.insert(entity, CollisionObjectUid(uid));
+                object_uid.insert(entity, ObjectUid(uid));
 
                 entity
             })
@@ -95,22 +115,22 @@ impl<'a> System<'a> for CreateCollisionObjectSys {
 
         for (entity, _) in (&*entities, &create_object).join() {
             panic!(
-                "Entity {:?} has CreateCollisionObject but not Position, Orientation or Shape",
+                "Entity {:?} has CreateObject but not Position, Orientation or Shape",
                 entity
             );
         }
     }
 }
 
-// System for removing collision objects for entities tagged with RemoveCollisionObject
-struct RemoveCollisionObjectSys;
+// System for removing collision objects for entities tagged with RemoveObject
+struct RemoveObjectSys;
 
-impl<'a> System<'a> for RemoveCollisionObjectSys {
+impl<'a> System<'a> for RemoveObjectSys {
     type SystemData = (
         FetchMut<'a, CollisionWorld>,
         Entities<'a>,
-        WriteStorage<'a, RemoveCollisionObject>,
-        WriteStorage<'a, CollisionObjectUid>,
+        WriteStorage<'a, RemoveObject>,
+        WriteStorage<'a, ObjectUid>,
     );
 
     fn run(
@@ -131,10 +151,7 @@ impl<'a> System<'a> for RemoveCollisionObjectSys {
         }
 
         for (entity, _) in (&*entities, &remove_object).join() {
-            panic!(
-                "Entity {:?} has RemoveCollisionObject but not CollisionObjectUid",
-                entity
-            );
+            panic!("Entity {:?} has RemoveObject but not ObjectUid", entity);
         }
     }
 }

@@ -27,9 +27,10 @@ impl Event for RemoveOrder {
     }
 }
 
+// TODO: Probably want to use Box<FnSomething>
 pub type Ctor = fn(specs::EntityBuilder) -> specs::EntityBuilder;
 
-/// Constructors for adding client-side-specific components to replicated entities.
+/// Constructors, e.g. for adding client-side-specific components to replicated entities.
 struct Ctors(pub BTreeMap<EntityClassId, Vec<Ctor>>);
 
 /// Maps from entity class names to their unique id. This map should be exactly the same on server
