@@ -4,6 +4,7 @@ pub mod init;
 pub mod input;
 pub mod catch;
 
+use physics::collision;
 use registry::Registry;
 use repl;
 
@@ -11,7 +12,13 @@ pub use self::snapshot::{ComponentType, EntityClasses, EntitySnapshot, LoadSnaps
                          StoreSnapshotSys, WorldSnapshot};
 pub use self::state::State;
 
-fn register(_: &mut Registry) {}
+fn register(reg: &mut Registry) {
+    reg.tick_system(
+        collision::CreateObjectSys::new(),
+        "collision::CreateObjectSys",
+        &[],
+    );
+}
 
 pub mod auth {
     use super::*;

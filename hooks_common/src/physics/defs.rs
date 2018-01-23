@@ -2,7 +2,6 @@ use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
 
 use nalgebra::Point2;
-use ncollide::shape::ShapeHandle2;
 use specs::VecStorage;
 
 use registry::Registry;
@@ -10,7 +9,6 @@ use registry::Registry;
 pub fn register(reg: &mut Registry) {
     reg.component::<Position>();
     reg.component::<Orientation>();
-    reg.component::<CollisionShape>();
 }
 
 #[derive(Component, PartialEq, Clone, Debug)]
@@ -23,12 +21,6 @@ pub struct Position {
 #[component(VecStorage)]
 pub struct Orientation {
     pub angle: f32,
-}
-
-#[derive(Clone, Component)]
-#[component(VecStorage)]
-pub struct CollisionShape {
-    pub shape: ShapeHandle2<f32>,
 }
 
 impl BitStore for Position {
