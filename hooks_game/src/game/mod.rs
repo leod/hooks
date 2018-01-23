@@ -54,8 +54,8 @@ pub struct Game {
     server_recv_ack_tick: Option<TickNum>,
 }
 
-fn register(game_info: &GameInfo, reg: &mut Registry) {
-    common::view::register(game_info, reg);
+fn register(reg: &mut Registry, game_info: &GameInfo) {
+    common::view::register(reg, game_info);
 }
 
 #[derive(Debug)]
@@ -69,7 +69,7 @@ impl Game {
         let mut state = {
             let mut reg = Registry::new();
 
-            register(game_info, &mut reg);
+            register(&mut reg, game_info);
 
             // TODO: Might be cleaner to create the `Registry` outside of `Game`
             view::register(game_info, &mut reg);

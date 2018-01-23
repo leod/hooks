@@ -60,8 +60,8 @@ pub struct Game {
     queued_events: event::Sink,
 }
 
-fn register(game_info: &GameInfo, reg: &mut Registry) {
-    common::auth::register(game_info, reg);
+fn register(reg: &mut Registry, game_info: &GameInfo) {
+    common::auth::register(reg, game_info);
 }
 
 impl Game {
@@ -69,7 +69,7 @@ impl Game {
         let mut state = {
             let mut reg = Registry::new();
 
-            register(&game_info, &mut reg);
+            register(&mut reg, &game_info);
 
             game::State::from_registry(reg)
         };

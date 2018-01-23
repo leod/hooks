@@ -34,7 +34,7 @@ pub use defs::*;
 pub use event::Event;
 pub use registry::Registry;
 
-fn register(game_info: &GameInfo, reg: &mut Registry) {
+fn register(reg: &mut Registry, game_info: &GameInfo) {
     reg.resource(game_info.clone());
     reg.resource(event::Sink::new());
 
@@ -46,8 +46,8 @@ fn register(game_info: &GameInfo, reg: &mut Registry) {
 pub mod auth {
     use super::*;
 
-    pub fn register(game_info: &GameInfo, reg: &mut Registry) {
-        super::register(game_info, reg);
+    pub fn register(reg: &mut Registry, game_info: &GameInfo) {
+        super::register(reg, game_info);
         game::auth::register(reg);
     }
 }
@@ -55,8 +55,8 @@ pub mod auth {
 pub mod view {
     use super::*;
 
-    pub fn register(game_info: &GameInfo, reg: &mut Registry) {
-        super::register(game_info, reg);
+    pub fn register(reg: &mut Registry, game_info: &GameInfo) {
+        super::register(reg, game_info);
         game::view::register(reg);
     }
 }
