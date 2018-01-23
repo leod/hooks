@@ -47,7 +47,7 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
         graphics::push_transform(ctx, Some(curr_transform * matrix));
         graphics::apply_transformations(ctx)?;
 
-        assets.rect.draw(ctx, Point2::origin(), 0.0)?;
+        assets.rect_line.draw(ctx, Point2::origin(), 0.0)?;
 
         graphics::pop_transform(ctx);
     }

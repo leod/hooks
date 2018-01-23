@@ -1,5 +1,6 @@
 mod camera;
 mod rect;
+mod wall;
 mod entity_types;
 
 use nalgebra::Point2;
@@ -22,16 +23,18 @@ pub fn register(game_info: &GameInfo, reg: &mut common::Registry) {
 
 pub fn register_load(game_info: &GameInfo, reg: &mut Registry) {
     rect::register_load(reg);
+    wall::register_load(reg);
 }
 
 pub struct Assets {
-    pub rect: Mesh,
+    pub rect_fill: Mesh,
+    pub rect_line: Mesh,
 }
 
 impl Assets {
     pub fn new(ctx: &mut ggez::Context) -> ggez::error::GameResult<Assets> {
         // TODO: Better place to put this
-        let rect = Mesh::new_polygon(
+        let rect_fill = Mesh::new_polygon(
             ctx,
             DrawMode::Fill,
             &[
@@ -41,8 +44,21 @@ impl Assets {
                 Point2::new(-0.5, 0.5),
             ],
         )?;
+        let rect_line = Mesh::new_polygon(
+            ctx,
+            DrawMode::Line(1.0),
+            &[
+                Point2::new(-0.5, -0.5),
+                Point2::new(0.5, -0.5),
+                Point2::new(0.5, 0.5),
+                Point2::new(-0.5, 0.5),
+            ],
+        )?;
 
-        Ok(Assets { rect })
+        Ok(Assets {
+            rect_fill,
+            rect_line,
+        })
     }
 }
 
