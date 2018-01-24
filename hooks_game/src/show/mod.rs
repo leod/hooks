@@ -16,14 +16,14 @@ use common::repl::player::Players;
 
 use self::camera::Camera;
 
-pub fn register(game_info: &GameInfo, reg: &mut common::Registry) {
+pub fn register(reg: &mut common::Registry) {
     rect::register(reg);
     entity_types::register(reg);
 }
 
-pub fn register_load(game_info: &GameInfo, reg: &mut Registry) {
-    rect::register_load(reg);
-    wall::register_load(reg);
+pub fn register_show(reg: &mut Registry) {
+    rect::register_show(reg);
+    wall::register_show(reg);
 }
 
 pub struct Assets {
@@ -83,7 +83,7 @@ impl Registry {
     }
 }
 
-pub struct View {
+pub struct Show {
     my_player_id: PlayerId,
     game_info: GameInfo,
 
@@ -93,18 +93,18 @@ pub struct View {
     camera: Camera,
 }
 
-impl View {
-    /// Load all assets for a game info and create a `View`.
+impl Show {
+    /// Load all assets for a game info and create a `Show`.
     pub fn load(
         view_size: (u32, u32),
         my_player_id: PlayerId,
         game_info: &GameInfo,
         assets: Assets,
-    ) -> ggez::error::GameResult<View> {
+    ) -> ggez::error::GameResult<Show> {
         let mut reg = Registry::default();
-        register_load(game_info, &mut reg);
+        register_show(&mut reg);
 
-        Ok(View {
+        Ok(Show {
             my_player_id,
             game_info: game_info.clone(),
 
@@ -115,7 +115,7 @@ impl View {
         })
     }
 
-    /// View game events.
+    /// Show game events.
     pub fn handle_events(
         &self,
         world: &mut World,

@@ -12,11 +12,20 @@ use std::{env, path};
 use ggez::event::Keycode;
 use nalgebra::Vector2;
 
-use common::defs::PlayerInput;
+use common::defs::{PlayerInput, GameInfo};
+use common::registry::Registry;
 
 use hooks_game::client::Client;
 use hooks_game::game::{self, Game};
-use hooks_game::view::{Assets, View};
+use hooks_game::show::{self, Assets, Show};
+
+fn register(reg: &mut Registry, game_info: &GameInfo) {
+    // Game state
+    game::register(reg, game_info);
+
+    // Components for showing game state
+    show::register(reg);
+}
 
 struct Config {
     host: String,
@@ -27,7 +36,7 @@ struct Config {
 struct MainState {
     client: Client,
     game: Game,
-    view: View,
+    show: Show,
 
     next_player_input: PlayerInput,
 }
@@ -45,7 +54,7 @@ impl ggez::event::EventHandler for MainState {
                 ctx.quit()?;
             }
             Some(game::Event::TickStarted(ref events)) => {
-                self.view.handle_events(self.game.world_mut(), events)?;
+                self.show.handle_events(self.game.world_mut(), events)?;
             }
             None => {}
         }
@@ -56,7 +65,7 @@ impl ggez::event::EventHandler for MainState {
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::error::GameResult<()> {
         ggez::graphics::clear(ctx);
 
-        self.view.draw(ctx, self.game.world())?;
+        self.show.draw(ctx, self.game.world())?;
 
         ggez::graphics::present(ctx);
 
@@ -150,7 +159,11 @@ fn main() {
         client.game_info()
     );
 
-    let game = Game::new(client.my_player_id(), client.game_info());
+    // Register and create game
+    let mut reg = Registry::new();
+    register(&mut reg, client.game_info());
+
+    let game = Game::new(reg, client.my_player_id(), client.game_info());
 
     // Initialize ggez
     let ctx = &mut ggez::Context::load_from_conf("hooks", "leod", ggez::conf::Conf::new()).unwrap();
@@ -164,7 +177,7 @@ fn main() {
     }
 
     let assets = Assets::new(ctx).unwrap();
-    let view = View::load(
+    let show = Show::load(
         ggez::graphics::get_size(ctx),
         client.my_player_id(),
         client.game_info(),
@@ -177,7 +190,7 @@ fn main() {
     let mut state = MainState {
         client,
         game,
-        view,
+        show,
         next_player_input: PlayerInput::default(),
     };
     ggez::event::run(ctx, &mut state).unwrap();

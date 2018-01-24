@@ -12,4 +12,4 @@ extern crate specs_derive;
 
 pub mod client;
 pub mod game;
-pub mod view;
+pub mod show;
