@@ -27,7 +27,7 @@ pub mod auth {
                 let pos = Point2::new(rng.next_f32() * 200.00, rng.next_f32() * 200.0);
 
                 repl::entity::auth::create(world, player_id, &player_entity_class, |builder| {
-                    builder.with(Position { pos })
+                    builder.with(Position(pos))
                 });
             }
         }

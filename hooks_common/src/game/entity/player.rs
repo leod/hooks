@@ -20,11 +20,10 @@ pub fn register(reg: &mut Registry) {
             groups.set_membership(&[collision::GROUP_PLAYER]);
             groups.set_whitelist(&[collision::GROUP_WALL]);
             let query_type = GeometricQueryType::Contacts(1000.0);
+
             builder
-                .with(Orientation { angle: 0.0 })
-                .with(collision::Shape {
-                    shape: ShapeHandle::new(shape),
-                })
+                .with(Orientation(0.0))
+                .with(collision::Shape(ShapeHandle::new(shape)))
                 .with(collision::CreateObject { groups, query_type })
         },
     );

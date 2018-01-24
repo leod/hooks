@@ -4,7 +4,7 @@ pub mod init;
 pub mod input;
 pub mod catch;
 
-use physics::collision;
+use physics::{self, collision};
 use registry::Registry;
 use repl;
 
@@ -15,13 +15,18 @@ pub use self::state::State;
 fn register(reg: &mut Registry) {
     reg.tick_system(
         collision::CreateObjectSys::new(),
-        "collision::CreateObjectSys",
+        "physics::collision::CreateObjectSys",
         &[],
     );
     reg.tick_system(
         collision::UpdateSys,
-        "collision::UpdateSys",
-        &["collision::CreateObjectSys"],
+        "physics::collision::UpdateSys",
+        &["physics::collision::CreateObjectSys"],
+    );
+    reg.tick_system(
+        physics::run::RunSys,
+        "physics::run::RunSys",
+        &["physics::collision::UpdateSys"],
     );
 }
 

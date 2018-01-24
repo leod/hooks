@@ -29,16 +29,16 @@ pub mod auth {
             let mut position = data.position.get_mut(entity).unwrap();
             let mut orientation = data.orientation.get_mut(entity).unwrap();
 
-            orientation.angle = input.rot_angle;
+            orientation.0 = input.rot_angle;
 
-            let forward = Rotation2::new(orientation.angle).matrix() * Vector2::new(1.0, 0.0);
+            let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
 
             if input.move_forward {
-                position.pos += forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
+                position.0 += forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
             }
 
             if input.move_backward {
-                position.pos -= forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
+                position.0 -= forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
             }
         }
     }

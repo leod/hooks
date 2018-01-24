@@ -2,7 +2,7 @@ use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
 
 use nalgebra::Point2;
-use specs::VecStorage;
+use specs::{Component, FlaggedStorage, VecStorage};
 
 use registry::Registry;
 
@@ -11,27 +11,29 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Orientation>();
 }
 
-#[derive(Component, PartialEq, Clone, Debug)]
-#[component(VecStorage)]
-pub struct Position {
-    pub pos: Point2<f32>,
+/// Two-dimensional position.
+#[derive(PartialEq, Clone, Debug)]
+pub struct Position(pub Point2<f32>);
+
+impl Component for Position {
+    type Storage = FlaggedStorage<Self, VecStorage<Self>>;
 }
 
-#[derive(Component, PartialEq, Clone, Debug, BitStore)]
-#[component(VecStorage)]
-pub struct Orientation {
-    pub angle: f32,
+/// Rotation angle.
+#[derive(PartialEq, Clone, Debug, BitStore)]
+pub struct Orientation(pub f32);
+
+impl Component for Orientation {
+    type Storage = FlaggedStorage<Self, VecStorage<Self>>;
 }
 
 impl BitStore for Position {
     fn read_from<R: BitRead>(reader: &mut R) -> Result<Self> {
-        Ok(Position {
-            pos: Point2::new(reader.read()?, reader.read()?),
-        })
+        Ok(Position(Point2::new(reader.read()?, reader.read()?)))
     }
 
     fn write_to<W: BitWrite>(&self, writer: &mut W) -> Result<()> {
-        writer.write(&self.pos.x)?;
-        writer.write(&self.pos.y)
+        writer.write(&self.0.x)?;
+        writer.write(&self.0.y)
     }
 }
