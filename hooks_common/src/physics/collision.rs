@@ -58,9 +58,47 @@ pub struct ObjectUid(usize);
 pub struct UpdateSys;
 
 impl<'a> System<'a> for UpdateSys {
-    type SystemData = (FetchMut<'a, CollisionWorld>,);
+    type SystemData = (
+        FetchMut<'a, CollisionWorld>,
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, Orientation>,
+        ReadStorage<'a, ObjectUid>,
+    );
 
-    fn run(&mut self, (mut collision_world,): Self::SystemData) {
+    fn run(
+        &mut self,
+        (mut collision_world, mut position, mut orientation, object_uid): Self::SystemData,
+    ) {
+        // Update isometry of entities that have moved or rotated
+        {
+            let position_changed = position.open().0;
+            let orientation_changed = orientation.open().0;
+            let changed = position_changed | orientation_changed;
+
+            for x in (&orientation_changed).join() {
+                debug!("{:?}", x);
+            }
+
+            for (_, position, orientation, object_uid) in
+                (&changed, &position, &orientation, &object_uid).join()
+            {
+                if collision_world.collision_object(object_uid.0).is_none() {
+                    // This should happen exactly once for each object when it is first created.
+                    // `CreateObjectSys` has deferred-added the object, but the collision world has
+                    // not been updated yet, so changing the position here would be an error.
+                    continue;
+                }
+
+                debug!("Updating {}", object_uid.0);
+
+                let isometry = Isometry2::new(position.0.coords, orientation.0);
+                collision_world.deferred_set_position(object_uid.0, isometry);
+            }
+        }
+
+        (&mut position).open().1.clear_flags();
+        (&mut orientation).open().1.clear_flags();
+
         collision_world.update();
     }
 }

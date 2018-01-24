@@ -7,7 +7,7 @@ use specs::World;
 use game::entity::wall;
 
 fn create_state(world: &mut World) {
-    let n_walls = 100;
+    let n_walls = 2;
     let mut rng = rand::thread_rng();
 
     for _ in 0..n_walls {
