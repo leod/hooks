@@ -12,7 +12,7 @@ use std::{env, path};
 use ggez::event::Keycode;
 use nalgebra::Vector2;
 
-use common::defs::{PlayerInput, GameInfo};
+use common::defs::{GameInfo, PlayerInput};
 use common::registry::Registry;
 
 use hooks_game::client::Client;

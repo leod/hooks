@@ -41,7 +41,7 @@ impl State {
         let events = self.world.read_resource::<event::Sink>().clone();
         for event in events.iter() {
             for handler in &self.event_handlers_pre_tick {
-                handler(&mut self.world, event)?;
+                handler(&mut self.world, &**event)?;
             }
         }
 
@@ -54,7 +54,7 @@ impl State {
         let events = self.world.write_resource::<event::Sink>().clear();
         for event in &events {
             for handler in &self.event_handlers_post_tick {
-                handler(&mut self.world, event)?;
+                handler(&mut self.world, &**event)?;
             }
         }
 
@@ -75,7 +75,7 @@ impl State {
         // First run pre-tick event handlers, e.g. handle player join/leave events
         for event in &tick_data.events {
             for handler in &self.event_handlers_pre_tick {
-                handler(&mut self.world, event)?;
+                handler(&mut self.world, &**event)?;
             }
         }
 
@@ -100,7 +100,7 @@ impl State {
         let events = self.world.write_resource::<event::Sink>().clear();
         for event in &events {
             for handler in &self.event_handlers_post_tick {
-                handler(&mut self.world, event)?;
+                handler(&mut self.world, &**event)?;
             }
         }
 

@@ -57,7 +57,7 @@ impl Event for LeftEvent {
 
 /// Handle events regarding player creation. Note that, both on the server and the clients, this
 /// event comes from the outside. Thus, we want to handle these before starting the tick.
-fn handle_event_pre_tick(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
+fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::Error> {
     match_event!(event:
         JoinedEvent => {
             info!("Player {} with name {} joined", event.id, event.info.name);

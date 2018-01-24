@@ -9,7 +9,7 @@ use event::{self, Event};
 use repl;
 
 pub type TickFn = fn(&mut World) -> Result<(), repl::Error>;
-pub type EventHandler = fn(&mut World, &Box<Event>) -> Result<(), repl::Error>;
+pub type EventHandler = fn(&mut World, &Event) -> Result<(), repl::Error>;
 
 #[derive(Default)]
 pub struct Registry {
