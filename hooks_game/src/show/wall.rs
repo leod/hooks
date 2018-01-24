@@ -30,11 +30,11 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
     let (position, orientation, size) = DrawData::fetch(&world.res, 0);
 
     for (position, orientation, size) in (&position, &orientation, &size).join() {
-        let coords = position.pos.coords;
+        let coords = position.0.coords;
         let scaling = Matrix4::from_diagonal(&Vector4::new(size.0.x, size.0.y, 1.0, 1.0));
         let isometry = Isometry3::new(
             Vector3::new(coords.x, coords.y, 0.0),
-            orientation.angle * Vector3::z_axis().unwrap(),
+            orientation.0 * Vector3::z_axis().unwrap(),
         );
         let matrix = isometry.to_homogeneous() * scaling;
 

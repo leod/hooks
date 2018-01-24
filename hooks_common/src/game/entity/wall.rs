@@ -27,12 +27,10 @@ pub fn create(world: &mut World, pos: Point2<f32>, size: Vector2<f32>, angle: f3
 
     world
         .create_entity()
-        .with(Position { pos })
-        .with(Orientation { angle })
+        .with(Position(pos))
+        .with(Orientation(angle))
         .with(Size(size * 2.0))
-        .with(collision::Shape {
-            shape: ShapeHandle::new(shape),
-        })
+        .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::CreateObject { groups, query_type })
         .build()
 }

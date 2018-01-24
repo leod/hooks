@@ -3,7 +3,7 @@ N_STRESS=20
 
 all: build
 
-build: common server game
+build: server game
 
 run: build
 	tmux \

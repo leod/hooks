@@ -1,5 +1,6 @@
 mod defs;
 pub mod collision;
+pub mod run;
 
 use registry::Registry;
 

@@ -25,7 +25,7 @@ pub mod auth {
         reg.tick_system(TickSys, "test", &[]);
 
         entity::add_ctor(reg, "test", |builder| {
-            builder.with(Orientation { angle: 0.0 }).with(Test(0.0))
+            builder.with(Orientation(0.0)).with(Test(0.0))
         });
     }
 
@@ -46,8 +46,8 @@ pub mod auth {
         fn run(&mut self, (game_info, mut position, mut orientation, mut test): Self::SystemData) {
             for (position, orientation, test) in (&mut position, &mut orientation, &mut test).join()
             {
-                position.pos.x = (test.0.sin() * 100.0) as f32;
-                orientation.angle = test.0 as f32;
+                position.0.x = (test.0.sin() * 100.0) as f32;
+                orientation.0 = test.0 as f32;
                 test.0 += game_info.tick_duration_secs();
             }
         }

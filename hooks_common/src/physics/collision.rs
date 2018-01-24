@@ -26,11 +26,10 @@ pub const GROUP_WALL: usize = 0;
 pub const GROUP_PLAYER: usize = 1;
 
 /// Collision shape.
+/// For now, we assume that an object's shape will not change in its lifetime.
 #[derive(Clone, Component)]
 #[component(VecStorage)]
-pub struct Shape {
-    pub shape: ShapeHandle2<f32>,
-}
+pub struct Shape(pub ShapeHandle2<f32>);
 
 /// Tag component which indicates that we should inform the collision world of this entity. The
 /// component is removed from the entity after that.
@@ -106,11 +105,11 @@ impl<'a> System<'a> for CreateObjectSys {
                 let uid = self.next_uid;
                 self.next_uid += 1;
 
-                let isometry = Isometry2::new(position.pos.coords, orientation.angle);
+                let isometry = Isometry2::new(position.0.coords, orientation.0);
                 collision_world.deferred_add(
                     uid,
                     isometry,
-                    shape.shape.clone(),
+                    shape.0.clone(),
                     create_object.groups,
                     create_object.query_type,
                     entity,
