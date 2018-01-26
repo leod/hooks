@@ -71,8 +71,8 @@ impl<'a> System<'a> for UpdateSys {
     ) {
         // Update isometry of entities that have moved or rotated
         {
-            let position_changed = (position.open().1).open().0;
-            let orientation_changed = (orientation.open().1).open().0;
+            let position_changed = position.open().1.open().0;
+            let orientation_changed = orientation.open().1.open().0;
             let changed = position_changed | orientation_changed;
 
             for (_, position, orientation, object_uid) in
