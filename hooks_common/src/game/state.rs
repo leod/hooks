@@ -54,6 +54,8 @@ impl State {
     }
 
     fn run_tick(&mut self) -> Result<Vec<Box<Event>>, repl::Error> {
+        physics::sim::run(&self.world);
+
         self.tick_dispatcher.dispatch_seq(&self.world.res);
 
         let events = self.world.write_resource::<event::Sink>().clear();
@@ -69,7 +71,6 @@ impl State {
     /// Running a tick on the server side.
     pub fn run_tick_auth(&mut self) -> Result<Vec<Box<Event>>, repl::Error> {
         self.run_pre_tick()?;
-        physics::sim::run(&self.world);
         self.run_tick()
     }
 

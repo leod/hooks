@@ -17,6 +17,7 @@ pub fn register(reg: &mut Registry) {
     reg.component::<ObjectUid>();
 
     reg.resource(CollisionWorld2::<f32, Entity>::new(0.02, false));
+    reg.resource(UidSource { next_uid: 0 });
 }
 
 type CollisionWorld = CollisionWorld2<f32, Entity>;
@@ -97,20 +98,26 @@ impl<'a> System<'a> for UpdateSys {
     }
 }
 
-/// System for creating collision objects for entities tagged with CreateObject.
-pub struct CreateObjectSys {
+pub struct UidSource {
     next_uid: usize,
 }
 
-impl CreateObjectSys {
-    pub fn new() -> Self {
-        Self { next_uid: 0 }
+impl UidSource {
+    fn next_uid(&mut self) -> usize {
+        let uid = self.next_uid;
+        self.next_uid += 1;
+
+        uid
     }
 }
+
+/// System for creating collision objects for entities tagged with CreateObject.
+pub struct CreateObjectSys;
 
 impl<'a> System<'a> for CreateObjectSys {
     type SystemData = (
         FetchMut<'a, CollisionWorld>,
+        FetchMut<'a, UidSource>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Orientation>,
@@ -123,6 +130,7 @@ impl<'a> System<'a> for CreateObjectSys {
         &mut self,
         (
             mut collision_world,
+            mut uid_source,
             entities,
             position,
             orientation,
@@ -134,9 +142,7 @@ impl<'a> System<'a> for CreateObjectSys {
         let created_entities = (&*entities, &position, &orientation, &shape, &create_object)
             .join()
             .map(|(entity, position, orientation, shape, create_object)| {
-                let uid = self.next_uid;
-                self.next_uid += 1;
-
+                let uid = uid_source.next_uid();
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
                 collision_world.deferred_add(
                     uid,
