@@ -4,7 +4,7 @@ pub mod auth {
     use specs::{Fetch, World, WriteStorage};
 
     use defs::{GameInfo, PlayerId, PlayerInput};
-    use physics::{Orientation, Position};
+    use physics::{Orientation, Position, Velocity};
     use repl::player::Players;
 
     #[derive(SystemData)]
@@ -12,6 +12,7 @@ pub mod auth {
         game_info: Fetch<'a, GameInfo>,
         players: Fetch<'a, Players>,
         position: WriteStorage<'a, Position>,
+        velocity: WriteStorage<'a, Velocity>,
         orientation: WriteStorage<'a, Orientation>,
     }
 
@@ -33,22 +34,26 @@ pub mod auth {
             let orientation = data.orientation.get(entity).unwrap().0;
             let forward = Rotation2::new(orientation).matrix() * Vector2::new(1.0, 0.0);
 
-            let mut position = data.position.get(entity).unwrap().0;
-            let mut changed = false;
+            //let mut position = data.position.get(entity).unwrap().0;
+            //let mut changed = false;
+
+            let velocity = data.velocity.get_mut(entity).unwrap();
 
             if input.move_forward {
-                position += forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
-                changed = true;
+                //position += forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
+                //changed = true;
+                velocity.0 = forward * MOVE_SPEED;
+            } else if input.move_backward {
+                //position -= forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
+                //changed = true;
+                velocity.0 = -forward * MOVE_SPEED;
+            } else {
+                velocity.0 = Vector2::new(0.0, 0.0);
             }
 
-            if input.move_backward {
-                position -= forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
-                changed = true;
-            }
-
-            if changed {
-                data.position.get_mut(entity).unwrap().0 = position;
-            }
+            //if changed {
+            //data.position.get_mut(entity).unwrap().0 = position;
+            //}
         }
     }
 }

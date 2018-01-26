@@ -2,7 +2,7 @@ use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
 
 use nalgebra::{Point2, Vector2};
-use specs::{Component, FlaggedStorage, VecStorage};
+use specs::{Component, FlaggedStorage, NullStorage, VecStorage};
 
 use registry::Registry;
 
@@ -11,15 +11,18 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Position>();
     reg.component::<Velocity>();
     reg.component::<Orientation>();
+    reg.component::<Dynamic>();
 }
 
 /// Physical mass.
-#[derive(PartialEq, Clone, Debug)]
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(VecStorage)]
 pub struct Mass(pub f32);
 
-impl Component for Mass {
-    type Storage = VecStorage<Self>;
-}
+/// Two-dimensional velocity.
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(VecStorage)]
+pub struct Velocity(pub Vector2<f32>);
 
 /// Two-dimensional position.
 #[derive(PartialEq, Clone, Debug)]
@@ -29,14 +32,6 @@ impl Component for Position {
     type Storage = FlaggedStorage<Self, VecStorage<Self>>;
 }
 
-/// Two-dimensional velocity.
-#[derive(PartialEq, Clone, Debug)]
-pub struct Velocity(pub Vector2<f32>);
-
-impl Component for Velocity {
-    type Storage = VecStorage<Self>;
-}
-
 /// Rotation angle.
 #[derive(PartialEq, Clone, Debug, BitStore)]
 pub struct Orientation(pub f32);
@@ -44,6 +39,11 @@ pub struct Orientation(pub f32);
 impl Component for Orientation {
     type Storage = FlaggedStorage<Self, VecStorage<Self>>;
 }
+
+/// Non-static entities
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(NullStorage)]
+pub struct Dynamic;
 
 impl BitStore for Velocity {
     fn read_from<R: BitRead>(reader: &mut R) -> Result<Self> {
