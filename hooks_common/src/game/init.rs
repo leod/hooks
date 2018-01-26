@@ -16,7 +16,8 @@ fn create_state(world: &mut World) {
         let pos = Point2::new(x, y);
 
         let w = rng.gen::<f32>() * 300.0 + 20.0;
-        let h = rng.gen::<f32>() * 10.0 + 1.0;
+        let w = rng.gen::<f32>() * 1.0 + 20.0;
+        let h = rng.gen::<f32>() * 1.0 + 1.0;
         let size = Vector2::new(w, h);
 
         let angle = rng.gen::<f32>() * f32::consts::PI;
