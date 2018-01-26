@@ -20,7 +20,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(UidSource { next_uid: 0 });
 }
 
-type CollisionWorld = CollisionWorld2<f32, Entity>;
+pub type CollisionWorld = CollisionWorld2<f32, Entity>;
 
 // Collision groups. Put them here for now.
 pub const GROUP_WALL: usize = 0;
