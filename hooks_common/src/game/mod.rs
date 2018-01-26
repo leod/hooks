@@ -23,11 +23,6 @@ fn register(reg: &mut Registry) {
         "physics::collision::UpdateSys",
         &["physics::collision::CreateObjectSys"],
     );
-    reg.tick_system(
-        physics::run::RunSys,
-        "physics::run::RunSys",
-        &["physics::collision::UpdateSys"],
-    );
 }
 
 pub mod auth {
