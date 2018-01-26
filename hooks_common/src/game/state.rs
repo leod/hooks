@@ -49,6 +49,8 @@ impl State {
             f(&mut self.world)?;
         }
 
+        self.world.maintain();
+
         self.tick_dispatcher.dispatch_seq(&self.world.res);
 
         let events = self.world.write_resource::<event::Sink>().clear();
@@ -87,9 +89,13 @@ impl State {
             // Now we are up-to-date regarding the player list, so we can create new entities
             entity::view::create_new_entities(&mut self.world, snapshot)?;
 
+            self.world.maintain();
+
             // Snap entities to their state in the new tick
             let mut sys = game::LoadSnapshotSys(snapshot);
             sys.run_now(&self.world.res);
+        } else {
+            self.world.maintain();
         }
 
         // So far, there are no tick systems on the client. It's not clear yet if we will need
