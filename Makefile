@@ -11,8 +11,11 @@ run: build
 		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"' \; \
 		select-layout even-horizontal
 
-run-game:
+run-game: game
 	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game
+
+run-server: server
+	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server
 
 random-bot:
 	CARGO_TARGET_DIR=${TARGET} cargo run -j4 --manifest-path=hooks_game/Cargo.toml --example random_bot

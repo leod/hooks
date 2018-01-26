@@ -102,11 +102,6 @@ fn create<F>(
 where
     F: FnOnce(EntityBuilder) -> EntityBuilder,
 {
-    debug!(
-        "Creating entity {} for player {} of type {}",
-        id, owner, class_id
-    );
-
     let ctors = {
         let ctors = world.read_resource::<Ctors>();
 
@@ -179,6 +174,11 @@ where
 
         entity_map.0.insert(id, entity);
     }
+
+    debug!(
+        "Created entity {} (index {:?}), for player {} of type {}",
+        id, entity, owner, class_id
+    );
 
     Ok((id, entity))
 }

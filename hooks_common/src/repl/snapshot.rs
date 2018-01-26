@@ -477,7 +477,22 @@ macro_rules! snapshot {
 
                         $(
                             if let Some(component) = (entity_snapshot.1).$field_name.as_ref() {
-                                $field_name.insert(entity, component.clone());
+                                // At this point, the snapshot is no longer a delta and contains
+                                // state of all repl entities that this client knows. Since we
+                                // don't want to unnecessary flag the component in specs as
+                                // changed, we have to check here if its value has changed. It is
+                                // unlikely that this will ever be a bottleneck unless we have
+                                // boatloads of entities.
+                                let changed =
+                                    if let Some(prev_component) = $field_name.get(entity) {
+                                        component != prev_component
+                                    } else {
+                                        true
+                                    };
+
+                                if changed {
+                                    $field_name.insert(entity, component.clone());
+                                }
                             }
                         )+
                     }

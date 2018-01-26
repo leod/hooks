@@ -26,19 +26,28 @@ pub mod auth {
         let entity = data.players.0.get(&player_id).unwrap().1;
 
         if let Some(entity) = entity {
-            let mut position = data.position.get_mut(entity).unwrap();
-            let mut orientation = data.orientation.get_mut(entity).unwrap();
+            if input.rot_angle != data.orientation.get(entity).unwrap().0 {
+                data.orientation.get_mut(entity).unwrap().0 = input.rot_angle;
+            }
 
-            orientation.0 = input.rot_angle;
+            let orientation = data.orientation.get(entity).unwrap().0;
+            let forward = Rotation2::new(orientation).matrix() * Vector2::new(1.0, 0.0);
 
-            let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
+            let mut position = data.position.get(entity).unwrap().0;
+            let mut changed = false;
 
             if input.move_forward {
-                position.0 += forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
+                position += forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
+                changed = true;
             }
 
             if input.move_backward {
-                position.0 -= forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
+                position -= forward * MOVE_SPEED * data.game_info.tick_duration_secs() as f32;
+                changed = true;
+            }
+
+            if changed {
+                data.position.get_mut(entity).unwrap().0 = position;
             }
         }
     }
