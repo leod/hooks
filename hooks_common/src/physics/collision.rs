@@ -85,8 +85,6 @@ impl<'a> System<'a> for UpdateSys {
                     continue;
                 }
 
-                debug!("Updating {}", object_uid.0);
-
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
                 collision_world.deferred_set_position(object_uid.0, isometry);
             }
