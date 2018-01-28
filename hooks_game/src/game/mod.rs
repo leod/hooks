@@ -7,6 +7,7 @@ use rand::{self, Rng};
 use specs::World;
 
 use hooks_util::debug;
+use hooks_util::profile;
 use hooks_util::timer::Timer;
 use hooks_common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
 use hooks_common::net::protocol::ClientGameMsg;
@@ -96,6 +97,8 @@ impl Game {
         player_input: &PlayerInput,
         delta: Duration,
     ) -> Result<Option<Event>, Error> {
+        profile!("update game");
+
         // Advance timers
         self.tick_timer += delta;
 

@@ -5,7 +5,7 @@ use ggez::graphics::{self, Font, Text};
 
 use hooks_util::debug;
 
-const SUCC_MARGIN: f32 = 10.0;
+const SUCC_MARGIN: f32 = 0.0;
 const NAME_MARGIN: f32 = 30.0;
 
 pub fn show(
@@ -13,12 +13,12 @@ pub fn show(
     font: &Font,
     vars: &debug::Vars,
     pos: Point2<f32>,
-) -> ggez::GameResult<Point2<f32>> {
+) -> ggez::GameResult<Vector2<f32>> {
     match vars {
         &debug::Vars::Leaf(ref string) => {
             let text = Text::new(ctx, &string, font)?;
             graphics::draw(ctx, &text, pos, 0.0)?;
-            Ok(Point2::new(text.width() as f32, text.height() as f32))
+            Ok(Vector2::new(text.width() as f32, text.height() as f32))
         }
         &debug::Vars::Node(ref succs) => {
             let mut name_texts = Vec::new();
@@ -41,7 +41,7 @@ pub fn show(
                 cur_pos.coords.y += succ_size.y + SUCC_MARGIN;
             }
 
-            Ok(cur_pos)
+            Ok(cur_pos - pos)
         }
     }
 }

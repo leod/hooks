@@ -3,20 +3,22 @@ extern crate ggez;
 extern crate hooks_common;
 extern crate hooks_game;
 extern crate hooks_show;
+#[macro_use]
 extern crate hooks_util;
 #[macro_use]
 extern crate log;
 extern crate nalgebra;
 extern crate specs;
 
-use std::{env, path};
+use std::{env, path, thread};
 
 use nalgebra::{Point2, Vector2};
 
-use ggez::event::Keycode;
+use ggez::event::{self, Keycode};
 use ggez::graphics::Font;
 
 use hooks_util::debug::{self, Inspect};
+use hooks_util::profile::{self, PROFILER};
 use hooks_common::defs::{GameInfo, PlayerInput};
 use hooks_common::registry::Registry;
 use hooks_game::client::Client;
@@ -47,10 +49,11 @@ struct MainState {
     font: Font,
     fps: f64,
     show_debug: bool,
+    show_profiler: bool,
 }
 
-impl ggez::event::EventHandler for MainState {
-    fn update(&mut self, ctx: &mut ggez::Context) -> ggez::error::GameResult<()> {
+impl MainState {
+    fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult<()> {
         self.fps = ggez::timer::get_fps(ctx);
         let delta = ggez::timer::get_delta(ctx);
 
@@ -71,12 +74,13 @@ impl ggez::event::EventHandler for MainState {
         Ok(())
     }
 
-    fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::error::GameResult<()> {
+    fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult<()> {
         ggez::graphics::clear(ctx);
 
         self.show.draw(ctx, self.game.world())?;
 
         if self.show_debug {
+            profile!("draw text");
             hooks_show::debug::show(ctx, &self.font, &self.inspect(), Point2::new(10.0, 10.0))?;
         }
 
@@ -85,79 +89,77 @@ impl ggez::event::EventHandler for MainState {
         Ok(())
     }
 
-    fn mouse_button_down_event(
-        &mut self,
-        _ctx: &mut ggez::Context,
-        _button: ggez::event::MouseButton,
-        _x: i32,
-        _y: i32,
-    ) {
-    }
+    fn handle_event(&mut self, ctx: &mut ggez::Context, event: event::Event) -> bool {
+        match event {
+            event::Event::Quit { .. } => return false,
+            event::Event::MouseMotion { x, y, .. } => {
+                let (size_x, size_y) = ggez::graphics::get_size(ctx);
+                let size = Vector2::new(size_x as f32, size_y as f32);
+                let clip = Vector2::new(
+                    x.max(0).min(size_x as i32) as f32,
+                    y.max(0).min(size_y as i32) as f32,
+                );
+                let shift = clip - size / 2.0;
 
-    fn mouse_button_up_event(
-        &mut self,
-        _ctx: &mut ggez::Context,
-        _button: ggez::event::MouseButton,
-        _x: i32,
-        _y: i32,
-    ) {
-    }
-
-    fn mouse_motion_event(
-        &mut self,
-        ctx: &mut ggez::Context,
-        _state: ggez::event::MouseState,
-        x: i32,
-        y: i32,
-        _xrel: i32,
-        _yrel: i32,
-    ) {
-        let (size_x, size_y) = ggez::graphics::get_size(ctx);
-        let size = Vector2::new(size_x as f32, size_y as f32);
-        let clip = Vector2::new(
-            x.max(0).min(size_x as i32) as f32,
-            y.max(0).min(size_y as i32) as f32,
-        );
-        let shift = clip - size / 2.0;
-
-        self.next_player_input.rot_angle = shift.y.atan2(shift.x)
-    }
-
-    fn key_down_event(
-        &mut self,
-        _ctx: &mut ggez::Context,
-        keycode: Keycode,
-        _keymod: ggez::event::Mod,
-        _repeat: bool,
-    ) {
-        match keycode {
-            Keycode::W => self.next_player_input.move_forward = true,
-            Keycode::S => self.next_player_input.move_backward = true,
+                self.next_player_input.rot_angle = shift.y.atan2(shift.x)
+            }
+            event::Event::KeyDown {
+                keycode: Some(keycode),
+                ..
+            } => match keycode {
+                Keycode::W => self.next_player_input.move_forward = true,
+                Keycode::S => self.next_player_input.move_backward = true,
+                _ => {}
+            },
+            event::Event::KeyUp {
+                keycode: Some(keycode),
+                ..
+            } => match keycode {
+                Keycode::W => self.next_player_input.move_forward = false,
+                Keycode::S => self.next_player_input.move_backward = false,
+                _ => {}
+            },
             _ => {}
         }
+
+        true
     }
 
-    fn key_up_event(
-        &mut self,
-        _ctx: &mut ggez::Context,
-        keycode: ggez::event::Keycode,
-        _keymod: ggez::event::Mod,
-        _repeat: bool,
-    ) {
-        match keycode {
-            Keycode::W => self.next_player_input.move_forward = false,
-            Keycode::S => self.next_player_input.move_backward = false,
-            _ => {}
+    pub fn run_frame(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult<bool> {
+        let _frame = PROFILER.with(|p| p.borrow_mut().frame());
+
+        ctx.timer_context.tick();
+
+        for event in event::Events::new(ctx)?.poll() {
+            if !self.handle_event(ctx, event) {
+                return Ok(false);
+            }
         }
+
+        self.update(ctx)?;
+        self.draw(ctx)?;
+
+        thread::yield_now();
+
+        Ok(true)
     }
 }
 
 impl debug::Inspect for MainState {
     fn inspect(&self) -> debug::Vars {
-        debug::Vars::Node(vec![
+        let mut vars = vec![
             ("fps".to_string(), self.fps.inspect()),
             ("game".to_string(), self.game.inspect()),
-        ])
+        ];
+
+        if self.show_profiler {
+            vars.push((
+                "profiler".to_string(),
+                PROFILER.with(|p| p.borrow().inspect()),
+            ));
+        }
+
+        debug::Vars::Node(vars)
     }
 }
 
@@ -218,6 +220,8 @@ fn main() {
         font,
         fps: 0.0,
         show_debug: true,
+        show_profiler: true,
     };
-    ggez::event::run(ctx, &mut state).unwrap();
+
+    while state.run_frame(ctx).unwrap() {}
 }
