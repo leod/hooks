@@ -19,7 +19,7 @@ pub fn register(reg: &mut Registry) {
             let mut groups = CollisionGroups::new();
             groups.set_membership(&[collision::GROUP_PLAYER]);
             groups.set_whitelist(&[collision::GROUP_WALL]);
-            let query_type = GeometricQueryType::Contacts(1000.0);
+            let query_type = GeometricQueryType::Contacts(0.0);
 
             // TODO: Velocity (and Dynamic?) component should be added only for owners
             builder
