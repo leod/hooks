@@ -2,6 +2,8 @@ use std::thread;
 use std::time::Duration;
 
 use hooks_common::GameInfo;
+#[cfg(feature = "show")]
+use hooks_show::Show;
 
 use game::Game;
 use host::{self, Host};
@@ -15,6 +17,7 @@ pub struct Config {
 pub struct Server {
     host: Host,
     game: Game,
+    #[cfg(feature = "show")] show: Show,
 }
 
 impl Server {
