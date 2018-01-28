@@ -1,7 +1,8 @@
 extern crate env_logger;
 extern crate ggez;
 extern crate hooks_common as common;
-extern crate hooks_game as hooks_game;
+extern crate hooks_game as game;
+extern crate hooks_show as show;
 #[macro_use]
 extern crate log;
 extern crate nalgebra;
@@ -17,13 +18,13 @@ use common::debug::{self, Inspect};
 use common::defs::{GameInfo, PlayerInput};
 use common::registry::Registry;
 
-use hooks_game::client::Client;
-use hooks_game::game::{self, Game};
-use hooks_game::show::{self, Assets, Show};
+use game::client::Client;
+use game::game::Game;
+use show::{Assets, Show};
 
 fn register(reg: &mut Registry, game_info: &GameInfo) {
     // Game state
-    game::register(reg, game_info);
+    game::game::register(reg, game_info);
 
     // Components for showing game state
     show::register(reg);
@@ -73,11 +74,11 @@ impl ggez::event::EventHandler for MainState {
             .update(&mut self.client, &self.next_player_input, delta)
             .unwrap()
         {
-            Some(game::Event::Disconnected) => {
+            Some(game::game::Event::Disconnected) => {
                 info!("Got disconnected! Bye.");
                 ctx.quit()?;
             }
-            Some(game::Event::TickStarted(ref events)) => {
+            Some(game::game::Event::TickStarted(ref events)) => {
                 self.show.handle_events(self.game.world_mut(), events)?;
             }
             None => {}

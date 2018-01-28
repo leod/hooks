@@ -1,17 +1,25 @@
+extern crate ggez;
+extern crate hooks_common as common;
+#[macro_use]
+extern crate log;
+extern crate nalgebra;
+extern crate specs;
+#[macro_use]
+extern crate specs_derive;
+
 mod camera;
 mod rect;
 mod wall;
-mod entity_types;
+mod entity;
 pub mod debug;
 
 use nalgebra::Point2;
 
-use specs::{self, World};
+use specs::World;
 
-use ggez;
 use ggez::graphics::{self, DrawMode, Mesh};
 
-use common::{self, Event, GameInfo, PlayerId};
+use common::{Event, GameInfo, PlayerId};
 use common::physics::Position;
 use common::repl::player::Players;
 
@@ -19,7 +27,7 @@ use self::camera::Camera;
 
 pub fn register(reg: &mut common::Registry) {
     rect::register(reg);
-    entity_types::register(reg);
+    entity::register(reg);
 }
 
 pub fn register_show(reg: &mut Registry) {
