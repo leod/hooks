@@ -1,6 +1,8 @@
 extern crate bit_manager;
 extern crate env_logger;
 extern crate hooks_common;
+#[cfg(feature = "show")]
+extern crate hooks_show;
 #[macro_use]
 extern crate log;
 extern crate rand;
