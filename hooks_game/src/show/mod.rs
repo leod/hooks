@@ -2,6 +2,7 @@ mod camera;
 mod rect;
 mod wall;
 mod entity_types;
+pub mod debug;
 
 use nalgebra::Point2;
 

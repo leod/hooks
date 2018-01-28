@@ -1,3 +1,5 @@
+#![feature(specialization)]
+
 extern crate bit_manager;
 #[macro_use]
 extern crate bit_manager_derive;
@@ -29,6 +31,7 @@ pub mod registry;
 pub mod repl;
 pub mod net;
 pub mod game;
+pub mod debug;
 
 pub use defs::*;
 pub use event::Event;

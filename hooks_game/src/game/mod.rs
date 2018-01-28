@@ -6,7 +6,7 @@ use bit_manager::BitReader;
 use rand::{self, Rng};
 use specs::World;
 
-use common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
+use common::{self, debug, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
 use common::net::protocol::ClientGameMsg;
 use common::registry::Registry;
 use common::repl::{self, tick};
@@ -175,20 +175,26 @@ impl Game {
     }
 }
 
-impl fmt::Debug for Game {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "min tick\t{:?}\n\
-             max tick\t{:?}\n\
-             tick timer\t{:.2}%\n\
-             last tick\t{:?}\n\
-             server recv ack tick\t{:?}",
-            self.tick_history.min_num(),
-            self.tick_history.max_num(),
-            self.tick_timer.progress() * 100.0,
-            self.last_tick,
-            self.server_recv_ack_tick
-        )
+impl debug::Inspect for Game {
+    fn inspect(&self) -> debug::Vars {
+        debug::Vars::Node(vec![
+            (
+                "min tick".to_string(),
+                self.tick_history.min_num().inspect(),
+            ),
+            (
+                "max tick".to_string(),
+                self.tick_history.max_num().inspect(),
+            ),
+            (
+                "tick timer".to_string(),
+                (self.tick_timer.progress() * 100.0).inspect(),
+            ),
+            ("last tick".to_string(), self.last_tick.inspect()),
+            (
+                "server recv ack tick".to_string(),
+                self.server_recv_ack_tick.inspect(),
+            ),
+        ])
     }
 }
