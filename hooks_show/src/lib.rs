@@ -1,4 +1,5 @@
 extern crate ggez;
+#[macro_use]
 extern crate hooks_util;
 extern crate hooks_common;
 #[macro_use]
@@ -20,6 +21,7 @@ use specs::World;
 
 use ggez::graphics::{self, DrawMode, Mesh};
 
+use hooks_util::profile;
 use hooks_common::{Event, GameInfo, PlayerId};
 use hooks_common::physics::Position;
 use hooks_common::repl::player::Players;
@@ -140,6 +142,8 @@ impl Show {
 
     /// Draw the game.
     pub fn draw(&mut self, ctx: &mut ggez::Context, world: &World) -> ggez::error::GameResult<()> {
+        profile!("show game");
+
         let delta = ggez::timer::get_delta(ctx);
 
         let positions = world.read::<Position>();
