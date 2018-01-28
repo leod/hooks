@@ -6,11 +6,11 @@ use bit_manager::BitReader;
 use rand::{self, Rng};
 use specs::World;
 
-use common::{self, debug, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
-use common::net::protocol::ClientGameMsg;
-use common::registry::Registry;
-use common::repl::{self, tick};
-use common::timer::Timer;
+use hooks_common::{self, debug, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
+use hooks_common::net::protocol::ClientGameMsg;
+use hooks_common::registry::Registry;
+use hooks_common::repl::{self, tick};
+use hooks_common::timer::Timer;
 
 use client::{self, Client};
 
@@ -55,7 +55,7 @@ pub struct Game {
 }
 
 pub fn register(reg: &mut Registry, game_info: &GameInfo) {
-    common::view::register(reg, game_info);
+    hooks_common::view::register(reg, game_info);
 }
 
 #[derive(Debug)]

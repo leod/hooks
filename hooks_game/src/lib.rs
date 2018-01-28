@@ -1,7 +1,7 @@
 extern crate bit_manager;
 extern crate ggez;
-extern crate hooks_common as common;
-extern crate hooks_show as show;
+extern crate hooks_common;
+extern crate hooks_show;
 #[macro_use]
 extern crate log;
 extern crate nalgebra;

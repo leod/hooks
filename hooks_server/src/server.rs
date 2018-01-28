@@ -1,7 +1,7 @@
 use std::thread;
 use std::time::Duration;
 
-use common::GameInfo;
+use hooks_common::GameInfo;
 
 use game::Game;
 use host::{self, Host};

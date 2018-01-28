@@ -1,4 +1,4 @@
-use common::net::transport;
+use hooks_common::net::transport;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum State {

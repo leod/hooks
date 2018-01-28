@@ -4,12 +4,12 @@ use specs::{Join, ReadStorage, VecStorage, World, SystemData};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use common;
-use common::physics::{Orientation, Position};
+use hooks_common;
+use hooks_common::physics::{Orientation, Position};
 
 use {Assets, Registry};
 
-pub fn register(reg: &mut common::Registry) {
+pub fn register(reg: &mut hooks_common::Registry) {
     reg.component::<Draw>();
 }
 

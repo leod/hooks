@@ -7,12 +7,12 @@ use bit_manager::BitWriter;
 
 use shred::{Fetch, RunNow};
 
-use common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
-             TickDeltaNum, TickNum};
-use common::net::protocol::ClientGameMsg;
-use common::registry::Registry;
-use common::repl::{player, tick};
-use common::timer::{Stopwatch, Timer};
+use hooks_common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
+                   TickDeltaNum, TickNum};
+use hooks_common::net::protocol::ClientGameMsg;
+use hooks_common::registry::Registry;
+use hooks_common::repl::{player, tick};
+use hooks_common::timer::{Stopwatch, Timer};
 
 use host::{self, Host};
 
@@ -61,7 +61,7 @@ pub struct Game {
 }
 
 fn register(reg: &mut Registry, game_info: &GameInfo) {
-    common::auth::register(reg, game_info);
+    hooks_common::auth::register(reg, game_info);
 }
 
 impl Game {
