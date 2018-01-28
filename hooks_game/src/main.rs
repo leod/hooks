@@ -10,7 +10,8 @@ extern crate specs;
 use std::{env, path};
 
 use ggez::event::Keycode;
-use nalgebra::Vector2;
+use ggez::graphics::{self, Font, Text};
+use nalgebra::{Point2, Vector2};
 
 use common::defs::{GameInfo, PlayerInput};
 use common::registry::Registry;
@@ -36,9 +37,29 @@ struct Config {
 struct MainState {
     client: Client,
     game: Game,
+
     show: Show,
+    font: Font,
+    show_debug: bool,
 
     next_player_input: PlayerInput,
+}
+
+fn debug_text(
+    ctx: &mut ggez::Context,
+    text: &str,
+    pos: Point2<f32>,
+    font: &Font,
+) -> ggez::error::GameResult<()> {
+    let lines_columns: Vec<Vec<&str>> = text.lines()
+        .map(|line| line.split('\t').collect())
+        .collect();
+
+    /*let column_lens = lines_columns
+        .iter()
+        .scan(*/
+
+    Ok(())
 }
 
 impl ggez::event::EventHandler for MainState {
@@ -66,6 +87,14 @@ impl ggez::event::EventHandler for MainState {
         ggez::graphics::clear(ctx);
 
         self.show.draw(ctx, self.game.world())?;
+
+        if self.show_debug {
+            let text = Text::new(ctx, &format!("{:?}", self.game), &self.font).unwrap();
+            graphics::draw(ctx, &text, Point2::new(10.0, 10.0), 0.0).unwrap();
+
+            let text = Text::new(ctx, "Hello world!", &self.font).unwrap();
+            graphics::draw(ctx, &text, Point2::new(10.0, 10.0), 0.0).unwrap();
+        }
 
         ggez::graphics::present(ctx);
 
@@ -183,6 +212,7 @@ fn main() {
         client.game_info(),
         assets,
     ).unwrap();
+    let font = Font::default_font().unwrap();
 
     // Inform the server that we are good to go
     client.ready().unwrap();
@@ -191,6 +221,8 @@ fn main() {
         client,
         game,
         show,
+        font,
+        show_debug: true,
         next_player_input: PlayerInput::default(),
     };
     ggez::event::run(ctx, &mut state).unwrap();

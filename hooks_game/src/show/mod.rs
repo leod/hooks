@@ -148,6 +148,7 @@ impl Show {
         }
 
         graphics::pop_transform(ctx);
+        graphics::apply_transformations(ctx)?;
 
         Ok(())
     }

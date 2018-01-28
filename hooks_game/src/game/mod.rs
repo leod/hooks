@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::Cursor;
 use std::time::Duration;
 
@@ -171,5 +172,23 @@ impl Game {
         }
 
         Ok(None)
+    }
+}
+
+impl fmt::Debug for Game {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "min tick\t{:?}\n\
+             max tick\t{:?}\n\
+             tick timer\t{:.2}%\n\
+             last tick\t{:?}\n\
+             server recv ack tick\t{:?}",
+            self.tick_history.min_num(),
+            self.tick_history.max_num(),
+            self.tick_timer.progress() * 100.0,
+            self.last_tick,
+            self.server_recv_ack_tick
+        )
     }
 }
