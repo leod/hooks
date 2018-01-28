@@ -8,6 +8,7 @@ name = "hooks_game"
 path = "src/lib.rs"
 
 [dependencies]
+hooks_util = { path = "../hooks_util" }
 hooks_common = { path = "../hooks_common" }
 hooks_show = { path = "../hooks_show" }
 ggez = "0.4.0"

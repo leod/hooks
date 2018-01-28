@@ -3,9 +3,10 @@ use std::fmt::Debug;
 
 use bit_manager::{self, BitRead, BitWrite};
 
+use hooks_util::join;
+
 use super::Entity;
 use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
-use ordered_join;
 
 #[derive(Debug)]
 pub enum Error {
@@ -91,13 +92,13 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         writer: &mut W,
     ) -> Result<(), bit_manager::Error> {
         // Iterate entity pairs contained in the previous (left) and the next (right) snapshot
-        for join_item in ordered_join::FullJoinIter::new(self.0.iter(), cur.0.iter()) {
+        for join_item in join::FullJoinIter::new(self.0.iter(), cur.0.iter()) {
             match join_item {
-                ordered_join::Item::Left(&id, _left) => {
+                join::Item::Left(&id, _left) => {
                     // The entity stopped existing in the new snapshot - write nothing
                     assert!(id != INVALID_ENTITY_ID);
                 }
-                ordered_join::Item::Right(&id, &(ref right_entity, ref right_snapshot)) => {
+                join::Item::Right(&id, &(ref right_entity, ref right_snapshot)) => {
                     // We have a new entity
                     assert!(id != INVALID_ENTITY_ID);
 
@@ -111,7 +112,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                     let left_snapshot = T::none();
                     left_snapshot.delta_write(right_snapshot, components, writer)?;
                 }
-                ordered_join::Item::Both(
+                join::Item::Both(
                     &id,
                     &(ref left_entity, ref left_snapshot),
                     &(ref right_entity, ref right_snapshot),
@@ -184,17 +185,17 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
             let left = prev_entity_iter.peek().map(|&(&id, entity)| (id, entity));
             let right = delta_id.map(|id| (id, ()));
 
-            let (left_next, right_next) = match ordered_join::full_join_item(left, right) {
+            let (left_next, right_next) = match join::full_join_item(left, right) {
                 Some(item) => {
                     match item {
-                        ordered_join::Item::Left(id, left) => {
+                        join::Item::Left(id, left) => {
                             // No new information about this entity
                             assert!(id != INVALID_ENTITY_ID);
 
                             // Keep previous snapshot
                             cur_snapshot.0.insert(id, (*left).clone());
                         }
-                        ordered_join::Item::Right(id, _) => {
+                        join::Item::Right(id, _) => {
                             // New entity
                             assert!(id != INVALID_ENTITY_ID);
                             new_entities.push(id);
@@ -217,7 +218,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
 
                             cur_snapshot.0.insert(id, (entity, entity_snapshot));
                         }
-                        ordered_join::Item::Both(id, &(ref left_entity, ref left_snapshot), _) => {
+                        join::Item::Both(id, &(ref left_entity, ref left_snapshot), _) => {
                             // This entity exists in both snapshots
                             assert!(id != INVALID_ENTITY_ID);
 

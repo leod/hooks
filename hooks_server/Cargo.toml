@@ -9,6 +9,7 @@ default = []
 show = ["hooks_show"]
 
 [dependencies]
+hooks_util = { path = "../hooks_util" }
 hooks_common = { path = "../hooks_common" }
 hooks_show = { path = "../hooks_show", optional = true }
 shred = "0.5.0"

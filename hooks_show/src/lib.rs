@@ -1,4 +1,5 @@
 extern crate ggez;
+extern crate hooks_util;
 extern crate hooks_common;
 #[macro_use]
 extern crate log;

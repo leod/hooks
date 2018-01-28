@@ -1,0 +1,4 @@
+[package]
+name = "hooks_util"
+version = "0.1.0"
+authors = ["leod <subtle.frustration@proton.me>"]
