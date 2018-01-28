@@ -6,11 +6,12 @@ use bit_manager::BitReader;
 use rand::{self, Rng};
 use specs::World;
 
-use hooks_common::{self, debug, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
+use hooks_util::debug;
+use hooks_util::timer::Timer;
+use hooks_common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
 use hooks_common::net::protocol::ClientGameMsg;
 use hooks_common::registry::Registry;
 use hooks_common::repl::{self, tick};
-use hooks_common::timer::Timer;
 
 use client::{self, Client};
 

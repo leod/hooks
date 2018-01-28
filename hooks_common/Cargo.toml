@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 
 [dependencies]
+hooks_util = { path = "../hooks_util" }
 bit_manager = "*"
 bit_manager_derive = "*"
 shred = "0.5.0"

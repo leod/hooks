@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use timer;
+use hooks_util::timer;
 
 pub type PlayerId = u32;
 

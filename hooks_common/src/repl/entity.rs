@@ -279,7 +279,7 @@ pub mod auth {
 
 /// Client-side entity management
 pub mod view {
-    use ordered_join;
+    use hooks_util::join;
     use repl;
 
     use super::*;
@@ -299,11 +299,9 @@ pub mod view {
         let new_entities = {
             let entity_map = world.read_resource::<repl::EntityMap>();
 
-            ordered_join::FullJoinIter::new(entity_map.0.iter(), snapshot.0.iter())
+            join::FullJoinIter::new(entity_map.0.iter(), snapshot.0.iter())
                 .filter_map(|item| match item {
-                    ordered_join::Item::Right(&id, entity_snapshot) => {
-                        Some((id, entity_snapshot.clone()))
-                    }
+                    join::Item::Right(&id, entity_snapshot) => Some((id, entity_snapshot.clone())),
                     _ => None,
                 })
                 .collect::<Vec<_>>()

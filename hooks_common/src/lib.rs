@@ -1,9 +1,8 @@
-#![feature(specialization)]
-
 extern crate bit_manager;
 #[macro_use]
 extern crate bit_manager_derive;
 extern crate enet_sys;
+extern crate hooks_util;
 extern crate libc;
 #[macro_use]
 extern crate log;
@@ -20,8 +19,6 @@ extern crate specs;
 extern crate specs_derive;
 extern crate take_mut;
 
-pub mod ordered_join;
-pub mod timer;
 pub mod defs;
 pub mod physics;
 #[macro_use]
@@ -31,7 +28,6 @@ pub mod registry;
 pub mod repl;
 pub mod net;
 pub mod game;
-pub mod debug;
 
 pub use defs::*;
 pub use event::Event;

@@ -3,6 +3,7 @@ extern crate ggez;
 extern crate hooks_common;
 extern crate hooks_game;
 extern crate hooks_show;
+extern crate hooks_util;
 #[macro_use]
 extern crate log;
 extern crate nalgebra;
@@ -13,9 +14,9 @@ use std::{env, path};
 use nalgebra::{Point2, Vector2};
 
 use ggez::event::Keycode;
-use ggez::graphics::{self, Font, Text};
+use ggez::graphics::Font;
 
-use hooks_common::debug::{self, Inspect};
+use hooks_util::debug::{self, Inspect};
 use hooks_common::defs::{GameInfo, PlayerInput};
 use hooks_common::registry::Registry;
 use hooks_game::client::Client;
@@ -46,23 +47,6 @@ struct MainState {
     font: Font,
     fps: f64,
     show_debug: bool,
-}
-
-fn debug_text(
-    ctx: &mut ggez::Context,
-    text: &str,
-    pos: Point2<f32>,
-    font: &Font,
-) -> ggez::error::GameResult<()> {
-    let lines_columns: Vec<Vec<&str>> = text.lines()
-        .map(|line| line.split('\t').collect())
-        .collect();
-
-    /*let column_lens = lines_columns
-        .iter()
-        .scan(*/
-
-    Ok(())
 }
 
 impl ggez::event::EventHandler for MainState {

@@ -1,0 +1,4 @@
+[package]
+name = "hooks_util"
+version = "0.1.0"
+authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]

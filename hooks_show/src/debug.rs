@@ -3,7 +3,7 @@ use nalgebra::{Point2, Vector2};
 use ggez;
 use ggez::graphics::{self, Font, Text};
 
-use hooks_common::debug;
+use hooks_util::debug;
 
 const SUCC_MARGIN: f32 = 10.0;
 const NAME_MARGIN: f32 = 30.0;
