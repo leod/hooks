@@ -36,7 +36,7 @@ pub fn run(world: &World) {
         gen.contacts(&mut contacts);
 
         for contact in &contacts {
-            debug!("contact {:?}", contact);
+            //debug!("contact {:?}", contact);
             //assert!(false);
         }
     }

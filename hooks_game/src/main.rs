@@ -13,6 +13,7 @@ use ggez::event::Keycode;
 use ggez::graphics::{self, Font, Text};
 use nalgebra::{Point2, Vector2};
 
+use common::debug::{self, Inspect};
 use common::defs::{GameInfo, PlayerInput};
 use common::registry::Registry;
 
@@ -38,11 +39,12 @@ struct MainState {
     client: Client,
     game: Game,
 
+    next_player_input: PlayerInput,
+
     show: Show,
     font: Font,
+    fps: f64,
     show_debug: bool,
-
-    next_player_input: PlayerInput,
 }
 
 fn debug_text(
@@ -64,6 +66,7 @@ fn debug_text(
 
 impl ggez::event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::error::GameResult<()> {
+        self.fps = ggez::timer::get_fps(ctx);
         let delta = ggez::timer::get_delta(ctx);
 
         match self.game
@@ -89,11 +92,7 @@ impl ggez::event::EventHandler for MainState {
         self.show.draw(ctx, self.game.world())?;
 
         if self.show_debug {
-            let text = Text::new(ctx, &format!("{:?}", self.game), &self.font).unwrap();
-            graphics::draw(ctx, &text, Point2::new(10.0, 10.0), 0.0).unwrap();
-
-            let text = Text::new(ctx, "Hello world!", &self.font).unwrap();
-            graphics::draw(ctx, &text, Point2::new(10.0, 10.0), 0.0).unwrap();
+            show::debug::show(ctx, &self.font, &self.inspect(), Point2::new(10.0, 10.0))?;
         }
 
         ggez::graphics::present(ctx);
@@ -168,6 +167,15 @@ impl ggez::event::EventHandler for MainState {
     }
 }
 
+impl debug::Inspect for MainState {
+    fn inspect(&self) -> debug::Vars {
+        debug::Vars::Node(vec![
+            ("fps".to_string(), self.fps.inspect()),
+            ("game".to_string(), self.game.inspect()),
+        ])
+    }
+}
+
 fn main() {
     env_logger::init();
 
@@ -220,10 +228,11 @@ fn main() {
     let mut state = MainState {
         client,
         game,
+        next_player_input: PlayerInput::default(),
         show,
         font,
+        fps: 0.0,
         show_debug: true,
-        next_player_input: PlayerInput::default(),
     };
     ggez::event::run(ctx, &mut state).unwrap();
 }
