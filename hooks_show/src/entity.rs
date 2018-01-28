@@ -1,9 +1,9 @@
-use common;
-use common::repl::entity;
+use hooks_common;
+use hooks_common::repl::entity;
 
 use rect;
 
-pub fn register(reg: &mut common::Registry) {
+pub fn register(reg: &mut hooks_common::Registry) {
     entity::add_ctor(reg, "test", |builder| {
         builder.with(rect::Draw {
             width: 10.0,

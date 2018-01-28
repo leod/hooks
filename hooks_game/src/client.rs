@@ -1,9 +1,9 @@
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
-use common::{GameInfo, LeaveReason, PlayerId};
-use common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
-                            CHANNEL_GAME, NUM_CHANNELS};
-use common::net::transport;
+use hooks_common::{GameInfo, LeaveReason, PlayerId};
+use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
+                                  CHANNEL_GAME, NUM_CHANNELS};
+use hooks_common::net::transport;
 
 #[derive(Debug)]
 pub enum Error {

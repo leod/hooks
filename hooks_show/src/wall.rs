@@ -4,9 +4,9 @@ use specs::{Join, ReadStorage, VecStorage, World, SystemData};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use common;
-use common::game::entity::wall;
-use common::physics::{Orientation, Position};
+use hooks_common;
+use hooks_common::game::entity::wall;
+use hooks_common::physics::{Orientation, Position};
 
 use {Assets, Registry};
 

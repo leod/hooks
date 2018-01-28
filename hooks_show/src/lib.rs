@@ -1,5 +1,5 @@
 extern crate ggez;
-extern crate hooks_common as common;
+extern crate hooks_common;
 #[macro_use]
 extern crate log;
 extern crate nalgebra;
@@ -19,13 +19,13 @@ use specs::World;
 
 use ggez::graphics::{self, DrawMode, Mesh};
 
-use common::{Event, GameInfo, PlayerId};
-use common::physics::Position;
-use common::repl::player::Players;
+use hooks_common::{Event, GameInfo, PlayerId};
+use hooks_common::physics::Position;
+use hooks_common::repl::player::Players;
 
 use self::camera::Camera;
 
-pub fn register(reg: &mut common::Registry) {
+pub fn register(reg: &mut hooks_common::Registry) {
     rect::register(reg);
     entity::register(reg);
 }

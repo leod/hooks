@@ -1,8 +1,8 @@
 extern crate env_logger;
 extern crate ggez;
-extern crate hooks_common as common;
-extern crate hooks_game as game;
-extern crate hooks_show as show;
+extern crate hooks_common;
+extern crate hooks_game;
+extern crate hooks_show;
 #[macro_use]
 extern crate log;
 extern crate nalgebra;
@@ -10,24 +10,24 @@ extern crate specs;
 
 use std::{env, path};
 
-use ggez::event::Keycode;
-use ggez::graphics::{self, Font, Text};
 use nalgebra::{Point2, Vector2};
 
-use common::debug::{self, Inspect};
-use common::defs::{GameInfo, PlayerInput};
-use common::registry::Registry;
+use ggez::event::Keycode;
+use ggez::graphics::{self, Font, Text};
 
-use game::client::Client;
-use game::game::Game;
-use show::{Assets, Show};
+use hooks_common::debug::{self, Inspect};
+use hooks_common::defs::{GameInfo, PlayerInput};
+use hooks_common::registry::Registry;
+use hooks_game::client::Client;
+use hooks_game::game::Game;
+use hooks_show::{Assets, Show};
 
 fn register(reg: &mut Registry, game_info: &GameInfo) {
     // Game state
-    game::game::register(reg, game_info);
+    hooks_game::game::register(reg, game_info);
 
     // Components for showing game state
-    show::register(reg);
+    hooks_show::register(reg);
 }
 
 struct Config {
@@ -74,11 +74,11 @@ impl ggez::event::EventHandler for MainState {
             .update(&mut self.client, &self.next_player_input, delta)
             .unwrap()
         {
-            Some(game::game::Event::Disconnected) => {
+            Some(hooks_game::game::Event::Disconnected) => {
                 info!("Got disconnected! Bye.");
                 ctx.quit()?;
             }
-            Some(game::game::Event::TickStarted(ref events)) => {
+            Some(hooks_game::game::Event::TickStarted(ref events)) => {
                 self.show.handle_events(self.game.world_mut(), events)?;
             }
             None => {}
@@ -93,7 +93,7 @@ impl ggez::event::EventHandler for MainState {
         self.show.draw(ctx, self.game.world())?;
 
         if self.show_debug {
-            show::debug::show(ctx, &self.font, &self.inspect(), Point2::new(10.0, 10.0))?;
+            hooks_show::debug::show(ctx, &self.font, &self.inspect(), Point2::new(10.0, 10.0))?;
         }
 
         ggez::graphics::present(ctx);
