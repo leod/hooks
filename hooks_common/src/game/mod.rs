@@ -4,7 +4,6 @@ pub mod init;
 pub mod input;
 pub mod catch;
 
-use physics::collision;
 use registry::Registry;
 use repl;
 

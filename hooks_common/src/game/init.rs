@@ -1,22 +1,21 @@
 use std::f32;
 
 use nalgebra::{Point2, Vector2};
-use rand::{self, Rng};
+use rand::{self, IsaacRng, Rng};
 use specs::World;
 
 use game::entity::wall;
 
 fn create_state(world: &mut World) {
     let n_walls = 2;
-    let mut rng = rand::thread_rng();
+    let mut rng = IsaacRng::new_unseeded();
 
     for _ in 0..n_walls {
-        let x = (rng.gen::<f32>() - 0.5) * 2000.0;
-        let y = (rng.gen::<f32>() - 0.5) * 2000.0;
+        let x = (rng.gen::<f32>() - 0.5) * 800.0;
+        let y = (rng.gen::<f32>() - 0.5) * 600.0;
         let pos = Point2::new(x, y);
 
         let w = rng.gen::<f32>() * 300.0 + 20.0;
-        let w = rng.gen::<f32>() * 1.0 + 20.0;
         let h = rng.gen::<f32>() * 1.0 + 1.0;
         let size = Vector2::new(w, h);
 

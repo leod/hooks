@@ -26,18 +26,18 @@ pub fn run(world: &World) {
     let collision_world = world.read_resource::<CollisionWorld>();
 
     for (oa, ob, gen) in collision_world.contact_pairs() {
-        debug!("{} colliding with {}", oa.uid, ob.uid);
-        debug!("{:?}", oa.position);
-        debug!("{:?}", ob.position);
-        debug!("{:?}", oa.shape.as_shape::<Cuboid<Vector2<f32>>>().unwrap());
-        debug!("{:?}", ob.shape.as_shape::<Cuboid<Vector2<f32>>>().unwrap());
+        //debug!("{} colliding with {}", oa.uid, ob.uid);
+        //debug!("{:?}", oa.position);
+        //debug!("{:?}", ob.position);
+        //debug!("{:?}", oa.shape.as_shape::<Cuboid<Vector2<f32>>>().unwrap());
+        //debug!("{:?}", ob.shape.as_shape::<Cuboid<Vector2<f32>>>().unwrap());
 
         let mut contacts = Vec::new();
         gen.contacts(&mut contacts);
 
         for contact in &contacts {
-            println!("{:?}", contact);
-            assert!(false);
+            debug!("contact {:?}", contact);
+            //assert!(false);
         }
     }
 }
