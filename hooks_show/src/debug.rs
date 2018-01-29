@@ -6,7 +6,7 @@ use ggez::graphics::{self, Font, Text};
 use hooks_util::debug;
 
 const SUCC_MARGIN: f32 = 0.0;
-const NAME_MARGIN: f32 = 30.0;
+const NAME_MARGIN: f32 = 10.0;
 
 pub fn show(
     ctx: &mut ggez::Context,

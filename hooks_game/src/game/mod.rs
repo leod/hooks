@@ -157,6 +157,8 @@ impl Game {
             };
 
             if let Some(tick) = tick {
+                profile!("start tick");
+
                 self.last_tick = Some(tick);
 
                 // Inform the server

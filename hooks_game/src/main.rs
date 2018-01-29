@@ -54,6 +54,8 @@ struct MainState {
 
 impl MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult<()> {
+        profile!("update");
+
         self.fps = ggez::timer::get_fps(ctx);
         let delta = ggez::timer::get_delta(ctx);
 
@@ -75,7 +77,12 @@ impl MainState {
     }
 
     fn draw(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult<()> {
-        ggez::graphics::clear(ctx);
+        profile!("draw");
+
+        {
+            profile!("clear");
+            ggez::graphics::clear(ctx);
+        }
 
         self.show.draw(ctx, self.game.world())?;
 
@@ -84,7 +91,10 @@ impl MainState {
             hooks_show::debug::show(ctx, &self.font, &self.inspect(), Point2::new(10.0, 10.0))?;
         }
 
-        ggez::graphics::present(ctx);
+        {
+            profile!("present");
+            ggez::graphics::present(ctx);
+        }
 
         Ok(())
     }

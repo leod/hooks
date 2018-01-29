@@ -7,15 +7,15 @@ build: server game
 
 run: build
 	tmux \
-		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server; cat"' \; \
-		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"' \; \
+		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server; cat"' \; \
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game; cat"' \; \
 		select-layout even-horizontal
 
 run-game: game
-	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game
+	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game
 
 run-server: server
-	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server
+	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server
 
 random-bot:
 	CARGO_TARGET_DIR=${TARGET} cargo run -j4 --manifest-path=hooks_game/Cargo.toml --example random_bot
@@ -23,19 +23,19 @@ random-bot:
 stress: build
 	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_game/Cargo.toml --example random_bot
 	tmux \
-		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server; cat"' \; \
-		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"' \; \
+		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server; cat"' \; \
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game; cat"' \; \
 		split-window -h 'bash -c "for i in {1..'${N_STRESS}'}; do echo $i; make random-bot & done ; cat"' \; \
 		select-layout even-horizontal
 
 common:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_common/Cargo.toml
+	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --release --manifest-path=hooks_common/Cargo.toml
 
 server:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_server/Cargo.toml
+	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --release --manifest-path=hooks_server/Cargo.toml
 
 game:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_game/Cargo.toml
+	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --release --manifest-path=hooks_game/Cargo.toml
 
 fmt:
 	cd hooks_common; cargo fmt
