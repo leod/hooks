@@ -1,11 +1,12 @@
 use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
-use specs::{Join, ReadStorage, VecStorage, World, SystemData};
+use specs::{Entities, Join, ReadStorage, VecStorage, World, SystemData};
 
 use ggez;
 use ggez::graphics::{self, Drawable};
 
 use hooks_common;
 use hooks_common::physics::{Orientation, Position};
+use hooks_common::physics::sim::Collided;
 
 use {Assets, Registry};
 
@@ -25,15 +26,17 @@ pub struct Draw {
 }
 
 type DrawData<'a> = (
+    Entities<'a>,
     ReadStorage<'a, Position>,
     ReadStorage<'a, Orientation>,
     ReadStorage<'a, Draw>,
+    ReadStorage<'a, Collided>,
 );
 
 fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
-    let (position, orientation, draw) = DrawData::fetch(&world.res, 0);
+    let (entities, position, orientation, draw, collided) = DrawData::fetch(&world.res, 0);
 
-    for (position, orientation, draw) in (&position, &orientation, &draw).join() {
+    for (entity, position, orientation, draw) in (&*entities, &position, &orientation, &draw).join() {
         let coords = position.0.coords;
         let scaling = Matrix4::from_diagonal(&Vector4::new(draw.width, draw.height, 1.0, 1.0));
         let isometry = Isometry3::new(
@@ -46,10 +49,19 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
         graphics::push_transform(ctx, Some(curr_transform * matrix));
         graphics::apply_transformations(ctx)?;
 
+        let color = if collided.get(entity).is_some() {
+            graphics::Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 }
+        } else {
+            graphics::WHITE
+        };
+        graphics::set_color(ctx, color);
+
         assets.rect_line.draw(ctx, Point2::origin(), 0.0)?;
 
         graphics::pop_transform(ctx);
     }
+
+    graphics::set_color(ctx, graphics::WHITE);
 
     Ok(())
 }
