@@ -139,9 +139,8 @@ impl Game {
         // 2. We have already started.
         match (self.last_tick, self.server_recv_ack_tick) {
             (Some(last_tick), Some(server_recv_ack_tick)) => {
-                if last_tick >= server_recv_ack_tick {
-                    self.tick_history.prune_older_ticks(server_recv_ack_tick);
-                }
+                self.tick_history
+                    .prune_older_ticks(server_recv_ack_tick.min(last_tick));
             }
             _ => {}
         }

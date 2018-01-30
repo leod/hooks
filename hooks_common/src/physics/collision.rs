@@ -1,8 +1,9 @@
 use specs::{Entities, Entity, FetchMut, Join, ReadStorage, System, WriteStorage};
 
-use nalgebra::Isometry2;
+use nalgebra::{Isometry2, Point2};
 use ncollide::shape::ShapeHandle2;
-use ncollide::world::CollisionWorld2;
+use ncollide::world::{CollisionObject2, CollisionWorld2};
+use ncollide::narrow_phase::{ContactGenerator, ContactHandler};
 
 use physics::{Orientation, Position};
 use registry::Registry;
@@ -16,7 +17,12 @@ pub fn register(reg: &mut Registry) {
     reg.component::<RemoveObject>();
     reg.component::<ObjectUid>();
 
-    reg.resource(CollisionWorld2::<f32, Entity>::new(0.02, false));
+    let collision_world = CollisionWorld2::<f32, Entity>::new(0.02, false);
+
+    // Does not exist in `send_sync` branch
+    //collision_world.register_contact_handler("contact handler", MyContactHandler);
+
+    reg.resource(collision_world);
     reg.resource(UidSource { next_uid: 0 });
 }
 
@@ -205,3 +211,24 @@ impl<'a> System<'a> for RemoveObjectSys {
         }
     }
 }
+
+/*/// ncollide contact handler.
+struct MyContactHandler;
+
+impl ContactHandler<Point2<f32>, Isometry2<f32>, Entity> for MyContactHandler {
+    fn handle_contact_started(
+        &mut self,
+        co1: &CollisionObject2<f32, Entity>,
+        co2: &CollisionObject2<f32, Entity>,
+        contacts: &Box<ContactGenerator<Point2<f32>, Isometry2<f32>>>,
+    ) {
+        debug!("{:?} with {:?}", co1.data, co2.data);
+    }
+
+    fn handle_contact_stopped(
+        &mut self,
+        co1: &CollisionObject2<f32, Entity>,
+        co2: &CollisionObject2<f32, Entity>,
+    ) {
+    }
+}*/

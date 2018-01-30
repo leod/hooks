@@ -2,6 +2,7 @@ extern crate bit_manager;
 #[macro_use]
 extern crate bit_manager_derive;
 extern crate enet_sys;
+#[macro_use]
 extern crate hooks_util;
 extern crate libc;
 #[macro_use]
