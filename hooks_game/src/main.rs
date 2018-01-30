@@ -119,6 +119,8 @@ impl MainState {
             } => match keycode {
                 Keycode::W => self.next_player_input.move_forward = true,
                 Keycode::S => self.next_player_input.move_backward = true,
+                Keycode::F1 => self.show_debug = !self.show_debug,
+                Keycode::F2 => self.show_profiler = !self.show_profiler,
                 _ => {}
             },
             event::Event::KeyUp {
@@ -230,7 +232,7 @@ fn main() {
         font,
         fps: 0.0,
         show_debug: true,
-        show_profiler: true,
+        show_profiler: false,
     };
 
     while state.run_frame(ctx).unwrap() {}
