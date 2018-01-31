@@ -1,10 +1,9 @@
 use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
-use specs::{Join, ReadStorage, VecStorage, World, SystemData};
+use specs::{Join, ReadStorage, World, SystemData};
 
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use hooks_common;
 use hooks_common::game::entity::wall;
 use hooks_common::physics::{Orientation, Position};
 

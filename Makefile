@@ -18,10 +18,10 @@ run-server: server
 	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server
 
 random-bot:
-	CARGO_TARGET_DIR=${TARGET} cargo run -j4 --manifest-path=hooks_game/Cargo.toml --example random_bot
+	CARGO_TARGET_DIR=${TARGET} cargo run -j8 --manifest-path=hooks_game/Cargo.toml --example random_bot
 
 stress: build
-	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --manifest-path=hooks_game/Cargo.toml --example random_bot
+	CARGO_TARGET_DIR=${TARGET} cargo build -j8 --manifest-path=hooks_game/Cargo.toml --example random_bot
 	tmux \
 		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server; cat"' \; \
 		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game; cat"' \; \
@@ -29,13 +29,13 @@ stress: build
 		select-layout even-horizontal
 
 common:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --release --manifest-path=hooks_common/Cargo.toml
+	CARGO_TARGET_DIR=${TARGET} cargo build -j8 --release --manifest-path=hooks_common/Cargo.toml
 
 server:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --release --manifest-path=hooks_server/Cargo.toml
+	CARGO_TARGET_DIR=${TARGET} cargo build -j8 --release --manifest-path=hooks_server/Cargo.toml
 
 game:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j4 --release --manifest-path=hooks_game/Cargo.toml
+	CARGO_TARGET_DIR=${TARGET} cargo build -j8 --release --manifest-path=hooks_game/Cargo.toml
 
 fmt:
 	cd hooks_common; cargo fmt

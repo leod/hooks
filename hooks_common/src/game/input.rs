@@ -3,15 +3,13 @@ pub mod auth {
     use shred::SystemData;
     use specs::{Fetch, World, WriteStorage};
 
-    use defs::{GameInfo, PlayerId, PlayerInput};
-    use physics::{Orientation, Position, Velocity};
+    use defs::{PlayerId, PlayerInput};
+    use physics::{Orientation, Velocity};
     use repl::player::Players;
 
     #[derive(SystemData)]
     struct Data<'a> {
-        game_info: Fetch<'a, GameInfo>,
         players: Fetch<'a, Players>,
-        position: WriteStorage<'a, Position>,
         velocity: WriteStorage<'a, Velocity>,
         orientation: WriteStorage<'a, Orientation>,
     }

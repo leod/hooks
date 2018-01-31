@@ -1,7 +1,7 @@
 // This module's implementation has been inspired by hprof:
 // <https://cmr.github.io/hprof/src/hprof/lib.rs.html#306-308> 
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 

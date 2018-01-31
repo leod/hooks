@@ -54,14 +54,14 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
         } else {
             graphics::WHITE
         };
-        graphics::set_color(ctx, color);
+        graphics::set_color(ctx, color)?;
 
         assets.rect_line.draw(ctx, Point2::origin(), 0.0)?;
 
         graphics::pop_transform(ctx);
     }
 
-    graphics::set_color(ctx, graphics::WHITE);
+    graphics::set_color(ctx, graphics::WHITE)?;
 
     Ok(())
 }

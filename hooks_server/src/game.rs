@@ -154,8 +154,8 @@ impl Game {
                     assert!(self.players.contains_key(&player_id));
 
                     match msg {
-                        ClientGameMsg::PlayerInput(input) => {
-                            // TODO
+                        ClientGameMsg::PlayerInput(_input) => {
+                            panic!("not used right now");
                         }
                         ClientGameMsg::ReceivedTick(tick_num) => {
                             // Client has acknowledged a tick

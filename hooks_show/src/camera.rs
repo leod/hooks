@@ -19,7 +19,7 @@ impl Camera {
         self.pos = pos;
     }
 
-    pub fn update(&mut self, delta: Duration) {}
+    pub fn update(&mut self, _delta: Duration) {}
 
     pub fn transform(&self) -> Matrix4<f32> {
         let coords = -self.pos.coords + self.window_size / 2.0;

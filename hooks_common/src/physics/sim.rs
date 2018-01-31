@@ -7,7 +7,7 @@ use hooks_util::profile;
 
 use defs::GameInfo;
 use physics::{collision, Dynamic, Position, Velocity};
-use physics::collision::{CollisionWorld, Cuboid};
+use physics::collision::CollisionWorld;
 use registry::Registry;
 
 pub fn register(reg: &mut Registry) {
@@ -37,36 +37,6 @@ pub fn run(world: &World) {
     PredictSys.run_now(&world.res);
     collision::UpdateSys.run_now(&world.res);
     ApplySys.run_now(&world.res);
-
-    let collision_world = world.read_resource::<CollisionWorld>();
-
-    for (oa, ob, gen) in collision_world.contact_pairs() {
-        //debug!("{} colliding with {}", oa.uid, ob.uid);
-        //debug!("{:?}", oa.position);
-        //debug!("{:?}", ob.position);
-        //debug!("{:?}", oa.shape.as_shape::<Cuboid<Vector2<f32>>>().unwrap());
-        //debug!("{:?}", ob.shape.as_shape::<Cuboid<Vector2<f32>>>().unwrap());
-
-        let mut contacts = Vec::new();
-        gen.contacts(&mut contacts);
-
-        for contact in &contacts {
-            //debug!("contact {:?}", contact);
-            //assert!(false);
-
-            world
-                .write::<Collided>()
-                .insert(oa.data, Collided { other: ob.data });
-            world
-                .write::<Collided>()
-                .insert(ob.data, Collided { other: oa.data });
-        }
-    }
-
-    /*for (oa, ob, contact) in collision_world.contacts() {
-        world.write::<Collided>().insert(oa.data, Collided { other: ob.data });
-        world.write::<Collided>().insert(ob.data, Collided { other: oa.data });
-    }*/
 }
 
 #[derive(Component)]
@@ -116,7 +86,6 @@ impl<'a> System<'a> for ApplySys {
     type SystemData = (
         Fetch<'a, GameInfo>,
         FetchMut<'a, CollisionWorld>,
-        Entities<'a>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, OldPosition>,
@@ -130,7 +99,6 @@ impl<'a> System<'a> for ApplySys {
         (
             game_info,
             collision_world,
-            entities,
             mut velocity,
             mut position,
             old_position,
@@ -151,10 +119,19 @@ impl<'a> System<'a> for ApplySys {
                 let a_dynamic = dynamic.get(a).is_some();
                 let b_dynamic = dynamic.get(b).is_some();
 
+                fn resolve(dt: f32, n: &Vector2<f32>, depth: f32, v: &mut Velocity) {
+                    //let t = depth.min(dot(&v.0, &n));
+                    let t = depth;
+                    v.0 -= n * t / dt;
+                }
+
                 if a_dynamic && !b_dynamic {
-                    velocity.get_mut(a).unwrap().0 -= contact.normal * contact.depth;
+                    //velocity.get_mut(a).unwrap().0 -= contact.normal * contact.depth / dt;
+                    resolve(dt, &contact.normal, contact.depth, velocity.get_mut(a).unwrap());
                 } else if !a_dynamic && b_dynamic {
-                    velocity.get_mut(b).unwrap().0 -= contact.normal * contact.depth;
+                    resolve(dt, &contact.normal, contact.depth, velocity.get_mut(b).unwrap());
+                } else {
+                    unimplemented!();
                 }
 
                 collided.insert(a, Collided { other: b });

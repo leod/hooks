@@ -69,6 +69,7 @@ impl Client {
 
                 let reply = Self::read_comm(packet)?;
 
+                #[allow(unreachable_patterns)]
                 match reply {
                     ServerCommMsg::AcceptConnect {
                         your_id: my_player_id,
@@ -120,7 +121,7 @@ impl Client {
 
         if let Some(event) = self.host.service(0)? {
             match event {
-                transport::Event::Connect(peer) => Err(Error::UnexpectedConnect),
+                transport::Event::Connect(_peer) => Err(Error::UnexpectedConnect),
                 transport::Event::Receive(_peer, channel, packet) => {
                     if channel == CHANNEL_COMM {
                         // Communication messages are handled here
@@ -136,7 +137,7 @@ impl Client {
                         Err(Error::InvalidChannel(channel))
                     }
                 }
-                transport::Event::Disconnect(peer) => Ok(Some(Event::Disconnected)),
+                transport::Event::Disconnect(_peer) => Ok(Some(Event::Disconnected)),
             }
         } else {
             // No transport event
