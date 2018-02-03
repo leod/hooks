@@ -2,7 +2,7 @@ use specs::{Entities, Entity, FetchMut, Join, ReadStorage, System, WriteStorage}
 
 use nalgebra::Isometry2;
 use ncollide::shape::ShapeHandle2;
-use ncollide::world::CollisionWorld2;
+use ncollide::world::{CollisionWorld2, CollisionObjectHandle};
 
 use physics::{Orientation, Position};
 use registry::Registry;
@@ -14,15 +14,14 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Shape>();
     reg.component::<CreateObject>();
     reg.component::<RemoveObject>();
-    reg.component::<ObjectUid>();
+    reg.component::<ObjectHandle>();
 
-    let collision_world = CollisionWorld2::<f32, Entity>::new(0.02, false);
+    let collision_world = CollisionWorld2::<f32, Entity>::new(0.02);
 
     // Does not exist in `send_sync` branch
     //collision_world.register_contact_handler("contact handler", MyContactHandler);
 
     reg.resource(collision_world);
-    reg.resource(UidSource { next_uid: 0 });
 }
 
 pub type CollisionWorld = CollisionWorld2<f32, Entity>;
@@ -58,7 +57,7 @@ pub struct RemoveObject;
 /// Handle of an ncollide CollisionObject.
 #[derive(Component)]
 #[component(VecStorage)]
-pub struct ObjectUid(usize);
+pub struct ObjectHandle(CollisionObjectHandle);
 
 /// System for running the collision pipeline.
 pub struct UpdateSys;
@@ -68,12 +67,12 @@ impl<'a> System<'a> for UpdateSys {
         FetchMut<'a, CollisionWorld>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Orientation>,
-        ReadStorage<'a, ObjectUid>,
+        ReadStorage<'a, ObjectHandle>,
     );
 
     fn run(
         &mut self,
-        (mut collision_world, mut position, mut orientation, object_uid): Self::SystemData,
+        (mut collision_world, mut position, mut orientation, object_handle): Self::SystemData,
     ) {
         // Update isometry of entities that have moved or rotated
         {
@@ -81,18 +80,18 @@ impl<'a> System<'a> for UpdateSys {
             let orientation_changed = orientation.open().1.open().0;
             let changed = position_changed | orientation_changed;
 
-            for (_, position, orientation, object_uid) in
-                (&changed, &position, &orientation, &object_uid).join()
+            for (_, position, orientation, object_handle) in
+                (&changed, &position, &orientation, &object_handle).join()
             {
-                if collision_world.collision_object(object_uid.0).is_none() {
+                if collision_world.collision_object(object_handle.0).is_none() {
                     // This should happen exactly once for each object when it is first created.
-                    // `CreateObjectSys` has deferred-added the object, but the collision world has
+                    // `CreateObjectSys` has added the object, but the collision world has
                     // not been updated yet, so changing the position here would be an error.
                     continue;
                 }
 
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
-                collision_world.deferred_set_position(object_uid.0, isometry);
+                collision_world.set_position(object_handle.0, isometry);
             }
         }
 
@@ -103,54 +102,37 @@ impl<'a> System<'a> for UpdateSys {
     }
 }
 
-pub struct UidSource {
-    next_uid: usize,
-}
-
-impl UidSource {
-    fn next_uid(&mut self) -> usize {
-        let uid = self.next_uid;
-        self.next_uid += 1;
-
-        uid
-    }
-}
-
 /// System for creating collision objects for entities tagged with CreateObject.
 pub struct CreateObjectSys;
 
 impl<'a> System<'a> for CreateObjectSys {
     type SystemData = (
         FetchMut<'a, CollisionWorld>,
-        FetchMut<'a, UidSource>,
         Entities<'a>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Orientation>,
         ReadStorage<'a, Shape>,
         WriteStorage<'a, CreateObject>,
-        WriteStorage<'a, ObjectUid>,
+        WriteStorage<'a, ObjectHandle>,
     );
 
     fn run(
         &mut self,
         (
             mut collision_world,
-            mut uid_source,
             entities,
             position,
             orientation,
             shape,
             mut create_object,
-            mut object_uid,
+            mut object_handle,
         ): Self::SystemData,
     ) {
         let created_entities = (&*entities, &position, &orientation, &shape, &create_object)
             .join()
             .map(|(entity, position, orientation, shape, create_object)| {
-                let uid = uid_source.next_uid();
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
-                collision_world.deferred_add(
-                    uid,
+                let handle = collision_world.add(
                     isometry,
                     shape.0.clone(),
                     create_object.groups,
@@ -158,7 +140,7 @@ impl<'a> System<'a> for CreateObjectSys {
                     entity,
                 );
 
-                object_uid.insert(entity, ObjectUid(uid));
+                object_handle.insert(entity, ObjectHandle(handle));
 
                 entity
             })
@@ -185,24 +167,24 @@ impl<'a> System<'a> for RemoveObjectSys {
         FetchMut<'a, CollisionWorld>,
         Entities<'a>,
         WriteStorage<'a, RemoveObject>,
-        WriteStorage<'a, ObjectUid>,
+        WriteStorage<'a, ObjectHandle>,
     );
 
     fn run(
         &mut self,
-        (mut collision_world, entities, mut remove_object, mut object_uid): Self::SystemData,
+        (mut collision_world, entities, mut remove_object, mut object_handle): Self::SystemData,
     ) {
-        let removed_entities = (&*entities, &mut remove_object, &mut object_uid)
+        let removed_entities = (&*entities, &mut remove_object, &mut object_handle)
             .join()
-            .map(|(entity, _, object_uid)| {
-                collision_world.deferred_remove(object_uid.0);
+            .map(|(entity, _, object_handle)| {
+                collision_world.remove(&[object_handle.0]);
                 entity
             })
             .collect::<Vec<_>>();
 
         for entity in removed_entities {
             remove_object.remove(entity);
-            object_uid.remove(entity);
+            object_handle.remove(entity);
         }
 
         for (entity, _) in (&*entities, &remove_object).join() {
