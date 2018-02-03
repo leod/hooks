@@ -1,0 +1,2 @@
+[workspace]
+members = ["hooks_game", "hooks_server"]
