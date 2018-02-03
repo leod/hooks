@@ -3,7 +3,8 @@ N_STRESS=20
 
 all: build
 
-build: server game
+build:
+	cargo build -j8 --release
 
 run: build
 	tmux \
@@ -27,15 +28,6 @@ stress: build
 		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game; cat"' \; \
 		split-window -h 'bash -c "for i in {1..'${N_STRESS}'}; do echo $i; make random-bot & done ; cat"' \; \
 		select-layout even-horizontal
-
-common:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j8 --release --manifest-path=hooks_common/Cargo.toml
-
-server:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j8 --release --manifest-path=hooks_server/Cargo.toml
-
-game:
-	CARGO_TARGET_DIR=${TARGET} cargo build -j8 --release --manifest-path=hooks_game/Cargo.toml
 
 fmt:
 	cd hooks_common; cargo fmt
