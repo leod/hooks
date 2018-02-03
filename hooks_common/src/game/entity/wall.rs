@@ -23,7 +23,7 @@ pub fn create(world: &mut World, pos: Point2<f32>, size: Vector2<f32>, angle: f3
     groups.set_membership(&[collision::GROUP_WALL]);
     groups.set_whitelist(&[collision::GROUP_PLAYER]);
 
-    let query_type = GeometricQueryType::Contacts(0.0);
+    let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
     world
         .create_entity()

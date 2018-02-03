@@ -15,7 +15,7 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Collided>();
 }
 
-/// Tag component for debuggin visually
+/// Tag component for debugging visually
 #[derive(Component)]
 #[component(BTreeStorage)]
 pub struct Collided {
@@ -113,16 +113,16 @@ impl<'a> System<'a> for ApplySys {
             gen.contacts(&mut contacts);
 
             for contact in &contacts {
-                let a = oa.data;
-                let b = ob.data;
+                let a = *oa.data();
+                let b = *ob.data();
 
                 let a_dynamic = dynamic.get(a).is_some();
                 let b_dynamic = dynamic.get(b).is_some();
 
                 fn resolve(dt: f32, n: &Vector2<f32>, depth: f32, v: &mut Velocity) {
                     //let t = depth.min(dot(&v.0, &n));
-                    let t = depth;
-                    v.0 -= n * t / dt;
+                    //let t = depth;
+                    //v.0 -= n * t / dt;
                 }
 
                 if a_dynamic && !b_dynamic {
