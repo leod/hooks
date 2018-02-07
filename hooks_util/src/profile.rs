@@ -1,5 +1,5 @@
 // This module's implementation has been inspired by hprof:
-// <https://cmr.github.io/hprof/src/hprof/lib.rs.html#306-308> 
+// <https://cmr.github.io/hprof/src/hprof/lib.rs.html#306-308>
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -45,7 +45,9 @@ impl Node {
     }
 
     fn leave(&mut self) {
-        self.duration_sum = self.duration_sum.checked_add(self.start_instant.unwrap().elapsed()).unwrap();
+        self.duration_sum = self.duration_sum
+            .checked_add(self.start_instant.unwrap().elapsed())
+            .unwrap();
     }
 }
 
@@ -73,7 +75,10 @@ impl Profiler {
     }
 
     pub fn frame(&mut self) -> Guard {
-        assert!(self.current.borrow().pred.is_none(), "should start frame at root profiling node");
+        assert!(
+            self.current.borrow().pred.is_none(),
+            "should start frame at root profiling node"
+        );
 
         let mut current = self.current.borrow_mut();
         current.enter()
@@ -104,7 +109,7 @@ impl Profiler {
 
     fn leave(&mut self) {
         self.current.borrow_mut().leave();
-        
+
         if self.current.borrow().pred.is_some() {
             self.current = {
                 let pred = self.current.borrow().pred.clone().unwrap();
@@ -117,10 +122,10 @@ impl Profiler {
 impl debug::Inspect for Node {
     fn inspect(&self) -> debug::Vars {
         let duration_sum_secs = timer::duration_to_secs(self.duration_sum);
-        let percent = self.pred.clone().map(|pred| {
-            duration_sum_secs /
-            timer::duration_to_secs(pred.borrow().duration_sum)
-        }).unwrap_or(1.0) * 100.0;
+        let percent = self.pred
+            .clone()
+            .map(|pred| duration_sum_secs / timer::duration_to_secs(pred.borrow().duration_sum))
+            .unwrap_or(1.0) * 100.0;
         let root_duration_sum_secs = PROFILER.with(|p| {
             let p = p.borrow();
             let root = p.root.borrow();
@@ -130,10 +135,15 @@ impl debug::Inspect for Node {
         let name = "".to_string();
 
         let mut vars = vec![
-            (name, debug::Vars::Leaf(format!("{:.2}% {:>4.2}ms/call {:.2}Hz",
-                         percent,
-                         duration_sum_secs * 1000.0 / (self.num_calls as f64),
-                         self.num_calls as f64 / root_duration_sum_secs))),
+            (
+                name,
+                debug::Vars::Leaf(format!(
+                    "{:.2}% {:>4.2}ms/call {:.2}Hz",
+                    percent,
+                    duration_sum_secs * 1000.0 / (self.num_calls as f64),
+                    self.num_calls as f64 / root_duration_sum_secs
+                )),
+            ),
         ];
 
         if !self.succs.is_empty() {

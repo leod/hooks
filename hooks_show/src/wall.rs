@@ -1,5 +1,5 @@
 use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
-use specs::{Join, ReadStorage, World, SystemData};
+use specs::{Join, ReadStorage, SystemData, World};
 
 use ggez;
 use ggez::graphics::{self, Drawable};

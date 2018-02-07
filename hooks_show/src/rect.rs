@@ -1,5 +1,5 @@
 use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
-use specs::{Entities, Join, ReadStorage, VecStorage, World, SystemData};
+use specs::{Entities, Join, ReadStorage, SystemData, VecStorage, World};
 
 use ggez;
 use ggez::graphics::{self, Drawable};
@@ -36,7 +36,8 @@ type DrawData<'a> = (
 fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
     let (entities, position, orientation, draw, collided) = DrawData::fetch(&world.res, 0);
 
-    for (entity, position, orientation, draw) in (&*entities, &position, &orientation, &draw).join() {
+    for (entity, position, orientation, draw) in (&*entities, &position, &orientation, &draw).join()
+    {
         let coords = position.0.coords;
         let scaling = Matrix4::from_diagonal(&Vector4::new(draw.width, draw.height, 1.0, 1.0));
         let isometry = Isometry3::new(
@@ -50,7 +51,12 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
         graphics::apply_transformations(ctx)?;
 
         let color = if collided.get(entity).is_some() {
-            graphics::Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 }
+            graphics::Color {
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            }
         } else {
             graphics::WHITE
         };
