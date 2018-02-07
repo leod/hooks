@@ -3,10 +3,11 @@ use std::time::Duration;
 use hooks_util::timer;
 
 pub type PlayerId = u32;
+pub type EntityIndex = u32;
 
 /// Global Ids for entities shared between server and clients.
 /// Note that the zero id is reserved.
-pub type EntityId = u32;
+pub type EntityId = (PlayerId, EntityIndex);
 
 pub type EntityClassId = u32;
 
@@ -18,7 +19,7 @@ pub type TickDeltaNum = u8;
 pub const NO_DELTA_TICK: TickDeltaNum = 0;
 
 pub const INVALID_PLAYER_ID: PlayerId = 0;
-pub const INVALID_ENTITY_ID: EntityId = 0;
+pub const INVALID_ENTITY_ID: EntityId = (INVALID_PLAYER_ID, 0);
 
 #[derive(Debug, Clone, BitStore)]
 pub struct MapInfo;

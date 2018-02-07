@@ -17,12 +17,9 @@ pub mod auth {
     pub const MOVE_SPEED: f32 = 100.0;
 
     pub fn run_player_input(world: &mut World, player_id: PlayerId, input: &PlayerInput) {
-        // TODO: Need to decide if players should move here immediately, or if player input should
-        //       only affect e.g. velocity or acceleration for a simultaneous physics tick.
-
         let mut data = Data::fetch(&world.res, 0);
 
-        let entity = data.players.0.get(&player_id).unwrap().1;
+        let entity = data.players.0.get(&player_id).unwrap().entity;
 
         if let Some(entity) = entity {
             if input.rot_angle != data.orientation.get(entity).unwrap().0 {

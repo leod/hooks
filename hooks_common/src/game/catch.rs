@@ -19,8 +19,8 @@ pub mod auth {
             .clone();
         let players = world.read_resource::<repl::player::Players>().clone();
 
-        for (&player_id, &(ref _info, ref entity)) in &players.0 {
-            if entity.is_none() {
+        for (&player_id, player) in players.iter() {
+            if player.entity.is_none() {
                 let mut rng = rand::thread_rng();
 
                 // TODO: Spawn points here

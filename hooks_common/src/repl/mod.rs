@@ -30,7 +30,6 @@ pub struct Id(pub EntityId);
 #[derive(Clone, PartialEq, Component, BitStore)]
 #[component(VecStorage)]
 pub struct Entity {
-    pub owner: PlayerId,
     pub class_id: EntityClassId,
 }
 

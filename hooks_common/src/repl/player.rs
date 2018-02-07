@@ -3,7 +3,7 @@ use std::collections::btree_map;
 
 use specs::{self, Join, World};
 
-use defs::{LeaveReason, PlayerId, PlayerInfo};
+use defs::{LeaveReason, PlayerId, PlayerInfo, EntityIndex};
 use event::{self, Event};
 use registry::Registry;
 use repl::{self, entity};
@@ -15,18 +15,41 @@ pub fn register(reg: &mut Registry) {
     reg.event_handler_pre_tick(handle_event_pre_tick);
 }
 
+#[derive(Clone, Debug)]
+pub struct Player {
+    pub info: PlayerInfo,
+    pub entity: Option<specs::Entity>,
+    pub next_entity_index: EntityIndex,
+}
+
+impl Player {
+    pub fn new(info: PlayerInfo) -> Player {
+        Player {
+            info: info,
+            entity: None,
+            next_entity_index: 0,
+        }
+    }
+
+    pub fn advance_entity_index(&mut self) -> EntityIndex {
+        let index = self.next_entity_index;
+        self.next_entity_index += 1;
+        index
+    }
+}
+
 /// For each player, store information (like the name and statistics) and the current main entity
 /// of the player, if it exists. Management of the player's entity handle is currently handled by
 /// the `repl::entity` mod.
 #[derive(Clone)]
-pub struct Players(pub BTreeMap<PlayerId, (PlayerInfo, Option<specs::Entity>)>);
+pub struct Players(pub BTreeMap<PlayerId, Player>);
 
 impl Players {
-    pub fn get(&self, id: PlayerId) -> Option<&(PlayerInfo, Option<specs::Entity>)> {
+    pub fn get(&self, id: PlayerId) -> Option<&Player> {
         self.0.get(&id)
     }
 
-    pub fn iter(&self) -> btree_map::Iter<PlayerId, (PlayerInfo, Option<specs::Entity>)> {
+    pub fn iter(&self) -> btree_map::Iter<PlayerId, Player> {
         self.0.iter()
     }
 }
@@ -69,7 +92,7 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
                 return Err(repl::Error::InvalidPlayerId(event.id));
             }
 
-            players.0.insert(event.id, (event.info.clone(), None));
+            players.0.insert(event.id, Player::new(event.info.clone()));
         },
         LeftEvent => {
             {
@@ -80,7 +103,7 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
                     return Err(repl::Error::InvalidPlayerId(event.id));
                 }
 
-                info!("Player {} with name {} left", event.id, players.0[&event.id].0.name);
+                info!("Player {} with name {} left", event.id, players.0[&event.id].info.name);
             }
 
             // Remove all entities owned by the disconnected player
@@ -88,10 +111,10 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
                 let mut repl_ids = world.read::<repl::Id>();
                 let mut repl_entities = world.read::<repl::Entity>();
 
-                (&repl_ids, &repl_entities).join()
-                    .filter_map(|(id, entity)| {
-                        if entity.owner == event.id {
-                            Some(id.0)
+                repl_ids.join()
+                    .filter_map(|&repl::Id(id)| {
+                        if id.0 == event.id {
+                            Some(id)
                         } else {
                             None
                         }
