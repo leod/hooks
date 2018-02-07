@@ -12,7 +12,7 @@ pub use repl::snapshot::{ComponentType, EntityClass, EntityClasses, EntitySnapsh
 fn register<T: EntitySnapshot>(reg: &mut Registry) {
     reg.resource(EntityClasses::<T>(BTreeMap::new()));
     reg.resource(Ctors(BTreeMap::new()));
-    reg.resource(ClassNames(BTreeMap::new()));
+    reg.resource(ClassIds(BTreeMap::new()));
 
     reg.event::<RemoveOrder>();
 }
@@ -35,7 +35,7 @@ struct Ctors(pub BTreeMap<EntityClassId, Vec<Ctor>>);
 
 /// Maps from entity class names to their unique id. This map should be exactly the same on server
 /// and clients and not change during a game.
-struct ClassNames(pub BTreeMap<String, EntityClassId>);
+struct ClassIds(pub BTreeMap<String, EntityClassId>);
 
 /// Register a new entity class. This should only be called in register functions that are used by
 /// both the server and the clients. Server and clients can attach their specific entity
@@ -52,7 +52,7 @@ pub fn register_type<T: ComponentType>(
 
     let mut classes = world.write_resource::<EntityClasses<T::EntitySnapshot>>();
     let mut ctors = world.write_resource::<Ctors>();
-    let mut class_names = world.write_resource::<ClassNames>();
+    let mut class_ids = world.write_resource::<ClassIds>();
 
     let class_id = classes.0.keys().next_back().map(|&id| id + 1).unwrap_or(0);
 
@@ -63,7 +63,7 @@ pub fn register_type<T: ComponentType>(
 
     assert!(!classes.0.contains_key(&class_id));
     assert!(!ctors.0.contains_key(&class_id));
-    assert!(!class_names.0.values().any(|&id| id == class_id));
+    assert!(!class_ids.0.values().any(|&id| id == class_id));
 
     let class = EntityClass::<T::EntitySnapshot> {
         components: components.to_vec(),
@@ -71,10 +71,10 @@ pub fn register_type<T: ComponentType>(
 
     classes.0.insert(class_id, class);
     ctors.0.insert(class_id, vec![ctor]);
-    class_names.0.insert(name.to_string(), class_id);
+    class_ids.0.insert(name.to_string(), class_id);
 
     assert!(classes.0.len() == ctors.0.len());
-    assert!(ctors.0.len() == class_names.0.len());
+    assert!(ctors.0.len() == class_ids.0.len());
 
     class_id
 }
@@ -83,8 +83,8 @@ pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
     let world = reg.world();
 
     let class_id = {
-        let class_names = world.read_resource::<ClassNames>();
-        class_names.0[name]
+        let class_ids = world.read_resource::<ClassIds>();
+        class_ids.0[name]
     };
 
     let mut ctors = world.write_resource::<Ctors>();
@@ -129,7 +129,7 @@ where
     // Remember player-controlled main entity
     if id.0 != INVALID_PLAYER_ID {
         let game_info = world.read_resource::<GameInfo>();
-        let class_names = world.read_resource::<ClassNames>();
+        let class_ids = world.read_resource::<ClassIds>();
 
         let mut players = world.write_resource::<player::Players>();
 
@@ -139,7 +139,7 @@ where
             return Err(repl::Error::InvalidPlayerId(id.0));
         };
         let player_class_id =
-            if let Some(&player_class_id) = class_names.0.get(&game_info.player_entity_class) {
+            if let Some(&player_class_id) = class_ids.0.get(&game_info.player_entity_class) {
                 player_class_id
             } else {
                 return Err(repl::Error::InvalidEntityClass(
@@ -188,7 +188,7 @@ pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error>
     // Remember player-controlled main entity
     if id.0 != INVALID_PLAYER_ID {
         let game_info = world.read_resource::<GameInfo>();
-        let class_names = world.read_resource::<ClassNames>();
+        let class_ids = world.read_resource::<ClassIds>();
 
         // TODO: Check for replication error here?
         let repl_entity = world.read::<repl::Entity>().get(entity).unwrap().clone();
@@ -201,7 +201,7 @@ pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error>
             return Err(repl::Error::InvalidPlayerId(id.0));
         };
         let player_class_id =
-            if let Some(player_class_id) = class_names.0.get(&game_info.player_entity_class) {
+            if let Some(player_class_id) = class_ids.0.get(&game_info.player_entity_class) {
                 *player_class_id
             } else {
                 return Err(repl::Error::InvalidEntityClass(
@@ -265,8 +265,8 @@ pub mod auth {
         let id = (owner, index);
 
         let class_id = {
-            let class_names = world.read_resource::<ClassNames>();
-            class_names.0[class]
+            let class_ids = world.read_resource::<ClassIds>();
+            class_ids.0[class]
         };
 
         // On the server, replication errors are definitely a bug, so unwrap
