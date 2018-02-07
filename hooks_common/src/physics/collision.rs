@@ -83,12 +83,12 @@ impl<'a> System<'a> for UpdateSys {
             for (_, position, orientation, object_handle) in
                 (&changed, &position, &orientation, &object_handle).join()
             {
-                if collision_world.collision_object(object_handle.0).is_none() {
+                /*if collision_world.collision_object(object_handle.0).is_none() {
                     // This should happen exactly once for each object when it is first created.
                     // `CreateObjectSys` has added the object, but the collision world has
                     // not been updated yet, so changing the position here would be an error.
                     continue;
-                }
+                }*/
 
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
                 collision_world.set_position(object_handle.0, isometry);
