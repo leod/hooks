@@ -175,8 +175,8 @@ impl Show {
     fn my_player_entity(&self, world: &World) -> Option<specs::Entity> {
         let players = world.read_resource::<Players>();
 
-        if let Some(&(ref _info, entity)) = players.get(self.my_player_id) {
-            entity
+        if let Some(player) = players.get(self.my_player_id) {
+            player.entity
         } else {
             // We are connected, but have not received the first tick yet...
             // ... or the server isn't doing its job.

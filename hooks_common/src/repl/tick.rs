@@ -310,7 +310,7 @@ impl<T: EntitySnapshot> History<T> {
                         // this here as well...
                         let ids = cur_snapshot.0.iter()
                             .filter_map(|(&id, &(ref entity, ref _snapshot))| {
-                                if entity.owner == event.id {
+                                if id.0 == event.id {
                                     Some(id)
                                 } else {
                                     None

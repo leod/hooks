@@ -336,10 +336,10 @@ impl Game {
         // events have not been processed in a tick yet) with the regular shared events.
         let other_players = self.state.world.read_resource::<player::Players>();
 
-        for (&other_id, &(ref other_info, _entity)) in other_players.iter() {
+        for (&other_id, other_player) in other_players.iter() {
             new_player.queued_events.push(player::JoinedEvent {
                 id: other_id,
-                info: other_info.clone(),
+                info: other_player.info.clone(),
             });
         }
     }

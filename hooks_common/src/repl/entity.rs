@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use specs::{self, Entity, EntityBuilder, World};
 
-use defs::{EntityClassId, EntityId, GameInfo, PlayerId, INVALID_ENTITY_ID, INVALID_PLAYER_ID};
+use defs::{EntityClassId, EntityIndex, EntityId, GameInfo, PlayerId, INVALID_PLAYER_ID};
 use event::{self, Event};
 use registry::Registry;
 use repl::{self, player};
@@ -95,7 +95,6 @@ pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
 fn create<F>(
     world: &mut World,
     id: EntityId,
-    owner: PlayerId,
     class_id: EntityClassId,
     ctor: F,
 ) -> Result<(EntityId, specs::Entity), repl::Error>
@@ -117,7 +116,7 @@ where
         let builder = world
             .create_entity()
             .with(repl::Id(id))
-            .with(repl::Entity { owner, class_id });
+            .with(repl::Entity { class_id });
 
         let builder = ctors.iter().fold(builder, |builder, ctor| ctor(builder));
 
@@ -128,23 +127,16 @@ where
     };
 
     // Remember player-controlled main entity
-    // TODO: Should this be here? First, I thought I could handle this in the `player` mod by
-    //       emitting a local `Created` event here. However, this leads to some headaches due to
-    //       event orders. Consider e.g. the situation that we spawn an entity for a player,
-    //       but then during the same tick that player disconnects. Then we would need to take care
-    //       to somehow insert the `Created` event *inbetween* the `player::JoinedEvent` and
-    //       `player::LeftEvent` (or ignore `Created` events with invalid player ids).
-    //       For now, let's just handle this immediately when the entity is created or removed.
-    if owner != INVALID_PLAYER_ID {
+    if id.0 != INVALID_PLAYER_ID {
         let game_info = world.read_resource::<GameInfo>();
         let class_names = world.read_resource::<ClassNames>();
 
         let mut players = world.write_resource::<player::Players>();
 
-        let player = if let Some(player) = players.0.get_mut(&owner) {
+        let player = if let Some(player) = players.0.get_mut(&id.0) {
             player
         } else {
-            return Err(repl::Error::InvalidPlayerId(owner));
+            return Err(repl::Error::InvalidPlayerId(id.0));
         };
         let player_class_id =
             if let Some(&player_class_id) = class_names.0.get(&game_info.player_entity_class) {
@@ -156,14 +148,15 @@ where
             };
 
         if class_id == player_class_id {
-            if player.1.is_some() {
+            if player.entity.is_some() {
                 return Err(repl::Error::Replication(format!(
-                    "player {} already has a main entity with id",
-                    id
+                    "player {} already has a main entity: {:?}",
+                    id.0,
+                    player.entity,
                 )));
             }
 
-            player.1 = Some(entity);
+            player.entity = Some(entity);
         }
     }
 
@@ -176,15 +169,15 @@ where
     }
 
     debug!(
-        "Created entity {} (index {:?}), for player {} of type {}",
-        id, entity, owner, class_id
+        "Created entity {:?} (local index {:?}) oftype {}",
+        id, entity, class_id
     );
 
     Ok((id, entity))
 }
 
 pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error> {
-    debug!("Removing entity {}", id);
+    debug!("Removing entity {:?}", id);
 
     let entity = {
         let mut entity_map = world.write_resource::<repl::EntityMap>();
@@ -194,17 +187,19 @@ pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error>
     };
 
     // Remember player-controlled main entity
-    let repl_entity = world.read::<repl::Entity>().get(entity).unwrap().clone();
-    if repl_entity.owner != INVALID_PLAYER_ID {
+    if id.0 != INVALID_PLAYER_ID {
         let game_info = world.read_resource::<GameInfo>();
         let class_names = world.read_resource::<ClassNames>();
 
+        // TODO: Check for replication error here?
+        let repl_entity = world.read::<repl::Entity>().get(entity).unwrap().clone();
+
         let mut players = world.write_resource::<player::Players>();
 
-        let player = if let Some(player) = players.0.get_mut(&repl_entity.owner) {
+        let player = if let Some(player) = players.0.get_mut(&id.0) {
             player
         } else {
-            return Err(repl::Error::InvalidPlayerId(repl_entity.owner));
+            return Err(repl::Error::InvalidPlayerId(id.0));
         };
         let player_class_id =
             if let Some(player_class_id) = class_names.0.get(&game_info.player_entity_class) {
@@ -216,14 +211,14 @@ pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error>
             };
 
         if repl_entity.class_id == player_class_id {
-            if player.1.is_none() {
+            if player.entity.is_none() {
                 return Err(repl::Error::Replication(format!(
                     "player {} has no main entity to remove",
-                    repl_entity.owner
+                    id.0,
                 )));
             }
 
-            player.1 = None;
+            player.entity = None;
         }
     }
 
@@ -239,41 +234,47 @@ pub mod auth {
     pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
         super::register::<T>(reg);
 
-        reg.resource(IdSource {
-            next_id: INVALID_ENTITY_ID + 1,
+        reg.resource(IndexSource {
+            next: 1,
         });
     }
 
-    struct IdSource {
-        next_id: EntityId,
+    struct IndexSource {
+        next: EntityIndex,
     }
 
-    impl IdSource {
-        fn next_id(&mut self) -> EntityId {
-            let id = self.next_id;
-            self.next_id += 1;
+    impl IndexSource {
+        fn advance_index(&mut self) -> EntityIndex {
+            let index = self.next;
+            self.next += 1;
 
-            assert!(id != INVALID_ENTITY_ID);
-
-            id
+            index
         }
-    }
+     }
+
 
     pub fn create<F>(world: &mut World, owner: PlayerId, class: &str, ctor: F) -> (EntityId, Entity)
     where
         F: FnOnce(EntityBuilder) -> EntityBuilder,
     {
-        let id = {
-            let mut id_source = world.write_resource::<IdSource>();
-            id_source.next_id()
+        let index = if owner != INVALID_PLAYER_ID {
+            let mut players = world.write_resource::<player::Players>();
+            let mut player = players.0.get_mut(&owner).unwrap();
+            player.advance_entity_index()
+        } else {
+            let mut index_source = world.write_resource::<IndexSource>();
+            index_source.advance_index()
         };
+
+        let id = (owner, index);
 
         let class_id = {
             let class_names = world.read_resource::<ClassNames>();
             class_names.0[class]
         };
 
-        super::create(world, id, owner, class_id, ctor).unwrap() // On the server, replication errors are definitely a bug
+        // On the server, replication errors are definitely a bug, so unwrap
+        super::create(world, id, class_id, ctor).unwrap() 
     }
 }
 
@@ -308,12 +309,11 @@ pub mod view {
         };
 
         for &(id, (ref repl_entity, ref _snapshot)) in &new_entities {
-            debug!("Replicating entity {} of type {}", id, repl_entity.class_id);
+            debug!("Replicating entity {:?} of type {}", id, repl_entity.class_id);
 
             super::create(
                 world,
                 id,
-                repl_entity.owner,
                 repl_entity.class_id,
                 |builder| builder,
             )?;
@@ -334,7 +334,7 @@ pub mod view {
                 };
 
                 if let Some(_) = entity {
-                    debug!("Removing entity {}", id);
+                    debug!("Removing entity {:?}", id);
 
                     super::remove(world, id)?;
                 } else {
@@ -348,7 +348,7 @@ pub mod view {
                     //       On second thought, this can also happen if we get the `RemoveOrder`
                     //       for an entity in an intermediate tick that we did not receive.
                     //       Could the server filter for this as well?
-                    warn!("Received `RemoveOrder` for entity {}, which we do not have", id);
+                    warn!("Received `RemoveOrder` for entity {:?}, which we do not have", id);
                 }
             },
         );

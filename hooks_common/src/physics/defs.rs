@@ -2,7 +2,7 @@ use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
 
 use nalgebra::{Point2, Vector2};
-use specs::{Component, FlaggedStorage, VecStorage};
+use specs::{self, Component, FlaggedStorage, VecStorage};
 
 use registry::Registry;
 
@@ -44,6 +44,14 @@ impl Component for Orientation {
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(NullStorage)]
 pub struct Dynamic;
+
+/// Some kind of joint thingy
+#[derive(Component, Clone, Debug)]
+#[component(BTreeStorage)]
+pub struct Joint {
+    entity_a: specs::Entity,
+    entity_b: specs::Entity,
+}
 
 impl BitStore for Velocity {
     fn read_from<R: BitRead>(reader: &mut R) -> Result<Self> {
