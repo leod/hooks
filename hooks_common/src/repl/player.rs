@@ -3,7 +3,7 @@ use std::collections::btree_map;
 
 use specs::{self, Join, World};
 
-use defs::{LeaveReason, PlayerId, PlayerInfo, EntityIndex};
+use defs::{EntityIndex, LeaveReason, PlayerId, PlayerInfo};
 use event::{self, Event};
 use registry::Registry;
 use repl::{self, entity};

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use specs::{self, Entity, EntityBuilder, World};
 
-use defs::{EntityClassId, EntityIndex, EntityId, GameInfo, PlayerId, INVALID_PLAYER_ID};
+use defs::{EntityClassId, EntityId, EntityIndex, GameInfo, PlayerId, INVALID_PLAYER_ID};
 use event::{self, Event};
 use registry::Registry;
 use repl::{self, player};
@@ -151,8 +151,7 @@ where
             if player.entity.is_some() {
                 return Err(repl::Error::Replication(format!(
                     "player {} already has a main entity: {:?}",
-                    id.0,
-                    player.entity,
+                    id.0, player.entity,
                 )));
             }
 
@@ -234,9 +233,7 @@ pub mod auth {
     pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
         super::register::<T>(reg);
 
-        reg.resource(IndexSource {
-            next: 1,
-        });
+        reg.resource(IndexSource { next: 1 });
     }
 
     struct IndexSource {
@@ -250,8 +247,7 @@ pub mod auth {
 
             index
         }
-     }
-
+    }
 
     pub fn create<F>(world: &mut World, owner: PlayerId, class: &str, ctor: F) -> (EntityId, Entity)
     where
@@ -274,7 +270,7 @@ pub mod auth {
         };
 
         // On the server, replication errors are definitely a bug, so unwrap
-        super::create(world, id, class_id, ctor).unwrap() 
+        super::create(world, id, class_id, ctor).unwrap()
     }
 }
 
@@ -309,14 +305,12 @@ pub mod view {
         };
 
         for &(id, (ref repl_entity, ref _snapshot)) in &new_entities {
-            debug!("Replicating entity {:?} of type {}", id, repl_entity.class_id);
+            debug!(
+                "Replicating entity {:?} of type {}",
+                id, repl_entity.class_id
+            );
 
-            super::create(
-                world,
-                id,
-                repl_entity.class_id,
-                |builder| builder,
-            )?;
+            super::create(world, id, repl_entity.class_id, |builder| builder)?;
         }
 
         Ok(())

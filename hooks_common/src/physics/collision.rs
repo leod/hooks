@@ -2,7 +2,7 @@ use specs::{Entities, Entity, FetchMut, Join, ReadStorage, System, WriteStorage}
 
 use nalgebra::Isometry2;
 use ncollide::shape::ShapeHandle2;
-use ncollide::world::{CollisionWorld2, CollisionObjectHandle};
+use ncollide::world::{CollisionObjectHandle, CollisionWorld2};
 
 use physics::{Orientation, Position};
 use registry::Registry;
