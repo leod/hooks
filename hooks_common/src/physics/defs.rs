@@ -7,12 +7,13 @@ use specs::{self, Component, FlaggedStorage, VecStorage};
 use registry::Registry;
 
 pub fn register(reg: &mut Registry) {
-    reg.component::<Mass>();
-    reg.component::<Dynamic>();
-
     reg.component::<Position>();
     reg.component::<Velocity>();
     reg.component::<Orientation>();
+
+    reg.component::<Mass>();
+    reg.component::<Dynamic>();
+    reg.component::<Friction>();
     reg.component::<Joints>();
 }
 
@@ -46,6 +47,11 @@ impl Component for Orientation {
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(NullStorage)]
 pub struct Dynamic;
+
+/// Whether to apply friction to this entity.
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(NullStorage)]
+pub struct Friction;
 
 /// Some kind of joint thingy.
 #[derive(PartialEq, Clone, Debug, BitStore)]
