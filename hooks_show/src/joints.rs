@@ -1,10 +1,9 @@
 use nalgebra::{norm, Isometry3, Matrix4, Point2, Vector3, Vector4};
-use specs::{Entities, Join, ReadStorage, SystemData, VecStorage, World};
+use specs::{Join, ReadStorage, SystemData, World};
 
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use hooks_common;
 use hooks_common::physics::{Joints, Position};
 
 use {Assets, Registry};

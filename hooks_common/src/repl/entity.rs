@@ -1,18 +1,18 @@
 use std::collections::BTreeMap;
 
-use specs::{self, Entity, EntityBuilder, World};
+use specs::{Entity, EntityBuilder, World};
 
 use defs::{EntityClassId, EntityId, EntityIndex, GameInfo, PlayerId, INVALID_PLAYER_ID};
 use event::{self, Event};
 use registry::Registry;
 use repl::{self, player};
+use entity;
 
+pub use entity::Meta;
 pub use repl::snapshot::{ComponentType, EntityClass, EntityClasses, EntitySnapshot, WorldSnapshot};
 
 fn register<T: EntitySnapshot>(reg: &mut Registry) {
     reg.resource(EntityClasses::<T>(BTreeMap::new()));
-    reg.resource(Ctors(BTreeMap::new()));
-    reg.resource(ClassIds(BTreeMap::new()));
 
     reg.event::<RemoveOrder>();
 }
@@ -27,127 +27,73 @@ impl Event for RemoveOrder {
     }
 }
 
-// TODO: Probably want to use Box<FnSomething>
-pub type Ctor = fn(specs::EntityBuilder) -> specs::EntityBuilder;
-
-/// Constructors, e.g. for adding client-side-specific components to replicated entities.
-struct Ctors(pub BTreeMap<EntityClassId, Vec<Ctor>>);
-
-/// Maps from entity class names to their unique id. This map should be exactly the same on server
-/// and clients and not change during a game.
-struct ClassIds(pub BTreeMap<String, EntityClassId>);
-
 /// Register a new entity class. This should only be called in register functions that are used by
 /// both the server and the clients. Server and clients can attach their specific entity
 /// constructors locally via `add_ctor`.
 ///
 /// Note that this function must only be called after this module's register function.
-pub fn register_type<T: ComponentType>(
+pub fn register_class<T: ComponentType>(
     reg: &mut Registry,
     name: &str,
     components: &[T],
-    ctor: Ctor,
+    ctor: entity::Ctor,
 ) -> EntityClassId {
-    let world = reg.world();
-
-    let mut classes = world.write_resource::<EntityClasses<T::EntitySnapshot>>();
-    let mut ctors = world.write_resource::<Ctors>();
-    let mut class_ids = world.write_resource::<ClassIds>();
-
-    let class_id = classes.0.keys().next_back().map(|&id| id + 1).unwrap_or(0);
+    let class_id = entity::register_class(reg, name, ctor);
 
     info!(
-        "Registering entity type {} with id {} and repl components {:?}",
+        "Registering entity class {} with id {} and repl components {:?}",
         name, class_id, components,
     );
 
-    assert!(!classes.0.contains_key(&class_id));
-    assert!(!ctors.0.contains_key(&class_id));
-    assert!(!class_ids.0.values().any(|&id| id == class_id));
+    let mut classes = reg.world()
+        .write_resource::<EntityClasses<T::EntitySnapshot>>();
 
     let class = EntityClass::<T::EntitySnapshot> {
         components: components.to_vec(),
     };
 
     classes.0.insert(class_id, class);
-    ctors.0.insert(class_id, vec![ctor]);
-    class_ids.0.insert(name.to_string(), class_id);
-
-    assert!(classes.0.len() == ctors.0.len());
-    assert!(ctors.0.len() == class_ids.0.len());
 
     class_id
 }
 
-pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
-    let world = reg.world();
-
-    let class_id = {
-        let class_ids = world.read_resource::<ClassIds>();
-        class_ids.0[name]
-    };
-
-    let mut ctors = world.write_resource::<Ctors>();
-    let ctor_vec = ctors.0.get_mut(&class_id).unwrap();
-    ctor_vec.push(ctor);
+fn try_get_class_id(world: &World, name: &str) -> Result<EntityClassId, repl::Error> {
+    if let Some(class_id) = entity::get_class_id(world, name) {
+        Ok(class_id)
+    } else {
+        Err(repl::Error::InvalidEntityClass(name.to_string()))
+    }
 }
 
+/// Create an entity with a shared, replicated id.
 fn create<F>(
     world: &mut World,
     id: EntityId,
     class_id: EntityClassId,
     ctor: F,
-) -> Result<specs::Entity, repl::Error>
+) -> Result<Entity, repl::Error>
 where
     F: FnOnce(EntityBuilder) -> EntityBuilder,
 {
-    let ctors = {
-        let ctors = world.read_resource::<Ctors>();
+    if !entity::is_class_id_valid(world, class_id) {
+        return Err(repl::Error::InvalidEntityClassId(class_id));
+    }
 
-        if let Some(ctor) = ctors.0.get(&class_id) {
-            ctor.clone()
-        } else {
-            return Err(repl::Error::InvalidEntityClassId(class_id));
-        }
-    };
-
-    // Build entity
-    let entity = {
-        let builder = world
-            .create_entity()
-            .with(repl::Id(id))
-            .with(repl::Entity { class_id });
-
-        let builder = ctors.iter().fold(builder, |builder, ctor| ctor(builder));
-
-        // Custom constructor
-        let builder = ctor(builder);
-
-        builder.build()
-    };
+    let entity = entity::create(world, class_id, |builder| ctor(builder).with(repl::Id(id)));
 
     // Remember player-controlled main entity
     if id.0 != INVALID_PLAYER_ID {
         let game_info = world.read_resource::<GameInfo>();
-        let class_ids = world.read_resource::<ClassIds>();
-
-        let mut players = world.write_resource::<player::Players>();
-
-        let player = if let Some(player) = players.0.get_mut(&id.0) {
-            player
-        } else {
-            return Err(repl::Error::InvalidPlayerId(id.0));
-        };
-        let player_class_id =
-            if let Some(&player_class_id) = class_ids.0.get(&game_info.player_entity_class) {
-                player_class_id
-            } else {
-                return Err(repl::Error::InvalidEntityClass(
-                    game_info.player_entity_class.clone(),
-                ));
-            };
+        let player_class_id = try_get_class_id(world, &game_info.player_entity_class)?;
 
         if class_id == player_class_id {
+            let mut players = world.write_resource::<player::Players>();
+            let player = players
+                .0
+                .get_mut(&id.0)
+                .map(Ok)
+                .unwrap_or(Err(repl::Error::InvalidPlayerId(id.0)))?;
+
             if player.entity.is_some() {
                 return Err(repl::Error::Replication(format!(
                     "player {} already has a main entity: {:?}",
@@ -178,6 +124,7 @@ where
 pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error> {
     debug!("Removing entity {:?}", id);
 
+    // Remove from entity map
     let entity = {
         let mut entity_map = world.write_resource::<repl::EntityMap>();
         let entity = entity_map.id_to_entity(id);
@@ -185,31 +132,23 @@ pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error>
         entity
     };
 
-    // Remember player-controlled main entity
+    // Forget player-controlled main entity
     if id.0 != INVALID_PLAYER_ID {
         let game_info = world.read_resource::<GameInfo>();
-        let class_ids = world.read_resource::<ClassIds>();
+        let player_class_id = try_get_class_id(world, &game_info.player_entity_class)?;
 
         // TODO: Check for replication error here?
-        let repl_entity = world.read::<repl::Entity>().get(entity).unwrap().clone();
+        let meta = world.read::<Meta>().get(entity).unwrap().clone();
 
-        let mut players = world.write_resource::<player::Players>();
+        if meta.class_id == player_class_id {
+            let mut players = world.write_resource::<player::Players>();
 
-        let player = if let Some(player) = players.0.get_mut(&id.0) {
-            player
-        } else {
-            return Err(repl::Error::InvalidPlayerId(id.0));
-        };
-        let player_class_id =
-            if let Some(player_class_id) = class_ids.0.get(&game_info.player_entity_class) {
-                *player_class_id
-            } else {
-                return Err(repl::Error::InvalidEntityClass(
-                    game_info.player_entity_class.clone(),
-                ));
-            };
+            let player = players
+                .0
+                .get_mut(&id.0)
+                .map(Ok)
+                .unwrap_or(Err(repl::Error::InvalidPlayerId(id.0)))?;
 
-        if repl_entity.class_id == player_class_id {
             if player.entity.is_none() {
                 return Err(repl::Error::Replication(format!(
                     "player {} has no main entity to remove",
@@ -221,7 +160,7 @@ pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error>
         }
     }
 
-    world.delete_entity(entity).unwrap();
+    entity::remove(world, entity);
 
     Ok(())
 }
@@ -268,12 +207,7 @@ pub mod auth {
         };
 
         let id = (owner, index);
-
-        let class_id = {
-            let class_ids = world.read_resource::<ClassIds>();
-            class_ids.0[class]
-        };
-
+        let class_id = entity::get_class_id(world, class).unwrap();
         let entity = super::create(world, id, class_id, ctor);
 
         // On the server, replication errors are definitely a bug, so unwrap
@@ -311,13 +245,10 @@ pub mod view {
                 .collect::<Vec<_>>()
         };
 
-        for &(id, (ref repl_entity, ref _snapshot)) in &new_entities {
-            debug!(
-                "Replicating entity {:?} of type {}",
-                id, repl_entity.class_id
-            );
+        for &(id, (ref meta, ref _snapshot)) in &new_entities {
+            debug!("Replicating entity {:?} of type {}", id, meta.class_id);
 
-            super::create(world, id, repl_entity.class_id, |builder| builder)?;
+            super::create(world, id, meta.class_id, |builder| builder)?;
         }
 
         Ok(())

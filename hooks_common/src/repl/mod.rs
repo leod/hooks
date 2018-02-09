@@ -16,22 +16,14 @@ use registry::Registry;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Id>();
-    reg.component::<Entity>();
 
     reg.resource(EntityMap(BTreeMap::new()));
 }
 
-/// Shared entity Id for replication.
+/// Shared entity id for replication.
 #[derive(PartialEq, Component)]
 #[component(VecStorage)]
 pub struct Id(pub EntityId);
-
-/// Meta-information about replicated entities.
-#[derive(Clone, PartialEq, Component, BitStore)]
-#[component(VecStorage)]
-pub struct Entity {
-    pub class_id: EntityClassId,
-}
 
 /// Map from shared EntityId to the local ECS handle.
 pub struct EntityMap(BTreeMap<EntityId, specs::Entity>);
