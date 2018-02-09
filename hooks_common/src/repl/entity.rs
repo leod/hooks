@@ -97,7 +97,7 @@ fn create<F>(
     id: EntityId,
     class_id: EntityClassId,
     ctor: F,
-) -> Result<(EntityId, specs::Entity), repl::Error>
+) -> Result<specs::Entity, repl::Error>
 where
     F: FnOnce(EntityBuilder) -> EntityBuilder,
 {
@@ -172,7 +172,7 @@ where
         id, entity, class_id
     );
 
-    Ok((id, entity))
+    Ok(entity)
 }
 
 pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error> {
@@ -249,7 +249,12 @@ pub mod auth {
         }
     }
 
-    pub fn create<F>(world: &mut World, owner: PlayerId, class: &str, ctor: F) -> (EntityId, Entity)
+    pub fn create<F>(
+        world: &mut World,
+        owner: PlayerId,
+        class: &str,
+        ctor: F,
+    ) -> (EntityIndex, Entity)
     where
         F: FnOnce(EntityBuilder) -> EntityBuilder,
     {
@@ -269,8 +274,10 @@ pub mod auth {
             class_ids.0[class]
         };
 
+        let entity = super::create(world, id, class_id, ctor);
+
         // On the server, replication errors are definitely a bug, so unwrap
-        super::create(world, id, class_id, ctor).unwrap()
+        (index, entity.unwrap())
     }
 }
 

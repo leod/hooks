@@ -10,6 +10,7 @@ use repl::{self, entity};
 
 pub fn register(reg: &mut Registry) {
     reg.resource(Players(BTreeMap::new()));
+
     reg.event::<JoinedEvent>();
     reg.event::<LeftEvent>();
     reg.event_handler_pre_tick(handle_event_pre_tick);
@@ -36,6 +37,10 @@ impl Player {
         self.next_entity_index += 1;
         index
     }
+
+    pub fn next_entity_index(&self, n: EntityIndex) -> EntityIndex {
+        self.next_entity_index + n
+    }
 }
 
 /// For each player, store information (like the name and statistics) and the current main entity
@@ -52,6 +57,11 @@ impl Players {
     pub fn iter(&self) -> btree_map::Iter<PlayerId, Player> {
         self.0.iter()
     }
+}
+
+pub fn get(world: &mut World, id: PlayerId) -> Option<Player> {
+    let players = world.read_resource::<Players>();
+    players.get(id).cloned()
 }
 
 #[derive(Debug, Clone, BitStore)]

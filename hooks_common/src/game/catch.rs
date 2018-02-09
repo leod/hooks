@@ -4,9 +4,9 @@ pub mod auth {
     use specs::World;
 
     use defs::GameInfo;
-    use physics::Position;
     use registry::Registry;
     use repl;
+    use game::entity;
 
     pub fn register(reg: &mut Registry) {
         reg.pre_tick_fn(pre_tick);
@@ -17,6 +17,8 @@ pub mod auth {
             .read_resource::<GameInfo>()
             .player_entity_class
             .clone();
+        assert!(player_entity_class == "player");
+
         let players = world.read_resource::<repl::player::Players>().clone();
 
         for (&player_id, player) in players.iter() {
@@ -25,10 +27,7 @@ pub mod auth {
 
                 // TODO: Spawn points here
                 let pos = Point2::new(rng.next_f32() * 200.00, rng.next_f32() * 200.0);
-
-                repl::entity::auth::create(world, player_id, &player_entity_class, |builder| {
-                    builder.with(Position(pos))
-                });
+                entity::player::auth::create(world, player_id, pos);
             }
         }
 

@@ -84,8 +84,10 @@ impl State {
 
         self.run_pre_tick()?;
 
+        let events = self.run_tick()?;
+
         if let Some(ref snapshot) = tick_data.snapshot {
-            // Now we are up-to-date regarding the player list, so we can create new entities
+            // By now we are up-to-date regarding the player list, so we can create new entities
             entity::view::create_new_entities(&mut self.world, snapshot)?;
 
             // Snap entities to their state in the new tick
@@ -93,6 +95,6 @@ impl State {
             sys.run_now(&self.world.res);
         }
 
-        self.run_tick()
+        Ok(events)
     }
 }

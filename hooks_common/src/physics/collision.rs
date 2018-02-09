@@ -18,9 +18,6 @@ pub fn register(reg: &mut Registry) {
 
     let collision_world = CollisionWorld2::<f32, Entity>::new(0.02);
 
-    // Does not exist in `send_sync` branch
-    //collision_world.register_contact_handler("contact handler", MyContactHandler);
-
     reg.resource(collision_world);
 }
 
@@ -192,24 +189,3 @@ impl<'a> System<'a> for RemoveObjectSys {
         }
     }
 }
-
-/*/// ncollide contact handler.
-struct MyContactHandler;
-
-impl ContactHandler<Point2<f32>, Isometry2<f32>, Entity> for MyContactHandler {
-    fn handle_contact_started(
-        &mut self,
-        co1: &CollisionObject2<f32, Entity>,
-        co2: &CollisionObject2<f32, Entity>,
-        contacts: &Box<ContactGenerator<Point2<f32>, Isometry2<f32>>>,
-    ) {
-        debug!("{:?} with {:?}", co1.data, co2.data);
-    }
-
-    fn handle_contact_stopped(
-        &mut self,
-        co1: &CollisionObject2<f32, Entity>,
-        co2: &CollisionObject2<f32, Entity>,
-    ) {
-    }
-}*/

@@ -1,5 +1,5 @@
 mod test;
-mod player;
+pub mod player;
 pub mod wall;
 
 use registry::Registry;
