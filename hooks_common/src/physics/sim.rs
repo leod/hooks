@@ -119,17 +119,17 @@ impl<'a> System<'a> for ApplySys {
                 let a_dynamic = dynamic.get(a).is_some();
                 let b_dynamic = dynamic.get(b).is_some();
 
-                debug!(
+                /*debug!(
                     "contact {} {} with depth {}",
                     oa.handle().uid(), ob.handle().uid(), contact.depth
-                );
+                );*/
 
                 fn resolve(dt: f32, n: &Vector2<f32>, depth: f32, v: &mut Velocity) {
                     //let t = depth.min(dot(&v.0, &n));
                     let t = depth;
-                    debug!("resolving {:?} with {}: {:?}", v.0, t / dt, n * t / dt);
+                    //debug!("resolving {:?} with {}: {:?}", v.0, t / dt, n * t / dt);
                     v.0 += n * t / dt;
-                    debug!("-> {:?}", v.0);
+                    //debug!("-> {:?}", v.0);
                 }
 
                 if a_dynamic && !b_dynamic {
