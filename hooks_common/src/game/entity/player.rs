@@ -24,9 +24,11 @@ pub fn register(reg: &mut Registry) {
         ],
         |builder| {
             let shape = Cuboid::new(Vector2::new(10.0, 10.0));
+
             let mut groups = CollisionGroups::new();
             groups.set_membership(&[collision::GROUP_PLAYER]);
             groups.set_whitelist(&[collision::GROUP_WALL]);
+
             let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
             // TODO: Velocity (and Dynamic?) component should be added only for owners
@@ -52,9 +54,11 @@ pub fn register(reg: &mut Registry) {
         |builder| {
             // TODO
             let shape = Cuboid::new(Vector2::new(4.0, 4.0));
+
             let mut groups = CollisionGroups::new();
             groups.set_membership(&[collision::GROUP_PLAYER]);
             groups.set_whitelist(&[collision::GROUP_WALL]);
+
             let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
             // TODO: Velocity (and Dynamic?) component should be added only for owners

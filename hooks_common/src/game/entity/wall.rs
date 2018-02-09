@@ -4,9 +4,12 @@ use specs::{DenseVecStorage, Entity, World};
 use physics::{Orientation, Position};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use registry::Registry;
+use entity;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Size>();
+
+    entity::register_class(reg, "wall", |builder| builder);
 }
 
 #[derive(Component)]
@@ -25,12 +28,14 @@ pub fn create(world: &mut World, pos: Point2<f32>, size: Vector2<f32>, angle: f3
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
-    world
-        .create_entity()
-        .with(Position(pos))
-        .with(Orientation(angle))
-        .with(Size(size * 2.0))
-        .with(collision::Shape(ShapeHandle::new(shape)))
-        .with(collision::CreateObject { groups, query_type })
-        .build()
+    let class_id = entity::get_class_id(world, "wall").unwrap();
+
+    entity::create(world, class_id, |builder| {
+        builder
+            .with(Position(pos))
+            .with(Orientation(angle))
+            .with(Size(size * 2.0))
+            .with(collision::Shape(ShapeHandle::new(shape)))
+            .with(collision::CreateObject { groups, query_type })
+    })
 }
