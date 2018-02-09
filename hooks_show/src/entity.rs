@@ -1,5 +1,5 @@
 use hooks_common;
-use hooks_common::repl::entity;
+use hooks_common::entity;
 
 use rect;
 

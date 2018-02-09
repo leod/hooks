@@ -5,8 +5,8 @@ use bit_manager::{self, BitRead, BitWrite};
 
 use hooks_util::join;
 
-use super::Entity;
 use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
+use entity::Meta;
 
 #[derive(Debug)]
 pub enum Error {
@@ -59,7 +59,7 @@ pub struct EntityClass<T: EntitySnapshot> {
     pub components: Vec<T::ComponentType>,
 }
 
-/// All possible replicated entity types. Every replicated entity has a `repl::Entity` component,
+/// All possible replicated entity types. Every replicated entity has a `entity::Meta` component,
 /// storing an index into this map.
 pub struct EntityClasses<T: EntitySnapshot>(pub BTreeMap<EntityClassId, EntityClass<T>>);
 
@@ -70,10 +70,10 @@ impl<T: EntitySnapshot> EntityClasses<T> {
 }
 
 /// Snapshot of a set of entities at one point in time. In addition to the EntitySnapshot, we store
-/// the entities' meta-information `repl::Entity` here as well, so that we know which components
-/// should be replicated.
+/// the entities' meta-information here as well, so that we know which components should be
+/// replicated.
 #[derive(PartialEq, Clone)]
-pub struct WorldSnapshot<T: EntitySnapshot>(pub BTreeMap<EntityId, (Entity, T)>);
+pub struct WorldSnapshot<T: EntitySnapshot>(pub BTreeMap<EntityId, (Meta, T)>);
 
 impl<T: EntitySnapshot> WorldSnapshot<T> {
     pub fn new() -> Self {
@@ -98,34 +98,34 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                     // The entity stopped existing in the new snapshot - write nothing
                     assert!(id != INVALID_ENTITY_ID);
                 }
-                join::Item::Right(&id, &(ref right_entity, ref right_snapshot)) => {
+                join::Item::Right(&id, &(ref right_meta, ref right_snapshot)) => {
                     // We have a new entity
                     assert!(id != INVALID_ENTITY_ID);
 
                     writer.write(&id)?;
 
                     // Write meta-information of the entity
-                    writer.write(right_entity)?;
+                    writer.write(right_meta)?;
 
                     // Write all of the components
-                    let components = &classes.0[&right_entity.class_id].components;
+                    let components = &classes.0[&right_meta.class_id].components;
                     let left_snapshot = T::none();
                     left_snapshot.delta_write(right_snapshot, components, writer)?;
                 }
                 join::Item::Both(
                     &id,
-                    &(ref left_entity, ref left_snapshot),
-                    &(ref right_entity, ref right_snapshot),
+                    &(ref left_meta, ref left_snapshot),
+                    &(ref right_meta, ref right_snapshot),
                 ) => {
                     // This entity exists in the left and the right snapshot
                     assert!(id != INVALID_ENTITY_ID);
-                    assert!(left_entity == right_entity);
+                    assert!(left_meta == right_meta);
 
                     // We only need to write this entity if at least one component has changed
                     if left_snapshot != right_snapshot {
                         writer.write(&id)?;
 
-                        let components = &classes.0[&left_entity.class_id].components;
+                        let components = &classes.0[&left_meta.class_id].components;
 
                         // Write all the changed components
                         left_snapshot.delta_write(right_snapshot, components, writer)?;
@@ -201,10 +201,10 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                             new_entities.push(id);
 
                             // Read meta-information
-                            let entity: Entity = reader.read()?;
+                            let meta: Meta = reader.read()?;
 
                             // Check that we have this class
-                            let class = classes.0.get(&entity.class_id);
+                            let class = classes.0.get(&meta.class_id);
                             if class.is_none() {
                                 return Err(Error::ReceivedInvalidSnapshot(
                                     "invalid class id in entity snapshot".to_string(),
@@ -216,19 +216,19 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                             let left_snapshot = T::none();
                             let entity_snapshot = left_snapshot.delta_read(components, reader)?;
 
-                            cur_snapshot.0.insert(id, (entity, entity_snapshot));
+                            cur_snapshot.0.insert(id, (meta, entity_snapshot));
                         }
-                        join::Item::Both(id, &(ref left_entity, ref left_snapshot), _) => {
+                        join::Item::Both(id, &(ref left_meta, ref left_snapshot), _) => {
                             // This entity exists in both snapshots
                             assert!(id != INVALID_ENTITY_ID);
 
                             // Update existing entity snapshot with delta from the stream
-                            let components = &classes.0[&left_entity.class_id].components;
+                            let components = &classes.0[&left_meta.class_id].components;
                             let entity_snapshot = left_snapshot.delta_read(components, reader)?;
 
                             cur_snapshot
                                 .0
-                                .insert(id, (left_entity.clone(), entity_snapshot));
+                                .insert(id, (left_meta.clone(), entity_snapshot));
                         }
                     }
 
@@ -285,6 +285,7 @@ macro_rules! snapshot {
 
             use specs::{Entities, System, ReadStorage, WriteStorage, Fetch, Join};
 
+            use entity::Meta;
             use repl::{self, snapshot};
 
             $(use $use_head$(::$use_tail)*;)*
@@ -433,19 +434,19 @@ macro_rules! snapshot {
                     Fetch<'a, EntityClasses>,
                     Entities<'a>,
                     ReadStorage<'a, repl::Id>,
-                    ReadStorage<'a, repl::Entity>,
+                    ReadStorage<'a, Meta>,
                     LoadData<'a>,
                 );
 
                 fn run(
                     &mut self,
-                    (classes, entities, repl_id, repl_entity, ($($field_name,)+)): Self::SystemData,
+                    (classes, entities, repl_id, meta, ($($field_name,)+)): Self::SystemData,
                 ) {
                     (self.0).0.clear();
 
-                    let join = (&*entities, &repl_id, &repl_entity).join();
-                    for (entity, repl_id, repl_entity) in join {
-                        let components = &classes.0.get(&repl_entity.class_id).unwrap().components;
+                    let join = (&*entities, &repl_id, &meta).join();
+                    for (entity, repl_id, meta) in join {
+                        let components = &classes.0.get(&meta.class_id).unwrap().components;
 
                         let mut entity_snapshot: EntitySnapshot = snapshot::EntitySnapshot::none();
                         for component in components {
@@ -457,7 +458,7 @@ macro_rules! snapshot {
                             }
                         }
 
-                        (self.0).0.insert(repl_id.0, (repl_entity.clone(), entity_snapshot));
+                        (self.0).0.insert(repl_id.0, (meta.clone(), entity_snapshot));
                     }
                 }
             }

@@ -119,7 +119,7 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
             // Remove all entities owned by the disconnected player
             let owned_ids = {
                 let mut repl_ids = world.read::<repl::Id>();
-                let mut repl_entities = world.read::<repl::Entity>();
+                let mut entity_meta = world.read::<entity::Meta>();
 
                 repl_ids.join()
                     .filter_map(|&repl::Id(id)| {

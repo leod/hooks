@@ -84,16 +84,13 @@ struct JointForceSys;
 
 impl<'a> System<'a> for JointForceSys {
     type SystemData = (
-        Fetch<'a, GameInfo>,
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Joints>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Force>,
     );
 
-    fn run(&mut self, (game_info, dynamic, joints, positions, mut force): Self::SystemData) {
-        let dt = game_info.tick_duration_secs() as f32;
-
+    fn run(&mut self, (dynamic, joints, positions, mut force): Self::SystemData) {
         for (_, joints, position_a, force) in (&dynamic, &joints, &positions, &mut force).join() {
             for &(entity_b, ref joint) in &joints.0 {
                 // TODO: Should we lazily remove joints whose endpoint entity no longer exists?

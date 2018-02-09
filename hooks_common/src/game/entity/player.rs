@@ -5,7 +5,7 @@ use defs::{EntityId, EntityIndex, PlayerId};
 use registry::Registry;
 use physics::{Dynamic, Friction, Joint, Joints, Mass, Orientation, Position, Velocity};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
-use repl::{self, entity, player, EntityMap};
+use repl::{self, player, EntityMap};
 use game::ComponentType;
 
 pub fn register(reg: &mut Registry) {
@@ -13,7 +13,7 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Hook>();
     reg.component::<HookSegment>();
 
-    entity::register_type(
+    repl::entity::register_class(
         reg,
         "player",
         &[
@@ -41,7 +41,7 @@ pub fn register(reg: &mut Registry) {
         },
     );
 
-    entity::register_type(
+    repl::entity::register_class(
         reg,
         "hook_segment",
         &[
@@ -141,7 +141,7 @@ pub mod auth {
         let player = player::get(world, owner).unwrap();
         let first_segment_index = player.next_entity_index(1);
 
-        let (player_index, _) = entity::auth::create(world, owner, "player", |builder| {
+        let (player_index, _) = repl::entity::auth::create(world, owner, "player", |builder| {
             let hook = Hook {
                 is_active: false,
                 first_segment_index,
@@ -151,7 +151,7 @@ pub mod auth {
         });
 
         for i in 0..NUM_HOOK_SEGMENTS {
-            entity::auth::create(world, owner, "hook_segment", |builder| {
+            repl::entity::auth::create(world, owner, "hook_segment", |builder| {
                 let hook_segment = HookSegment {
                     player_index,
                     is_last: i == NUM_HOOK_SEGMENTS - 1,

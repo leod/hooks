@@ -2,10 +2,11 @@ use defs::GameInfo;
 use game::ComponentType;
 use physics::{Orientation, Position};
 use registry::Registry;
-use repl::entity;
+use entity;
+use repl;
 
 pub fn register(reg: &mut Registry) {
-    entity::register_type(
+    repl::entity::register_class(
         reg,
         "test",
         &[ComponentType::Position, ComponentType::Orientation],
