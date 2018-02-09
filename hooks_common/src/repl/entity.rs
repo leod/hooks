@@ -41,7 +41,7 @@ pub fn register_class<T: ComponentType>(
     let class_id = entity::register_class(reg, name, ctor);
 
     info!(
-        "Registering entity class {} with id {} and repl components {:?}",
+        "Registering replicated entity class {} with id {} and repl components {:?}",
         name, class_id, components,
     );
 
