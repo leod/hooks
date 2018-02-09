@@ -1,4 +1,4 @@
-use nalgebra::{norm, Point2, Vector2};
+use nalgebra::{norm, zero, Point2, Vector2};
 
 use specs::{self, Entities, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage, World,
             WriteStorage};
@@ -6,16 +6,20 @@ use specs::{self, Entities, Fetch, FetchMut, Join, ReadStorage, RunNow, System, 
 use hooks_util::profile;
 
 use defs::GameInfo;
-use physics::{collision, Dynamic, Joints, Mass, Position, Velocity};
+use physics::{collision, Dynamic, Friction, Joints, Mass, Position, Velocity};
 use physics::collision::CollisionWorld;
 use registry::Registry;
 
 pub fn register(reg: &mut Registry) {
-    reg.component::<OldPosition>();
     reg.component::<Collided>();
+
+    reg.component::<OldPosition>();
+    reg.component::<Force>();
 }
 
 const JOINT_MIN_DISTANCE: f32 = 0.01;
+const MIN_SPEED: f32 = 0.01;
+const FRICTION: f32 = 0.3;
 
 /// Tag component for debugging visually
 #[derive(Component)]
@@ -36,7 +40,10 @@ pub fn run(world: &World) {
     collision::CreateObjectSys.run_now(&world.res);
     // TODO: Remove entities from `ncollide`
 
-    ApplyJointForceSys.run_now(&world.res);
+    FrictionForceSys.run_now(&world.res);
+    JointForceSys.run_now(&world.res);
+    ApplyForceSys.run_now(&world.res);
+
     PredictSys.run_now(&world.res);
     collision::UpdateSys.run_now(&world.res);
     ApplySys.run_now(&world.res);
@@ -46,27 +53,48 @@ pub fn run(world: &World) {
 #[component(VecStorage)]
 struct OldPosition(Point2<f32>);
 
-struct ApplyJointForceSys;
+#[derive(Component)]
+#[component(VecStorage)]
+struct Force(Vector2<f32>);
 
-impl<'a> System<'a> for ApplyJointForceSys {
+struct FrictionForceSys;
+
+impl<'a> System<'a> for FrictionForceSys {
+    type SystemData = (
+        ReadStorage<'a, Dynamic>,
+        ReadStorage<'a, Friction>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Force>,
+    );
+
+    fn run(&mut self, (dynamic, friction, mut velocity, mut force): Self::SystemData) {
+        for (_, _, velocity, force) in (&dynamic, &friction, &mut velocity, &mut force).join() {
+            let speed = norm(&velocity.0);
+
+            if speed < MIN_SPEED {
+                velocity.0 = zero();
+            } else {
+                force.0 -= velocity.0 * FRICTION;
+            }
+        }
+    }
+}
+
+struct JointForceSys;
+
+impl<'a> System<'a> for JointForceSys {
     type SystemData = (
         Fetch<'a, GameInfo>,
-        ReadStorage<'a, Mass>,
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Joints>,
         ReadStorage<'a, Position>,
-        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Force>,
     );
 
-    fn run(
-        &mut self,
-        (game_info, mass, dynamic, joints, positions, mut velocity): Self::SystemData,
-    ) {
+    fn run(&mut self, (game_info, dynamic, joints, positions, mut force): Self::SystemData) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (_, mass, joints, position_a, velocity) in
-            (&dynamic, &mass, &joints, &positions, &mut velocity).join()
-        {
+        for (_, joints, position_a, force) in (&dynamic, &joints, &positions, &mut force).join() {
             for &(entity_b, ref joint) in &joints.0 {
                 // TODO: Should we lazily remove joints whose endpoint entity no longer exists?
 
@@ -77,13 +105,30 @@ impl<'a> System<'a> for ApplyJointForceSys {
                 let t = distance - joint.resting_length;
 
                 if t >= JOINT_MIN_DISTANCE {
-                    let normal = delta / t;
-                    let force = joint.stiffness * t * normal;
-
-                    //println!("{} {}", force.x, force.y);
-                    velocity.0 += force / mass.0 * dt;
+                    force.0 += joint.stiffness * t * delta / distance;
                 }
             }
+        }
+    }
+}
+
+struct ApplyForceSys;
+
+impl<'a> System<'a> for ApplyForceSys {
+    type SystemData = (
+        Fetch<'a, GameInfo>,
+        ReadStorage<'a, Mass>,
+        ReadStorage<'a, Dynamic>,
+        ReadStorage<'a, Force>,
+        WriteStorage<'a, Velocity>,
+    );
+
+    fn run(&mut self, (game_info, mass, dynamic, force, mut velocity): Self::SystemData) {
+        let dt = game_info.tick_duration_secs() as f32;
+
+        for (_, mass, force, velocity) in (&dynamic, &mass, &force, &mut velocity).join() {
+            velocity.0 += force.0 / mass.0 * dt;
+            //velocity.0 *= 0.9;
         }
     }
 }
@@ -211,11 +256,13 @@ impl<'a> System<'a> for ClearSys {
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, Dynamic>,
+        WriteStorage<'a, Force>,
         WriteStorage<'a, Collided>,
     );
 
-    fn run(&mut self, (entities, dynamic, mut collided): Self::SystemData) {
+    fn run(&mut self, (entities, dynamic, mut force, mut collided): Self::SystemData) {
         for (entity, _) in (&*entities, &dynamic).join() {
+            force.insert(entity, Force(zero()));
             collided.remove(entity);
         }
     }

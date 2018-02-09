@@ -3,7 +3,7 @@ use specs::{BTreeStorage, Entities, Fetch, Join, ReadStorage, System, World, Wri
 
 use defs::{EntityId, EntityIndex, PlayerId};
 use registry::Registry;
-use physics::{Dynamic, Joint, Joints, Mass, Orientation, Position, Velocity};
+use physics::{Dynamic, Friction, Joint, Joints, Mass, Orientation, Position, Velocity};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use repl::{self, entity, player, EntityMap};
 use game::ComponentType;
@@ -63,6 +63,7 @@ pub fn register(reg: &mut Registry) {
                 .with(Velocity(zero()))
                 .with(Mass(1.0))
                 .with(Dynamic)
+                .with(Friction)
                 .with(Joints(Vec::new()))
                 .with(collision::Shape(ShapeHandle::new(shape)))
                 .with(collision::CreateObject { groups, query_type })

@@ -20,7 +20,7 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
     let (position, joints) = DrawData::fetch(&world.res, 0);
 
     for (position_a, joints) in (&position, &joints).join() {
-        for &(entity_b, ref joint) in &joints.0 {
+        for &(entity_b, _) in &joints.0 {
             let position_b = position.get(entity_b).unwrap();
 
             let center = (position_a.0.coords + position_b.0.coords) / 2.0;

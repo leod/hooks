@@ -12,10 +12,10 @@ run: build
 		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game; cat"' \; \
 		select-layout even-horizontal
 
-run-game: game
+run-game: build
 	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game
 
-run-server: server
+run-server: build
 	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server
 
 random-bot:
