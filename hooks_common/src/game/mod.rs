@@ -37,7 +37,6 @@ pub mod view {
 snapshot! {
     use physics::Position;
     use physics::Orientation;
-    use physics::Joints;
 
     use game::entity::player::Player;
     use game::entity::player::Hook;
@@ -46,7 +45,6 @@ snapshot! {
     mod snapshot {
         position: Position,
         orientation: Orientation,
-        joints: Joints,
 
         player: Player,
         hook: Hook,

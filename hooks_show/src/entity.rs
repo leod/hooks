@@ -4,6 +4,8 @@ use hooks_common::repl::entity;
 use rect;
 
 pub fn register(reg: &mut hooks_common::Registry) {
+    // TODO: Get sizes from e.g. collision shapes?
+
     entity::add_ctor(reg, "test", |builder| {
         builder.with(rect::Draw {
             width: 10.0,
@@ -15,6 +17,13 @@ pub fn register(reg: &mut hooks_common::Registry) {
         builder.with(rect::Draw {
             width: 10.0,
             height: 10.0,
+        })
+    });
+
+    entity::add_ctor(reg, "hook_segment", |builder| {
+        builder.with(rect::Draw {
+            width: 4.0,
+            height: 4.0,
         })
     });
 }

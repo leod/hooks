@@ -168,7 +168,7 @@ where
     }
 
     debug!(
-        "Created entity {:?} (local index {:?}) oftype {}",
+        "Created entity {:?} (local index {:?}) of type {}",
         id, entity, class_id
     );
 

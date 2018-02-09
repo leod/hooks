@@ -44,6 +44,12 @@ impl EntityMap {
     pub fn get_id_to_entity(&self, id: EntityId) -> Option<specs::Entity> {
         self.0.get(&id).cloned()
     }
+
+    pub fn try_id_to_entity(&self, id: EntityId) -> Result<specs::Entity, Error> {
+        self.get_id_to_entity(id)
+            .map(Ok)
+            .unwrap_or(Err(Error::InvalidEntityId(id)))
+    }
 }
 
 /// An `Error` indicates that something went seriously wrong in replication. Either we have a bug,
@@ -56,4 +62,5 @@ pub enum Error {
     InvalidEntityClass(String),
     InvalidEntityId(EntityId),
     Replication(String),
+    InvalidState(String),
 }

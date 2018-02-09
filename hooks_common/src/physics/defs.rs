@@ -2,9 +2,8 @@ use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
 
 use nalgebra::{Point2, Vector2};
-use specs::{Component, FlaggedStorage, VecStorage};
+use specs::{self, Component, FlaggedStorage, VecStorage};
 
-use defs::EntityId;
 use registry::Registry;
 
 pub fn register(reg: &mut Registry) {
@@ -51,13 +50,14 @@ pub struct Dynamic;
 /// Some kind of joint thingy.
 #[derive(PartialEq, Clone, Debug, BitStore)]
 pub struct Joint {
-    strength: f32,
+    pub stiffness: f32,
+    pub resting_length: f32,
 }
 
 /// Entities that this entity is joined to.
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(BTreeStorage)]
-pub struct Joints(pub Vec<(EntityId, Joint)>);
+pub struct Joints(pub Vec<(specs::Entity, Joint)>);
 
 impl BitStore for Velocity {
     fn read_from<R: BitRead>(reader: &mut R) -> Result<Self> {
@@ -81,7 +81,7 @@ impl BitStore for Position {
     }
 }
 
-impl BitStore for Joints {
+/*impl BitStore for Joints {
     fn read_from<R: BitRead>(reader: &mut R) -> Result<Self> {
         let mut joints = Vec::new();
         while reader.read_bit()? {
@@ -99,4 +99,4 @@ impl BitStore for Joints {
 
         writer.write_bit(false)
     }
-}
+}*/
