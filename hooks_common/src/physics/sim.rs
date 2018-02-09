@@ -19,7 +19,7 @@ pub fn register(reg: &mut Registry) {
 
 const JOINT_MIN_DISTANCE: f32 = 0.01;
 const MIN_SPEED: f32 = 0.01;
-const FRICTION: f32 = 0.3;
+const FRICTION: f32 = 0.8;
 
 /// Tag component for debugging visually
 #[derive(Component)]
