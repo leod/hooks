@@ -140,15 +140,14 @@ pub mod auth {
         let player = player::get(world, owner).unwrap();
         let first_segment_index = player.next_entity_index(1);
 
-        let (player_index, player_entity) =
-            entity::auth::create(world, owner, "player", |builder| {
-                let hook = Hook {
-                    is_active: false,
-                    first_segment_index,
-                };
+        let (player_index, _) = entity::auth::create(world, owner, "player", |builder| {
+            let hook = Hook {
+                is_active: false,
+                first_segment_index,
+            };
 
-                builder.with(Position(pos)).with(hook)
-            });
+            builder.with(Position(pos)).with(hook)
+        });
 
         for i in 0..NUM_HOOK_SEGMENTS {
             entity::auth::create(world, owner, "hook_segment", |builder| {
