@@ -1,4 +1,4 @@
-use nalgebra::{Point2, Vector2};
+use nalgebra::{norm, Point2, Vector2};
 
 use specs::{self, Entities, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage, World,
             WriteStorage};
@@ -6,7 +6,7 @@ use specs::{self, Entities, Fetch, FetchMut, Join, ReadStorage, RunNow, System, 
 use hooks_util::profile;
 
 use defs::GameInfo;
-use physics::{collision, Dynamic, Position, Velocity};
+use physics::{collision, Dynamic, Joints, Mass, Position, Velocity};
 use physics::collision::CollisionWorld;
 use registry::Registry;
 
@@ -14,6 +14,8 @@ pub fn register(reg: &mut Registry) {
     reg.component::<OldPosition>();
     reg.component::<Collided>();
 }
+
+const JOINT_MIN_DISTANCE: f32 = 0.01;
 
 /// Tag component for debugging visually
 #[derive(Component)]
@@ -34,6 +36,7 @@ pub fn run(world: &World) {
     collision::CreateObjectSys.run_now(&world.res);
     // TODO: Remove entities from `ncollide`
 
+    ApplyJointForceSys.run_now(&world.res);
     PredictSys.run_now(&world.res);
     collision::UpdateSys.run_now(&world.res);
     ApplySys.run_now(&world.res);
@@ -42,6 +45,48 @@ pub fn run(world: &World) {
 #[derive(Component)]
 #[component(VecStorage)]
 struct OldPosition(Point2<f32>);
+
+struct ApplyJointForceSys;
+
+impl<'a> System<'a> for ApplyJointForceSys {
+    type SystemData = (
+        Fetch<'a, GameInfo>,
+        ReadStorage<'a, Mass>,
+        ReadStorage<'a, Dynamic>,
+        ReadStorage<'a, Joints>,
+        ReadStorage<'a, Position>,
+        WriteStorage<'a, Velocity>,
+    );
+
+    fn run(
+        &mut self,
+        (game_info, mass, dynamic, joints, positions, mut velocity): Self::SystemData,
+    ) {
+        let dt = game_info.tick_duration_secs() as f32;
+
+        for (_, mass, joints, position_a, velocity) in
+            (&dynamic, &mass, &joints, &positions, &mut velocity).join()
+        {
+            for &(entity_b, ref joint) in &joints.0 {
+                // TODO: Should we lazily remove joints whose endpoint entity no longer exists?
+
+                let position_b = positions.get(entity_b).unwrap();
+
+                let delta = position_b.0 - position_a.0;
+                let distance = norm(&delta);
+                let t = distance - joint.resting_length;
+
+                if t >= JOINT_MIN_DISTANCE {
+                    let normal = delta / t;
+                    let force = joint.stiffness * t * normal;
+
+                    //println!("{} {}", force.x, force.y);
+                    velocity.0 += force / mass.0 * dt;
+                }
+            }
+        }
+    }
+}
 
 struct PredictSys;
 
