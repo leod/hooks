@@ -10,10 +10,13 @@ extern crate specs;
 extern crate specs_derive;
 
 mod camera;
+pub mod debug;
+
 mod rect;
 mod wall;
+mod joints;
+
 mod entity;
-pub mod debug;
 
 use nalgebra::Point2;
 
@@ -36,6 +39,7 @@ pub fn register(reg: &mut hooks_common::Registry) {
 pub fn register_show(reg: &mut Registry) {
     rect::register_show(reg);
     wall::register_show(reg);
+    joints::register_show(reg);
 }
 
 pub struct Assets {
