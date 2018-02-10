@@ -1,12 +1,12 @@
 use nalgebra::{norm, zero, Point2, Vector2};
 
-use specs::{self, Entities, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage, World,
-            WriteStorage};
+use specs::{self, Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, System,
+            VecStorage, World, WriteStorage};
 
 use hooks_util::profile;
 
 use defs::GameInfo;
-use physics::{collision, Dynamic, Friction, Joints, Mass, Position, Velocity};
+use physics::{collision, interaction, Dynamic, Friction, Joints, Mass, Position, Velocity};
 use physics::collision::CollisionWorld;
 use registry::Registry;
 
@@ -15,6 +15,8 @@ pub fn register(reg: &mut Registry) {
 
     reg.component::<OldPosition>();
     reg.component::<Force>();
+
+    reg.resource(Interactions(Vec::new()));
 }
 
 const JOINT_MIN_DISTANCE: f32 = 0.01;
@@ -27,6 +29,9 @@ const FRICTION: f32 = 0.8;
 pub struct Collided {
     pub other: specs::Entity,
 }
+
+/// Resource to store the interactions that were detected in a time step.
+struct Interactions(Vec<(Entity, Entity, Point2<f32>)>);
 
 /// For now, it seems that putting the whole physics simulation into a set of systems would be
 /// clumsy. For example, to resolve collisions with impulses, we might need to iterate some systems
@@ -47,6 +52,12 @@ pub fn run(world: &World) {
     PredictSys.run_now(&world.res);
     collision::UpdateSys.run_now(&world.res);
     ApplySys.run_now(&world.res);
+
+    let interactions = world.read_resource::<Interactions>().0.clone();
+
+    for &(entity_a, entity_b, pos) in &interactions {
+        interaction::run(world, entity_a, entity_b, pos);
+    }
 }
 
 #[derive(Component)]
@@ -136,10 +147,10 @@ impl<'a> System<'a> for PredictSys {
     type SystemData = (
         Fetch<'a, GameInfo>,
         Entities<'a>,
+        ReadStorage<'a, Dynamic>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, OldPosition>,
-        ReadStorage<'a, Dynamic>,
     );
 
     #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
@@ -148,10 +159,10 @@ impl<'a> System<'a> for PredictSys {
         (
             game_info,
             entities,
+            dynamic,
             mut velocity,
             mut position,
             mut old_position,
-            dynamic
         ): Self::SystemData
     ) {
         let dt = game_info.tick_duration_secs() as f32;
@@ -172,12 +183,13 @@ struct ApplySys;
 impl<'a> System<'a> for ApplySys {
     type SystemData = (
         Fetch<'a, GameInfo>,
-        FetchMut<'a, CollisionWorld>,
+        Fetch<'a, CollisionWorld>,
+        FetchMut<'a, Interactions>,
+        ReadStorage<'a, Dynamic>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, OldPosition>,
         WriteStorage<'a, Collided>,
-        ReadStorage<'a, Dynamic>,
     );
 
     #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
@@ -186,11 +198,12 @@ impl<'a> System<'a> for ApplySys {
         (
             game_info,
             collision_world,
+            mut interactions,
+            dynamic,
             mut velocity,
             mut position,
             old_position,
             mut collided,
-            dynamic
         ): Self::SystemData
     ) {
         let dt = game_info.tick_duration_secs() as f32;
@@ -200,11 +213,11 @@ impl<'a> System<'a> for ApplySys {
             gen.contacts(&mut contacts);
 
             for contact in &contacts {
-                let a = *oa.data();
-                let b = *ob.data();
+                let entity_a = *oa.data();
+                let entity_b = *ob.data();
 
-                let a_dynamic = dynamic.get(a).is_some();
-                let b_dynamic = dynamic.get(b).is_some();
+                let dynamic_a = dynamic.get(entity_a).is_some();
+                let dynamic_b = dynamic.get(entity_b).is_some();
 
                 /*debug!(
                     "contact {} {} with depth {}",
@@ -219,17 +232,32 @@ impl<'a> System<'a> for ApplySys {
                     //debug!("-> {:?}", v.0);
                 }
 
-                if a_dynamic && !b_dynamic {
+                if dynamic_a && !dynamic_b {
                     //velocity.get_mut(a).unwrap().0 -= contact.normal * contact.depth / dt;
-                    resolve(dt, &contact.normal, contact.depth, velocity.get_mut(a).unwrap());
-                } else if !a_dynamic && b_dynamic {
-                    resolve(dt, &contact.normal, contact.depth, velocity.get_mut(b).unwrap());
+                    resolve(
+                        dt,
+                        &contact.normal,
+                        contact.depth,
+                        velocity.get_mut(entity_a).unwrap(),
+                    );
+                } else if !dynamic_a && dynamic_b {
+                    resolve(
+                        dt,
+                        &contact.normal,
+                        contact.depth,
+                        velocity.get_mut(entity_b).unwrap(),
+                    );
                 } else {
                     unimplemented!();
                 }
 
-                collided.insert(a, Collided { other: b });
-                collided.insert(b, Collided { other: a });
+                collided.insert(entity_a, Collided { other: entity_b });
+                collided.insert(entity_b, Collided { other: entity_a });
+
+                // TODO: Fix this position
+                let pos = contact.world1;
+
+                interactions.0.push((entity_a, entity_b, pos));
             }
         }
 
@@ -251,16 +279,22 @@ struct ClearSys;
 
 impl<'a> System<'a> for ClearSys {
     type SystemData = (
+        FetchMut<'a, Interactions>,
         Entities<'a>,
         ReadStorage<'a, Dynamic>,
         WriteStorage<'a, Force>,
         WriteStorage<'a, Collided>,
     );
 
-    fn run(&mut self, (entities, dynamic, mut force, mut collided): Self::SystemData) {
+    fn run(
+        &mut self,
+        (mut interactions, entities, dynamic, mut force, mut collided): Self::SystemData,
+    ) {
         for (entity, _) in (&*entities, &dynamic).join() {
             force.insert(entity, Force(zero()));
             collided.remove(entity);
         }
+
+        interactions.0.clear();
     }
 }

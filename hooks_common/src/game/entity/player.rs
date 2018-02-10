@@ -1,9 +1,10 @@
 use nalgebra::{zero, Point2, Vector2};
-use specs::{BTreeStorage, Entities, Fetch, Join, ReadStorage, System, World, WriteStorage};
+use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, Join, ReadStorage, System,
+            World, WriteStorage};
 
 use defs::{EntityId, EntityIndex, PlayerId};
 use registry::Registry;
-use physics::{Dynamic, Friction, Joint, Joints, Mass, Orientation, Position, Velocity};
+use physics::{interaction, Dynamic, Friction, Joint, Joints, Mass, Orientation, Position, Velocity};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use repl::{self, player, EntityMap};
 use game::ComponentType;
@@ -22,25 +23,7 @@ pub fn register(reg: &mut Registry) {
             ComponentType::Player,
             ComponentType::Hook,
         ],
-        |builder| {
-            let shape = Cuboid::new(Vector2::new(10.0, 10.0));
-
-            let mut groups = CollisionGroups::new();
-            groups.set_membership(&[collision::GROUP_PLAYER]);
-            groups.set_whitelist(&[collision::GROUP_WALL]);
-
-            let query_type = GeometricQueryType::Contacts(0.0, 0.0);
-
-            // TODO: Velocity (and Dynamic?) component should be added only for owners
-            builder
-                .with(Orientation(0.0))
-                .with(Velocity(zero()))
-                .with(Dynamic)
-                .with(Joints(Vec::new()))
-                .with(collision::Shape(ShapeHandle::new(shape)))
-                .with(collision::CreateObject { groups, query_type })
-                .with(Player)
-        },
+        build_player,
     );
 
     repl::entity::register_class(
@@ -51,28 +34,10 @@ pub fn register(reg: &mut Registry) {
             ComponentType::Orientation,
             ComponentType::HookSegment,
         ],
-        |builder| {
-            // TODO
-            let shape = Cuboid::new(Vector2::new(4.0, 4.0));
-
-            let mut groups = CollisionGroups::new();
-            groups.set_membership(&[collision::GROUP_PLAYER]);
-            groups.set_whitelist(&[collision::GROUP_WALL]);
-
-            let query_type = GeometricQueryType::Contacts(0.0, 0.0);
-
-            // TODO: Velocity (and Dynamic?) component should be added only for owners
-            builder
-                .with(Orientation(0.0))
-                .with(Velocity(zero()))
-                .with(Mass(1.0))
-                .with(Dynamic)
-                .with(Friction)
-                .with(Joints(Vec::new()))
-                .with(collision::Shape(ShapeHandle::new(shape)))
-                .with(collision::CreateObject { groups, query_type })
-        },
+        build_hook_segment,
     );
+
+    interaction::add(reg, "hook_segment", "wall", hook_segment_wall_interaction);
 
     // TODO: Check about when to best run hook system. Since it manages hook segment joints, would
     //       it be better if it runs before the physics simulation?
@@ -96,15 +61,74 @@ pub struct Hook {
 pub struct HookSegment {
     pub player_index: EntityIndex,
     pub is_last: bool,
+    pub fixed: Option<(f32, f32)>,
 }
 
 const NUM_HOOK_SEGMENTS: usize = 10;
 
 const HOOK_JOINT: Joint = Joint {
-    stiffness: 100.0,
+    stiffness: 200.0,
     resting_length: 10.0,
 };
 
+fn build_player(builder: EntityBuilder) -> EntityBuilder {
+    let shape = Cuboid::new(Vector2::new(10.0, 10.0));
+
+    let mut groups = CollisionGroups::new();
+    groups.set_membership(&[collision::GROUP_PLAYER]);
+    groups.set_whitelist(&[collision::GROUP_WALL]);
+
+    let query_type = GeometricQueryType::Contacts(0.0, 0.0);
+
+    // TODO: Velocity (and Dynamic?) component should be added only for owners
+    builder
+        .with(Orientation(0.0))
+        .with(Velocity(zero()))
+        .with(Dynamic)
+        .with(Joints(Vec::new()))
+        .with(collision::Shape(ShapeHandle::new(shape)))
+        .with(collision::CreateObject { groups, query_type })
+        .with(Player)
+}
+
+fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
+    // TODO
+    let shape = Cuboid::new(Vector2::new(4.0, 4.0));
+
+    let mut groups = CollisionGroups::new();
+    groups.set_membership(&[collision::GROUP_PLAYER]);
+    groups.set_whitelist(&[collision::GROUP_WALL]);
+
+    let query_type = GeometricQueryType::Contacts(0.0, 0.0);
+
+    // TODO: Velocity (and Dynamic?) component should be added only for owners
+    builder
+        .with(Orientation(0.0))
+        .with(Velocity(zero()))
+        .with(Mass(1.0))
+        .with(Dynamic)
+        .with(Friction)
+        .with(Joints(Vec::new()))
+        .with(collision::Shape(ShapeHandle::new(shape)))
+        .with(collision::CreateObject { groups, query_type })
+}
+
+fn hook_segment_wall_interaction(
+    world: &World,
+    segment_entity: Entity,
+    _wall_entity: Entity,
+    pos: Point2<f32>,
+) {
+    let mut segments = world.write::<HookSegment>();
+    let segment = segments.get_mut(segment_entity).unwrap();
+
+    if segment.is_last {
+        segment.fixed = Some((pos.x, pos.y));
+    }
+}
+
+/// Given the entity id of the first segment of a hook, returns a vector of the entity indices of
+/// all segments belonging to this hook.
 pub fn hook_segment_indices(
     entity_map: &EntityMap,
     segments: &ReadStorage<HookSegment>,
@@ -159,6 +183,7 @@ pub mod auth {
                 let hook_segment = HookSegment {
                     player_index,
                     is_last: i == NUM_HOOK_SEGMENTS - 1,
+                    fixed: None,
                 };
 
                 builder.with(Position(pos)).with(hook_segment)
