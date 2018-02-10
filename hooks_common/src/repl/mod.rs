@@ -18,6 +18,8 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Id>();
 
     reg.resource(EntityMap(BTreeMap::new()));
+
+    player::register(reg);
 }
 
 /// Shared entity id for replication.
