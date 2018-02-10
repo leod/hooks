@@ -35,21 +35,21 @@ impl Event for RemoveOrder {
 pub fn register_class<T: ComponentType>(
     reg: &mut Registry,
     name: &str,
-    components: &[T],
+    repl_components: &[T],
     ctor: entity::Ctor,
 ) -> EntityClassId {
     let class_id = entity::register_class(reg, name, ctor);
 
     info!(
         "Registering replicated entity class {} with id {} and repl components {:?}",
-        name, class_id, components,
+        name, class_id, repl_components,
     );
 
     let mut classes = reg.world()
         .write_resource::<EntityClasses<T::EntitySnapshot>>();
 
     let class = EntityClass::<T::EntitySnapshot> {
-        components: components.to_vec(),
+        components: repl_components.to_vec(),
     };
 
     classes.0.insert(class_id, class);
@@ -137,7 +137,6 @@ pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error>
         let game_info = world.read_resource::<GameInfo>();
         let player_class_id = try_get_class_id(world, &game_info.player_entity_class)?;
 
-        // TODO: Check for replication error here?
         let meta = world.read::<Meta>().get(entity).unwrap().clone();
 
         if meta.class_id == player_class_id {
@@ -172,6 +171,7 @@ pub mod auth {
     pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
         super::register::<T>(reg);
 
+        // Index source for entities not owned by a player
         reg.resource(IndexSource { next: 1 });
     }
 
