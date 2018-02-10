@@ -10,25 +10,49 @@ use registry::Registry;
 use entity;
 
 pub fn register(reg: &mut Registry) {
+    reg.resource(HandlersSetup(Vec::new()));
     reg.resource(Handlers(BTreeMap::new()));
 }
 
-type Handler = fn(&mut World, Entity, Entity, Point2<f32>);
+type Handler = fn(&World, Entity, Entity, Point2<f32>);
+
+/// In a module's `register` function, it can happen that another entity class that it wants to
+/// interact with has not been registered yet. Thus, we store class names while registering, and
+/// only resolve to ids later in `setup`.
+struct HandlersSetup(Vec<(String, String, Handler)>);
 
 struct Handlers(BTreeMap<OrderedPair<EntityClassId>, Vec<(EntityClassId, EntityClassId, Handler)>>);
 
-pub fn set<F>(reg: &mut Registry, entity_class_a: &str, entity_class_b: &str, handler: Handler) {
-    let id_a = entity::get_class_id(reg.world(), entity_class_a).unwrap();
-    let id_b = entity::get_class_id(reg.world(), entity_class_b).unwrap();
-    let id_pair = OrderedPair::new(id_a, id_b);
-
-    let mut handlers = reg.world().write_resource::<Handlers>();
-
-    let list = handlers.0.entry(id_pair).or_insert(Vec::new());
-    list.push((id_a, id_b, handler));
+pub fn add(reg: &mut Registry, entity_class_a: &str, entity_class_b: &str, handler: Handler) {
+    let mut setup = reg.world().write_resource::<HandlersSetup>();
+    setup.0.push((
+        entity_class_a.to_string(),
+        entity_class_b.to_string(),
+        handler,
+    ));
 }
 
-pub fn run(world: &mut World, entity_a: Entity, entity_b: Entity, pos: Point2<f32>) {
+/// Create `Handlers` from `HandlersSetup` by mapping class names to ids. This should have an
+/// effect only once at the start of the game.
+fn setup(world: &World) {
+    let mut setup = world.write_resource::<HandlersSetup>();
+    let mut handlers = world.write_resource::<Handlers>();
+
+    for &(ref entity_class_a, ref entity_class_b, handler) in &setup.0 {
+        let id_a = entity::get_class_id(world, entity_class_a).unwrap();
+        let id_b = entity::get_class_id(world, entity_class_b).unwrap();
+        let id_pair = OrderedPair::new(id_a, id_b);
+
+        let list = handlers.0.entry(id_pair).or_insert(Vec::new());
+        list.push((id_a, id_b, handler));
+    }
+
+    setup.0.clear();
+}
+
+pub fn run(world: &World, entity_a: Entity, entity_b: Entity, pos: Point2<f32>) {
+    setup(world);
+
     let (id_a, id_b) = {
         let meta = world.read::<entity::Meta>();
 
@@ -40,6 +64,8 @@ pub fn run(world: &mut World, entity_a: Entity, entity_b: Entity, pos: Point2<f3
         )
     };
     let id_pair = OrderedPair::new(id_a, id_b);
+
+    debug!("{:?} with {:?}", id_a, id_b);
 
     let handlers = world.read_resource::<Handlers>().0.get(&id_pair).cloned();
 
