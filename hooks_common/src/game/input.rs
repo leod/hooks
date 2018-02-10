@@ -6,12 +6,14 @@ pub mod auth {
     use defs::{PlayerId, PlayerInput};
     use physics::{Orientation, Velocity};
     use repl::player::Players;
+    use game::entity::player::Hook;
 
     #[derive(SystemData)]
     struct Data<'a> {
         players: Fetch<'a, Players>,
         velocity: WriteStorage<'a, Velocity>,
         orientation: WriteStorage<'a, Orientation>,
+        hook: WriteStorage<'a, Hook>,
     }
 
     pub const MOVE_SPEED: f32 = 100.0;
