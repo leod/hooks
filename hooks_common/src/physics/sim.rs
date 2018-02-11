@@ -43,9 +43,7 @@ pub fn run(world: &World) {
 
     ClearSys.run_now(&world.res);
 
-    // Update CollisionWorld
-    collision::CreateObjectSys.run_now(&world.res);
-    collision::RemoveObjectSys.run_now(&world.res);
+    collision::MaintainSys.run_now(&world.res);
 
     FrictionForceSys.run_now(&world.res);
     JointForceSys.run_now(&world.res);

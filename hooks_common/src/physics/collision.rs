@@ -13,8 +13,7 @@ pub use ncollide::world::{CollisionGroups, GeometricQueryType};
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Shape>();
-    reg.component::<CreateObject>();
-    reg.component::<RemoveObject>();
+    reg.component::<Object>();
     reg.component::<ObjectHandle>();
 
     let collision_world = CollisionWorld2::<f32, Entity>::new(0.02);
@@ -35,23 +34,14 @@ pub const GROUP_PLAYER: usize = 1;
 #[component(VecStorage)]
 pub struct Shape(pub ShapeHandle2<f32>);
 
-/// Tag component which indicates that we should inform the collision world of this entity. The
-/// component is removed from the entity after that.
+/// Component which indicates that we should inform the collision world of this entity.
+/// Note that only `entity::Active` entities are kept in the collision world.
 #[derive(Component)]
 #[component(BTreeStorage)]
-pub struct CreateObject {
+pub struct Object {
     pub groups: CollisionGroups,
     pub query_type: GeometricQueryType<f32>,
 }
-
-// TODO: Let's make `RemoveEntity` a thing independent of collision, and allow registering systems
-//       to handle the removal of entitites. Alternatively... we could use local events for this
-//       somehow? But then again, this would mean that entity removal would not be handled in
-//       batches.
-/// Tag component which indicates that we should remove the collision object.
-#[derive(Component, Default)]
-#[component(NullStorage)]
-pub struct RemoveObject;
 
 /// Handle of an ncollide CollisionObject.
 #[derive(Component)]
@@ -101,17 +91,19 @@ impl<'a> System<'a> for UpdateSys {
     }
 }
 
-/// System for creating collision objects for entities tagged with `CreateObject`.
-pub struct CreateObjectSys;
+/// System for making sure that exactly the entities with `entity::Active` and `Object` are present
+/// in the collision world. `Position`, `Orientation` and `Shape` also need to be given.
+pub struct MaintainSys;
 
-impl<'a> System<'a> for CreateObjectSys {
+impl<'a> System<'a> for MaintainSys {
     type SystemData = (
         FetchMut<'a, CollisionWorld>,
         Entities<'a>,
+        ReadStorage<'a, entity::Active>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Orientation>,
         ReadStorage<'a, Shape>,
-        WriteStorage<'a, CreateObject>,
+        ReadStorage<'a, Object>,
         WriteStorage<'a, ObjectHandle>,
     );
 
@@ -120,60 +112,51 @@ impl<'a> System<'a> for CreateObjectSys {
         (
             mut collision_world,
             entities,
+            active,
             position,
             orientation,
             shape,
-            mut create_object,
+            object,
             mut object_handle,
         ): Self::SystemData,
     ) {
-        let created_entities = (&*entities, &position, &orientation, &shape, &create_object)
-            .join()
-            .map(|(entity, position, orientation, shape, create_object)| {
+        // Create newly active entities in collision world
+        let new_handles = (
+            &*entities,
+            &active,
+            &position,
+            &orientation,
+            &shape,
+            &object,
+            !&object_handle,
+        ).join()
+            .map(|(entity, _, position, orientation, shape, object, _)| {
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
                 let handle = collision_world.add(
                     isometry,
                     shape.0.clone(),
-                    create_object.groups,
-                    create_object.query_type,
+                    object.groups,
+                    object.query_type,
                     entity,
                 );
 
-                object_handle.insert(entity, ObjectHandle(handle));
-
-                entity
+                (entity, handle)
             })
             .collect::<Vec<_>>();
 
-        for entity in created_entities {
-            create_object.remove(entity);
+        for &(entity, handle) in &new_handles {
+            object_handle.insert(entity, ObjectHandle(handle));
         }
 
-        for (entity, _) in (&*entities, &create_object).join() {
+        for (entity, _, _, _) in (&*entities, &active, &object, !&object_handle).join() {
             panic!(
-                "Entity {:?} has CreateObject but not Position, Orientation or Shape",
+                "Entity {:?} has collision::Object but not Position, Orientation or Shape",
                 entity
             );
         }
-    }
-}
 
-/// System for removing collision objects for entities tagged with `RemoveObject`.
-pub struct RemoveObjectSys;
-
-impl<'a> System<'a> for RemoveObjectSys {
-    type SystemData = (
-        Entities<'a>,
-        FetchMut<'a, CollisionWorld>,
-        WriteStorage<'a, RemoveObject>,
-        WriteStorage<'a, ObjectHandle>,
-    );
-
-    fn run(
-        &mut self,
-        (entities, mut collision_world, mut remove_object, mut object_handle): Self::SystemData,
-    ) {
-        let removed_entities = (&*entities, &mut remove_object, &mut object_handle)
+        // Remove newly inactive entities from collision world
+        let removed_handles = (&*entities, !&active, &object_handle)
             .join()
             .map(|(entity, _, object_handle)| {
                 collision_world.remove(&[object_handle.0]);
@@ -181,13 +164,8 @@ impl<'a> System<'a> for RemoveObjectSys {
             })
             .collect::<Vec<_>>();
 
-        for entity in removed_entities {
-            remove_object.remove(entity);
+        for entity in removed_handles {
             object_handle.remove(entity);
-        }
-
-        for (entity, _) in (&*entities, &remove_object).join() {
-            panic!("Entity {:?} has RemoveObject but no ObjectHandle", entity);
         }
     }
 }
