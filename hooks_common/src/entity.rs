@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use specs::{Entity, EntityBuilder, World, Join};
+use specs::{Entity, EntityBuilder, Join, World};
 
 use defs::EntityClassId;
 use registry::Registry;

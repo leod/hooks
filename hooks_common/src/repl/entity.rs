@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use specs::{Entity, EntityBuilder, World, ReadStorage, Fetch, FetchMut, System, Join};
+use specs::{Entity, EntityBuilder, Fetch, FetchMut, Join, ReadStorage, System, World};
 
 use defs::{EntityClassId, EntityId, EntityIndex, GameInfo, PlayerId, INVALID_PLAYER_ID};
 use event::{self, Event};
@@ -136,7 +136,19 @@ impl<'a> System<'a> for RemovalSys {
         ReadStorage<'a, entity::Remove>,
     );
 
-    fn run(&mut self, (game_info, class_ids, mut entity_map, mut players, repl_id, meta, remove): Self::SystemData) {
+    #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
+    fn run(
+        &mut self,
+        (
+            game_info,
+            class_ids,
+            mut entity_map,
+            mut players,
+            repl_id,
+            meta,
+            remove
+        ): Self::SystemData
+    ) {
         for (repl_id, meta, _) in (&repl_id, &meta, &remove).join() {
             debug!("Removing repl entity {:?}", repl_id.0);
 
@@ -149,7 +161,7 @@ impl<'a> System<'a> for RemovalSys {
                 if meta.class_id == player_class_id {
                     // We might have the case that the owner has just disconnected
                     if let Some(player) = players.0.get_mut(&(repl_id.0).0) {
-                        assert!(player.entity.is_some()); 
+                        assert!(player.entity.is_some());
                         player.entity = None;
                     }
                 }

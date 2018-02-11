@@ -173,7 +173,7 @@ impl<'a> System<'a> for RemovalSys {
         &mut self,
         (entities, mut collision_world, remove, mut object_handle): Self::SystemData,
     ) {
-        // Remove collision objects of entities that are about to be deleted 
+        // Remove collision objects of entities that are about to be deleted
         let removed_entities = (&*entities, &remove, &mut object_handle)
             .join()
             .map(|(entity, _, object_handle)| {
