@@ -6,7 +6,8 @@ use specs::{self, Join, World};
 use defs::{EntityIndex, LeaveReason, PlayerId, PlayerInfo};
 use event::{self, Event};
 use registry::Registry;
-use repl::{self, entity};
+use entity;
+use repl;
 
 pub fn register(reg: &mut Registry) {
     reg.resource(Players(BTreeMap::new()));
@@ -117,14 +118,14 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
             }
 
             // Remove all entities owned by the disconnected player
-            let owned_ids = {
+            let owned_entities = {
+                let entities = world.entities();
                 let mut repl_ids = world.read::<repl::Id>();
-                let mut entity_meta = world.read::<entity::Meta>();
 
-                repl_ids.join()
-                    .filter_map(|&repl::Id(id)| {
+                (&*entities, &repl_ids).join()
+                    .filter_map(|(entity, &repl::Id(id))| {
                         if id.0 == event.id {
-                            Some(id)
+                            Some(entity)
                         } else {
                             None
                         }
@@ -132,8 +133,8 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
                     .collect::<Vec<_>>()
             };
 
-            for &id in &owned_ids {
-                entity::remove(world, id);
+            for &id in &owned_entities {
+                entity::deferred_remove(world, id);
             }
 
             world.write_resource::<Players>().0.remove(&event.id).unwrap();

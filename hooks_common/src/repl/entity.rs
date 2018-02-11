@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use specs::{Entity, EntityBuilder, World};
+use specs::{Entity, EntityBuilder, World, ReadStorage, Fetch, FetchMut, System, Join};
 
 use defs::{EntityClassId, EntityId, EntityIndex, GameInfo, PlayerId, INVALID_PLAYER_ID};
 use event::{self, Event};
@@ -15,6 +15,8 @@ fn register<T: EntitySnapshot>(reg: &mut Registry) {
     reg.resource(EntityClasses::<T>(BTreeMap::new()));
 
     reg.event::<RemoveOrder>();
+
+    reg.removal_system(RemovalSys, "repl::entity");
 }
 
 /// Event to remove entities, broadcast to clients
@@ -121,47 +123,39 @@ where
     Ok(entity)
 }
 
-pub(super) fn remove(world: &mut World, id: EntityId) -> Result<(), repl::Error> {
-    debug!("Removing entity {:?}", id);
+struct RemovalSys;
 
-    // Remove from entity map
-    let entity = {
-        let mut entity_map = world.write_resource::<repl::EntityMap>();
-        let entity = entity_map.id_to_entity(id);
-        entity_map.0.remove(&id);
-        entity
-    };
+impl<'a> System<'a> for RemovalSys {
+    type SystemData = (
+        Fetch<'a, GameInfo>,
+        Fetch<'a, entity::ClassIds>,
+        FetchMut<'a, repl::EntityMap>,
+        FetchMut<'a, player::Players>,
+        ReadStorage<'a, repl::Id>,
+        ReadStorage<'a, entity::Meta>,
+        ReadStorage<'a, entity::Remove>,
+    );
 
-    // Forget player-controlled main entity
-    if id.0 != INVALID_PLAYER_ID {
-        let game_info = world.read_resource::<GameInfo>();
-        let player_class_id = try_get_class_id(world, &game_info.player_entity_class)?;
+    fn run(&mut self, (game_info, class_ids, mut entity_map, mut players, repl_id, meta, remove): Self::SystemData) {
+        for (repl_id, meta, _) in (&repl_id, &meta, &remove).join() {
+            debug!("Removing repl entity {:?}", repl_id.0);
 
-        let meta = world.read::<Meta>().get(entity).unwrap().clone();
+            entity_map.0.remove(&repl_id.0);
 
-        if meta.class_id == player_class_id {
-            let mut players = world.write_resource::<player::Players>();
+            // Forget player-controlled main entity
+            if (repl_id.0).0 != INVALID_PLAYER_ID {
+                let player_class_id = *class_ids.0.get(&game_info.player_entity_class).unwrap();
 
-            let player = players
-                .0
-                .get_mut(&id.0)
-                .map(Ok)
-                .unwrap_or(Err(repl::Error::InvalidPlayerId(id.0)))?;
-
-            if player.entity.is_none() {
-                return Err(repl::Error::Replication(format!(
-                    "player {} has no main entity to remove",
-                    id.0,
-                )));
+                if meta.class_id == player_class_id {
+                    // We might have the case that the owner has just disconnected
+                    if let Some(player) = players.0.get_mut(&(repl_id.0).0) {
+                        assert!(player.entity.is_some()); 
+                        player.entity = None;
+                    }
+                }
             }
-
-            player.entity = None;
         }
     }
-
-    entity::remove(world, entity);
-
-    Ok(())
 }
 
 /// Server-side entity management
@@ -265,10 +259,10 @@ pub mod view {
                     entity_map.get_id_to_entity(id)
                 };
 
-                if let Some(_) = entity {
+                if let Some(entity) = entity {
                     debug!("Removing entity {:?}", id);
 
-                    super::remove(world, id)?;
+                    entity::deferred_remove(world, entity);
                 } else {
                     // TODO: Is it a replication error if we get a `RemoveOrder` for an entity we 
                     //       don't have? This really depends on if we do both of the following:

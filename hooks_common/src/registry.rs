@@ -18,10 +18,11 @@ pub struct Registry {
     pub event_reg: event::Registry,
 
     // TODO: Check if the following are maybe needed only on the server
-    pub event_handlers_pre_tick: Vec<EventHandler>,
+    pub pre_tick_event_handlers: Vec<EventHandler>,
     pub pre_tick_fns: Vec<TickFn>,
     pub tick_systems: DispatcherBuilder<'static, 'static>,
-    pub event_handlers_post_tick: Vec<EventHandler>,
+    pub post_tick_event_handlers: Vec<EventHandler>,
+    pub removal_systems: DispatcherBuilder<'static, 'static>,
 }
 
 impl Registry {
@@ -50,7 +51,7 @@ impl Registry {
     }
 
     pub fn event_handler_pre_tick(&mut self, f: EventHandler) {
-        self.event_handlers_pre_tick.push(f);
+        self.pre_tick_event_handlers.push(f);
     }
 
     pub fn pre_tick_fn(&mut self, f: TickFn) {
@@ -67,6 +68,15 @@ impl Registry {
     }
 
     pub fn event_handler_post_tick(&mut self, f: EventHandler) {
-        self.event_handlers_post_tick.push(f);
+        self.post_tick_event_handlers.push(f);
+    }
+
+    pub fn removal_system<T>(&mut self, system: T, name: &str)
+    where
+        T: for<'a> System<'a> + Send + 'static,
+    {
+        take_mut::take(&mut self.removal_systems, |removal_systems| {
+            removal_systems.add(system, name, &[])
+        });
     }
 }
