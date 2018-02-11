@@ -132,10 +132,14 @@ impl<'a> System<'a> for JointForceSys {
 
                 let delta = position_b.0 - position_a.0;
                 let distance = norm(&delta);
-                let t = distance - joint.resting_length;
+                let r = distance - joint.resting_length;
 
-                if t.abs() >= JOINT_MIN_DISTANCE {
-                    force.0 += joint.stiffness * t * delta / distance;
+                if distance <= 0.0001 && joint.resting_length > 0.0 {
+                    // TODO: Joint if distance is close to zero
+                    force.0 += joint.stiffness * r * Vector2::new(1.0, 0.0);
+                } else {
+                    //if t.abs() >= JOINT_MIN_DISTANCE {
+                    force.0 += joint.stiffness * r * delta / distance;
                 }
             }
         }
