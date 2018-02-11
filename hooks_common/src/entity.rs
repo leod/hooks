@@ -32,9 +32,13 @@ pub struct Meta {
 }
 
 /// Is this entity active in the game?
-#[derive(Component, Debug, Clone, PartialEq)]
-#[component(NullStorage)]
-pub struct Active;
+///
+/// For usability, it would be nice if this were a tag component without any data. But for some
+/// entities, we actually want to replicate this component and with our implementation the set of
+/// replicated components must not change during the lifetime of an entity.
+#[derive(Component, Debug, Clone, PartialEq, BitStore)]
+#[component(VecStorage)]
+pub struct Active(pub bool);
 
 /// Entities tagged with this component shall be removed at the end of the tick.
 #[derive(Component, Debug)]
@@ -94,7 +98,10 @@ where
     let ctors = world.read_resource::<Ctors>().0[&class_id].clone();
 
     // Build entity
-    let builder = world.create_entity().with(Meta { class_id }).with(Active);
+    let builder = world
+        .create_entity()
+        .with(Meta { class_id })
+        .with(Active(true));
 
     let builder = ctors.iter().fold(builder, |builder, ctor| ctor(builder));
 

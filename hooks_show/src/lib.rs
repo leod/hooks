@@ -14,7 +14,7 @@ pub mod debug;
 
 mod rect;
 mod wall;
-mod joints;
+mod hook;
 
 mod entity;
 
@@ -39,7 +39,7 @@ pub fn register(reg: &mut hooks_common::Registry) {
 pub fn register_show(reg: &mut Registry) {
     rect::register_show(reg);
     wall::register_show(reg);
-    joints::register_show(reg);
+    hook::register_show(reg);
 }
 
 pub struct Assets {

@@ -81,9 +81,13 @@ impl<'a> System<'a> for FrictionForceSys {
     );
 
     fn run(&mut self, (active, dynamic, friction, mut velocity, mut force): Self::SystemData) {
-        for (_, _, _, velocity, force) in
+        for (active, _, _, velocity, force) in
             (&active, &dynamic, &friction, &mut velocity, &mut force).join()
         {
+            if !active.0 {
+                continue;
+            }
+
             let speed = norm(&velocity.0);
 
             if speed < MIN_SPEED {
@@ -107,9 +111,13 @@ impl<'a> System<'a> for JointForceSys {
     );
 
     fn run(&mut self, (active, dynamic, joints, positions, mut force): Self::SystemData) {
-        for (_, _, joints, position_a, force) in
+        for (is_active, _, joints, position_a, force) in
             (&active, &dynamic, &joints, &positions, &mut force).join()
         {
+            if !is_active.0 {
+                continue;
+            }
+
             for &(entity_b, ref joint) in &joints.0 {
                 if active.get(entity_b).is_none() {
                     // Both endpoints of the joint need to be active
@@ -149,9 +157,13 @@ impl<'a> System<'a> for ApplyForceSys {
     fn run(&mut self, (game_info, active, mass, dynamic, force, mut velocity): Self::SystemData) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (_, _, mass, force, velocity) in
+        for (active, _, mass, force, velocity) in
             (&active, &dynamic, &mass, &force, &mut velocity).join()
         {
+            if !active.0 {
+                continue;
+            }
+
             velocity.0 += force.0 / mass.0 * dt;
             //velocity.0 *= 0.9;
         }
@@ -186,11 +198,20 @@ impl<'a> System<'a> for PredictSys {
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (entity, _, _, position) in (&*entities, &active, &dynamic, &position).join() {
+        for (entity, active, _, position) in (&*entities, &active, &dynamic, &position).join() {
+            if !active.0 {
+                continue;
+            }
+
             old_position.insert(entity, OldPosition(position.0));
         }
 
-        for (velocity, _, _, position) in (&mut velocity, &active, &dynamic, &mut position).join() {
+        for (velocity, active, _, position) in
+            (&mut velocity, &active, &dynamic, &mut position).join() {
+            if !active.0 {
+                continue;
+            }
+
             // TODO: Only mutate position when velocity is non-zero
             position.0 += velocity.0 * dt;
         }
@@ -241,8 +262,8 @@ impl<'a> System<'a> for ApplySys {
                 let dynamic_b = dynamic.get(entity_b).is_some();
 
                 // Only active objects should be involved in the collision pipeline
-                assert!(active.get(entity_a).is_some());
-                assert!(active.get(entity_b).is_some());
+                assert!(active.get(entity_a).unwrap().0 == true);
+                assert!(active.get(entity_b).unwrap().0 == true);
 
                 /*debug!(
                     "contact {} {} with depth {}",
@@ -286,14 +307,23 @@ impl<'a> System<'a> for ApplySys {
             }
         }
 
-        for (_, _, position, old_position) in
+        for (active, _, position, old_position) in
             (&active, &dynamic, &mut position, &old_position).join() {
+            if !active.0 {
+                continue;
+            }
+
             // TODO: Only mutate position when position has changed
             position.0 = old_position.0;
         }
 
-        for (_, _, velocity, position) in (&active, &dynamic, &mut velocity, &mut position).join()
+        for (active, _, velocity, position) in
+            (&active, &dynamic, &mut velocity, &mut position).join()
         {
+            if !active.0 {
+                continue;
+            }
+
             // TODO: Only mutate position when velocity is non-zero
             position.0 += velocity.0 * dt;
         }
