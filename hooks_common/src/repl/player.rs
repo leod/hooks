@@ -14,13 +14,21 @@ pub fn register(reg: &mut Registry) {
 
     reg.event::<JoinedEvent>();
     reg.event::<LeftEvent>();
+
     reg.event_handler_pre_tick(handle_event_pre_tick);
 }
 
+/// Information about a player that is known by the server and clients.
 #[derive(Clone, Debug)]
 pub struct Player {
     pub info: PlayerInfo,
+
+    /// Current controlled entity. Maintained by `repl::entity`.
     pub entity: Option<specs::Entity>,
+
+    /// Index of the next entity that will be created for this player. This is used by the server
+    /// for all players, and might get used by clients for prediction of the creation of owned
+    /// entities.
     pub next_entity_index: EntityIndex,
 }
 
@@ -132,6 +140,16 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
                     })
                     .collect::<Vec<_>>()
             };
+
+            // Possible issue here: we remove the entities in a deferred way, so that systems can
+            // do something when an entity is removed --- most importantly, removing it from the
+            // `CollisionWorld`. But here, we remove the player immediately. Thus, everything after
+            // the removal here and before the next call to `entity::perform_removals` needs to be
+            // careful not to assume that the player information is still there!
+            //
+            // Right now, we immediately call `entity::perform_removals` after running the pre tick
+            // event handlers (in `game::state::run_pre_tick`), so we should be safe unless other
+            // pre tick event handlers do something stupid.
 
             for &id in &owned_entities {
                 entity::deferred_remove(world, id);
