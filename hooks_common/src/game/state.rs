@@ -40,6 +40,9 @@ impl State {
         }
     }
 
+    /// Execute the deferred removal of entities tagged with `Remove`. Right now, we try to call
+    /// this function after every step of the tick, with the hope of avoiding any interaction with
+    /// removed entities in subsequent steps.
     fn perform_removals(&mut self) {
         // Here, systems have a chance to react to entities that will be removed, tagged with the
         // `Remove` component ...
@@ -58,6 +61,8 @@ impl State {
             }
         }
 
+        self.perform_removals();
+
         for f in &self.pre_tick_fns {
             f(&mut self.world)?;
         }
@@ -69,6 +74,9 @@ impl State {
 
     fn run_tick(&mut self) -> Result<(), repl::Error> {
         self.tick_dispatcher.dispatch_seq(&self.world.res);
+
+        self.perform_removals();
+
         Ok(())
     }
 
