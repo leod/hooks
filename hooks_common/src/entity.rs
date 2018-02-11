@@ -10,7 +10,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(ClassIds(BTreeMap::new()));
 
     reg.component::<Meta>();
-    reg.component::<Status>();
+    reg.component::<Active>();
     reg.component::<Remove>();
 }
 
@@ -31,22 +31,10 @@ pub struct Meta {
     pub class_id: EntityClassId,
 }
 
-/// Status of an entity.
+/// Is this entity active in the game?
 #[derive(Component, Debug, Clone, PartialEq)]
-#[component(VecStorage)]
-pub struct Status {
-    pub active: bool,
-}
-
-impl Status {
-    pub fn active() -> Status {
-        Status { active: true }
-    }
-
-    pub fn inactive() -> Status {
-        Status { active: false }
-    }
-}
+#[component(NullStorage)]
+pub struct Active;
 
 /// Entities tagged with this component shall be removed at the end of the tick.
 #[derive(Component, Debug)]
@@ -106,10 +94,7 @@ where
     let ctors = world.read_resource::<Ctors>().0[&class_id].clone();
 
     // Build entity
-    let builder = world
-        .create_entity()
-        .with(Meta { class_id })
-        .with(Status::active());
+    let builder = world.create_entity().with(Meta { class_id }).with(Active);
 
     let builder = ctors.iter().fold(builder, |builder, ctor| ctor(builder));
 

@@ -87,7 +87,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         .with(Dynamic)
         .with(Joints(Vec::new()))
         .with(collision::Shape(ShapeHandle::new(shape)))
-        .with(collision::CreateObject { groups, query_type })
+        .with(collision::Object { groups, query_type })
         .with(Player)
 }
 
@@ -110,7 +110,7 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
         .with(Friction)
         .with(Joints(Vec::new()))
         .with(collision::Shape(ShapeHandle::new(shape)))
-        .with(collision::CreateObject { groups, query_type })
+        .with(collision::Object { groups, query_type })
 }
 
 fn hook_segment_wall_interaction(
