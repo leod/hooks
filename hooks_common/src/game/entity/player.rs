@@ -51,12 +51,17 @@ pub fn register(reg: &mut Registry) {
 #[component(BTreeStorage)]
 pub struct Player;
 
+#[derive(PartialEq, Clone, BitStore)]
+pub enum HookState {
+    Inactive,
+    Shooting { time_secs: f32 },
+}
+
 #[derive(Component, PartialEq, Clone, BitStore)]
 #[component(BTreeStorage)]
 pub struct Hook {
     pub first_segment_index: EntityIndex,
-    pub is_active: bool,
-    pub shoot_time_secs: Option<f32>,
+    pub state: HookState,
 }
 
 #[derive(Component, PartialEq, Clone, BitStore)]
@@ -155,9 +160,8 @@ pub fn shoot(world: &World, entity: Entity) {
     let pos = data.position.get(entity).unwrap().0;
     let hook = data.hook.get_mut(entity).unwrap();
 
-    if !hook.is_active {
-        hook.is_active = true;
-        hook.shoot_time_secs = Some(0.0);
+    if hook.state == HookState::Inactive {
+        hook.state = HookState::Shooting { time_secs: 0.0 };
 
         let first_segment_id = (entity_id.0, hook.first_segment_index);
 
@@ -224,8 +228,7 @@ pub mod auth {
         let (player_index, _) = repl::entity::auth::create(world, owner, "player", |builder| {
             let hook = Hook {
                 first_segment_index,
-                is_active: false,
-                shoot_time_secs: None,
+                state: HookState::Inactive,
             };
 
             builder.with(Position(pos)).with(hook)
@@ -282,16 +285,18 @@ pub mod auth {
             for (hook_entity, &repl::Id((owner, _index)), hook) in
                 (&*entities, &repl_id, &mut hook).join()
             {
-                //hook.is_active = true;
+                hook.state = match hook.state {
+                    HookState::Inactive => HookState::Inactive,
+                    HookState::Shooting { time_secs } => {
+                        let new_time_secs = time_secs + dt;
 
-                if hook.is_active {
-                    *hook.shoot_time_secs.as_mut().unwrap() += dt;
-
-                    if hook.shoot_time_secs.unwrap() >= HOOK_MAX_SHOOT_TIME_SECS {
-                        hook.is_active = false;
-                        hook.shoot_time_secs = None;
+                        if new_time_secs >= HOOK_MAX_SHOOT_TIME_SECS {
+                            HookState::Inactive
+                        } else {
+                            HookState::Shooting { time_secs: new_time_secs }
+                        }
                     }
-                }
+                };
 
                 let first_segment_id = (owner, hook.first_segment_index);
 
@@ -300,7 +305,7 @@ pub mod auth {
                     hook_segment_entities(&entity_map, &segment, first_segment_id).unwrap();
 
                 for &segment in &segments {
-                    if hook.is_active {
+                    if hook.state != HookState::Inactive {
                         active.insert(segment, entity::Active);
                     } else {
                         active.remove(segment);
