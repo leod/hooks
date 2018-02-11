@@ -4,6 +4,7 @@ use specs::{Join, ReadStorage, SystemData, World};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
+use hooks_common::entity::Active;
 use hooks_common::physics::{Joints, Position};
 
 use {Assets, Registry};
@@ -13,13 +14,21 @@ pub fn register_show(reg: &mut Registry) {
     reg.draw_fn(draw);
 }
 
-type DrawData<'a> = (ReadStorage<'a, Position>, ReadStorage<'a, Joints>);
+type DrawData<'a> = (
+    ReadStorage<'a, Active>,
+    ReadStorage<'a, Position>,
+    ReadStorage<'a, Joints>,
+);
 
 fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
-    let (position, joints) = DrawData::fetch(&world.res, 0);
+    let (active, position, joints) = DrawData::fetch(&world.res, 0);
 
-    for (position_a, joints) in (&position, &joints).join() {
+    for (_, position_a, joints) in (&active, &position, &joints).join() {
         for &(entity_b, _) in &joints.0 {
+            if active.get(entity_b).is_none() {
+                continue;
+            }
+
             let position_b = position.get(entity_b).unwrap();
 
             let center = (position_a.0.coords + position_b.0.coords) / 2.0;

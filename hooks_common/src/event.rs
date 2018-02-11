@@ -165,6 +165,10 @@ impl Sink {
         mem::replace(&mut self.events, Vec::new())
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
     pub fn iter(&self) -> &[Box<Event>] {
         &self.events
     }

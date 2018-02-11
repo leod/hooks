@@ -127,27 +127,35 @@ impl Game {
         while let Some(event) = host.service()? {
             match event {
                 host::Event::PlayerJoined(player_id, name) => {
+                    assert!(!self.players.contains_key(&player_id));
+
                     let player_info = PlayerInfo::new(name.clone());
 
+                    // At the start of the next tick, all players will receive an event that a new
+                    // player has joined. This induces the repl player management on server and
+                    // clients --- including the newly connected client.
                     self.queued_events.push(player::JoinedEvent {
                         id: player_id,
                         info: player_info,
                     });
 
-                    assert!(!self.players.contains_key(&player_id));
-
                     let mut player = Player::new(self.next_tick, self.state.event_reg.clone());
+
+                    // Send additional `JoinedEvent`s only for the new player, in the first tick
+                    // that it receives
                     self.send_player_list(&mut player);
 
                     self.players.insert(player_id, player);
                 }
                 host::Event::PlayerLeft(player_id, reason) => {
+                    assert!(self.players.contains_key(&player_id));
+
+                    // Inform game state on server and clients of player leaving
                     self.queued_events.push(player::LeftEvent {
                         id: player_id,
                         reason,
                     });
 
-                    assert!(self.players.contains_key(&player_id));
                     self.players.remove(&player_id);
                 }
                 host::Event::ClientGameMsg(player_id, msg) => {
@@ -242,6 +250,8 @@ impl Game {
                                 None => started_tick_num,
                             });
 
+                            // TODO: Ignore player input that is too old
+
                             player
                                 .queued_inputs
                                 .insert(started_tick_num, player_input.clone());
@@ -257,6 +267,7 @@ impl Game {
             //debug!("Starting tick {}", self.next_tick);
 
             // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
+            assert!(self.state.world.read_resource::<event::Sink>().is_empty());
             self.state.push_events(self.queued_events.clear());
 
             // For now, just run everyone's queued inputs. This will need to be refined!

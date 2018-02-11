@@ -5,6 +5,7 @@ use ggez;
 use ggez::graphics::{self, Drawable};
 
 use hooks_common;
+use hooks_common::entity::Active;
 use hooks_common::physics::{Orientation, Position};
 use hooks_common::physics::sim::Collided;
 
@@ -27,6 +28,7 @@ pub struct Draw {
 
 type DrawData<'a> = (
     Entities<'a>,
+    ReadStorage<'a, Active>,
     ReadStorage<'a, Position>,
     ReadStorage<'a, Orientation>,
     ReadStorage<'a, Draw>,
@@ -34,9 +36,10 @@ type DrawData<'a> = (
 );
 
 fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
-    let (entities, position, orientation, draw, collided) = DrawData::fetch(&world.res, 0);
+    let (entities, active, position, orientation, draw, collided) = DrawData::fetch(&world.res, 0);
 
-    for (entity, position, orientation, draw) in (&*entities, &position, &orientation, &draw).join()
+    for (entity, _, position, orientation, draw) in
+        (&*entities, &active, &position, &orientation, &draw).join()
     {
         let coords = position.0.coords;
         let scaling = Matrix4::from_diagonal(&Vector4::new(draw.width, draw.height, 1.0, 1.0));
