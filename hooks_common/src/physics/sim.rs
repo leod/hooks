@@ -119,7 +119,7 @@ impl<'a> System<'a> for JointForceSys {
             }
 
             for &(entity_b, ref joint) in &joints.0 {
-                if active.get(entity_b).is_none() {
+                if !active.get(entity_b).unwrap().0 {
                     // Both endpoints of the joint need to be active
                     continue;
                 }
@@ -134,7 +134,7 @@ impl<'a> System<'a> for JointForceSys {
                 let distance = norm(&delta);
                 let t = distance - joint.resting_length;
 
-                if t >= JOINT_MIN_DISTANCE {
+                if t.abs() >= JOINT_MIN_DISTANCE {
                     force.0 += joint.stiffness * t * delta / distance;
                 }
             }
