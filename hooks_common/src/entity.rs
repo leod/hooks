@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use specs::{Entity, EntityBuilder, World};
+use specs::{Entity, EntityBuilder, World, Join};
 
 use defs::EntityClassId;
 use registry::Registry;
@@ -10,6 +10,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(ClassIds(BTreeMap::new()));
 
     reg.component::<Meta>();
+    reg.component::<Remove>();
 }
 
 // TODO: Probably want to use Box<FnSomething>
@@ -20,7 +21,7 @@ struct Ctors(BTreeMap<EntityClassId, Vec<Ctor>>);
 
 /// Maps from entity class names to their unique id. This map should be exactly the same on server
 /// and clients and not change during a game.
-struct ClassIds(BTreeMap<String, EntityClassId>);
+pub struct ClassIds(pub BTreeMap<String, EntityClassId>);
 
 /// Meta-information about entities.
 #[derive(Component, Debug, Clone, PartialEq, BitStore)]
@@ -28,6 +29,11 @@ struct ClassIds(BTreeMap<String, EntityClassId>);
 pub struct Meta {
     pub class_id: EntityClassId,
 }
+
+/// Entities tagged with this component shall be removed at the end of the tick.
+#[derive(Component, Debug)]
+#[component(NullStorage)]
+pub struct Remove;
 
 pub fn is_class_id_valid(world: &World, class_id: EntityClassId) -> bool {
     world.read_resource::<Ctors>().0.contains_key(&class_id)
@@ -86,6 +92,21 @@ where
     builder.build()
 }
 
-pub fn remove(world: &mut World, entity: Entity) {
-    world.delete_entity(entity).unwrap();
+pub fn deferred_remove(world: &World, entity: Entity) {
+    world.write::<Remove>().insert(entity, Remove);
+}
+
+pub fn perform_removals(world: &mut World) {
+    {
+        let entities = world.entities();
+        let mut remove = world.write::<Remove>();
+
+        for (entity, _) in (&*entities, &remove).join() {
+            entities.delete(entity).unwrap();
+        }
+
+        remove.clear();
+    }
+
+    world.maintain();
 }
