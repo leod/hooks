@@ -65,7 +65,7 @@ pub fn run(world: &World, entity_a: Entity, entity_b: Entity, pos: Point2<f32>) 
     };
     let id_pair = OrderedPair::new(id_a, id_b);
 
-    debug!("{:?} with {:?}", id_a, id_b);
+    //debug!("{:?} with {:?}", id_a, id_b);
 
     let handlers = world.read_resource::<Handlers>().0.get(&id_pair).cloned();
 
