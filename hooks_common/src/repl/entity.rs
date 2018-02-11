@@ -179,6 +179,26 @@ pub mod auth {
 
         // Index source for entities not owned by a player
         reg.resource(IndexSource { next: 1 });
+
+        reg.removal_system(RemovalSys, "repl::auth::entity");
+    }
+
+    /// Send out an `RemoveOrder` when replicated entities are removed on the server.
+    struct RemovalSys;
+
+    impl<'a> System<'a> for RemovalSys {
+        type SystemData = (
+            FetchMut<'a, event::Sink>,
+            ReadStorage<'a, repl::Id>,
+            ReadStorage<'a, entity::Remove>,
+        );
+
+        #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
+        fn run(&mut self, (mut events, repl_id, remove): Self::SystemData) {
+            for (repl_id, _) in (&repl_id, &remove).join() {
+                events.push(RemoveOrder(repl_id.0));
+            }
+        }
     }
 
     struct IndexSource {
