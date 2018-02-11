@@ -35,6 +35,8 @@ pub mod view {
 }
 
 snapshot! {
+    use entity::Active;
+
     use physics::Position;
     use physics::Orientation;
 
@@ -43,6 +45,8 @@ snapshot! {
     use game::entity::player::HookSegment;
 
     mod snapshot {
+        active: Active,
+
         position: Position,
         orientation: Orientation,
 
