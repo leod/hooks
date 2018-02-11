@@ -2,7 +2,7 @@ use nalgebra::{zero, Point2, Vector2};
 use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, Join, ReadStorage, System,
             SystemData, World, WriteStorage};
 
-use defs::{EntityId, EntityIndex, GameInfo, PlayerId};
+use defs::{EntityId, EntityIndex, GameInfo, PlayerId, PlayerInput};
 use registry::Registry;
 use entity;
 use physics::{interaction, Dynamic, Friction, Joint, Joints, Mass, Orientation, Position, Velocity};
@@ -47,24 +47,29 @@ pub fn register(reg: &mut Registry) {
     reg.tick_system(auth::HookSys, "hook", &[]);
 }
 
-#[derive(Component, PartialEq, Clone, BitStore)]
+/// Component that is attached whenever player input should be executed for an entity.
+#[derive(Component, Clone, Debug)]
+pub struct CurrentInput(pub PlayerInput);
+
+#[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[component(BTreeStorage)]
 pub struct Player;
 
-#[derive(PartialEq, Clone, BitStore)]
+#[derive(PartialEq, Clone, Debug, BitStore)]
 pub enum HookState {
     Inactive,
     Shooting { time_secs: f32 },
+    //Contracting,
 }
 
-#[derive(Component, PartialEq, Clone, BitStore)]
+#[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[component(BTreeStorage)]
 pub struct Hook {
     pub first_segment_index: EntityIndex,
     pub state: HookState,
 }
 
-#[derive(Component, PartialEq, Clone, BitStore)]
+#[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[component(BTreeStorage)]
 pub struct HookSegment {
     pub player_index: EntityIndex,
