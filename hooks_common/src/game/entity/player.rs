@@ -1,8 +1,8 @@
 use nalgebra::{zero, Point2, Vector2};
 use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, Join, ReadStorage, System,
-            World, WriteStorage};
+            SystemData, World, WriteStorage};
 
-use defs::{EntityId, EntityIndex, PlayerId};
+use defs::{EntityId, EntityIndex, GameInfo, PlayerId};
 use registry::Registry;
 use entity;
 use physics::{interaction, Dynamic, Friction, Joint, Joints, Mass, Orientation, Position, Velocity};
@@ -42,6 +42,7 @@ pub fn register(reg: &mut Registry) {
 
     // TODO: Check about when to best run hook system. Since it manages hook segment joints, would
     //       it be better if it runs before the physics simulation?
+    //       Hook simulation should *not* run in every tick, but only if player input is given!
     // TODO: Should not register anything `auth` here.
     reg.tick_system(auth::HookSys, "hook", &[]);
 }
@@ -53,8 +54,9 @@ pub struct Player;
 #[derive(Component, PartialEq, Clone, BitStore)]
 #[component(BTreeStorage)]
 pub struct Hook {
-    pub is_active: bool,
     pub first_segment_index: EntityIndex,
+    pub is_active: bool,
+    pub shoot_time_secs: Option<f32>,
 }
 
 #[derive(Component, PartialEq, Clone, BitStore)]
@@ -65,11 +67,12 @@ pub struct HookSegment {
     pub fixed: Option<(f32, f32)>,
 }
 
-const NUM_HOOK_SEGMENTS: usize = 10;
-
+const HOOK_NUM_SEGMENTS: usize = 10;
+const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
+const HOOK_SHOOT_SPEED: f32 = 2000.0;
 const HOOK_JOINT: Joint = Joint {
     stiffness: 200.0,
-    resting_length: 10.0,
+    resting_length: 1.0,
 };
 
 fn build_player(builder: EntityBuilder) -> EntityBuilder {
@@ -128,6 +131,54 @@ fn hook_segment_wall_interaction(
     }
 }
 
+pub fn shoot(world: &World, entity: Entity) {
+    #[derive(SystemData)]
+    struct Data<'a> {
+        game_info: Fetch<'a, GameInfo>,
+        entity_map: Fetch<'a, EntityMap>,
+
+        repl_id: ReadStorage<'a, repl::Id>,
+        orientation: ReadStorage<'a, Orientation>,
+        segments: ReadStorage<'a, HookSegment>,
+
+        position: WriteStorage<'a, Position>,
+        velocity: WriteStorage<'a, Velocity>,
+        hook: WriteStorage<'a, Hook>,
+    }
+
+    let mut data = Data::fetch(&world.res, 0);
+
+    let _dt = data.game_info.tick_duration_secs() as f32;
+
+    let entity_id = data.repl_id.get(entity).unwrap().0;
+    let angle = data.orientation.get(entity).unwrap().0;
+    let pos = data.position.get(entity).unwrap().0;
+    let hook = data.hook.get_mut(entity).unwrap();
+
+    if !hook.is_active {
+        hook.is_active = true;
+        hook.shoot_time_secs = Some(0.0);
+
+        let first_segment_id = (entity_id.0, hook.first_segment_index);
+
+        // TODO: repl unwrap
+        let segments =
+            hook_segment_entities(&data.entity_map, &data.segments, first_segment_id).unwrap();
+
+        for &segment in &segments {
+            data.position.insert(segment, Position(pos));
+            data.velocity.insert(segment, Velocity(zero()));
+        }
+
+        let xvel = Vector2::x_axis().unwrap() * angle.cos();
+        let yvel = Vector2::y_axis().unwrap() * angle.sin();
+        let vel = (xvel + yvel) * HOOK_SHOOT_SPEED;
+
+        data.velocity
+            .insert(*segments.last().unwrap(), Velocity(vel));
+    }
+}
+
 /// Given the entity id of the first segment of a hook, returns a vector of the entities of all
 /// segments belonging to this hook.
 pub fn hook_segment_entities(
@@ -172,18 +223,19 @@ pub mod auth {
 
         let (player_index, _) = repl::entity::auth::create(world, owner, "player", |builder| {
             let hook = Hook {
-                is_active: false,
                 first_segment_index,
+                is_active: false,
+                shoot_time_secs: None,
             };
 
             builder.with(Position(pos)).with(hook)
         });
 
-        for i in 0..NUM_HOOK_SEGMENTS {
+        for i in 0..HOOK_NUM_SEGMENTS {
             repl::entity::auth::create(world, owner, "hook_segment", |builder| {
                 let hook_segment = HookSegment {
                     player_index,
-                    is_last: i == NUM_HOOK_SEGMENTS - 1,
+                    is_last: i == HOOK_NUM_SEGMENTS - 1,
                     fixed: None,
                 };
 
@@ -196,6 +248,7 @@ pub mod auth {
 
     impl<'a> System<'a> for HookSys {
         type SystemData = (
+            Fetch<'a, GameInfo>,
             Fetch<'a, EntityMap>,
             Entities<'a>,
             ReadStorage<'a, repl::Id>,
@@ -209,6 +262,7 @@ pub mod auth {
         fn run(
             &mut self,
             (
+                game_info,
                 entity_map,
                 entities,
                 repl_id,
@@ -218,6 +272,8 @@ pub mod auth {
                 mut active,
             ): Self::SystemData,
         ) {
+            let dt = game_info.tick_duration_secs() as f32;
+
             // Reset all joints of hook segments
             for (_, joints) in (&segment, &mut joints).join() {
                 joints.0.clear();
@@ -226,7 +282,16 @@ pub mod auth {
             for (hook_entity, &repl::Id((owner, _index)), hook) in
                 (&*entities, &repl_id, &mut hook).join()
             {
-                hook.is_active = false;
+                //hook.is_active = true;
+
+                if hook.is_active {
+                    *hook.shoot_time_secs.as_mut().unwrap() += dt;
+
+                    if hook.shoot_time_secs.unwrap() >= HOOK_MAX_SHOOT_TIME_SECS {
+                        hook.is_active = false;
+                        hook.shoot_time_secs = None;
+                    }
+                }
 
                 let first_segment_id = (owner, hook.first_segment_index);
 

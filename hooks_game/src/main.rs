@@ -14,7 +14,7 @@ use std::{env, path, thread};
 
 use nalgebra::{Point2, Vector2};
 
-use ggez::event::{self, Keycode};
+use ggez::event::{self, Keycode, MouseButton};
 use ggez::graphics::Font;
 
 use hooks_util::debug::{self, Inspect};
@@ -112,6 +112,18 @@ impl MainState {
                 let shift = clip - size / 2.0;
 
                 self.next_player_input.rot_angle = shift.y.atan2(shift.x)
+            }
+            event::Event::MouseButtonDown {
+                mouse_btn: MouseButton::Left,
+                ..
+            } => {
+                self.next_player_input.shoot_one = true;
+            }
+            event::Event::MouseButtonUp {
+                mouse_btn: MouseButton::Left,
+                ..
+            } => {
+                self.next_player_input.shoot_one = false;
             }
             event::Event::KeyDown {
                 keycode: Some(keycode),
