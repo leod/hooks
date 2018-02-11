@@ -17,7 +17,6 @@ pub struct Registry {
     pub world: World,
     pub event_reg: event::Registry,
 
-    // TODO: Check if the following are maybe needed only on the server
     pub pre_tick_event_handlers: Vec<EventHandler>,
     pub pre_tick_fns: Vec<TickFn>,
     pub tick_systems: DispatcherBuilder<'static, 'static>,

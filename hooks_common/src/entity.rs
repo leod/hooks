@@ -10,6 +10,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(ClassIds(BTreeMap::new()));
 
     reg.component::<Meta>();
+    reg.component::<Status>();
     reg.component::<Remove>();
 }
 
@@ -30,6 +31,23 @@ pub struct Meta {
     pub class_id: EntityClassId,
 }
 
+/// Status of an entity.
+#[derive(Component, Debug, Clone, PartialEq)]
+#[component(VecStorage)]
+pub struct Status {
+    pub active: bool,
+}
+
+impl Status {
+    pub fn active() -> Status {
+        Status { active: true }
+    }
+
+    pub fn inactive() -> Status {
+        Status { active: false }
+    }
+}
+
 /// Entities tagged with this component shall be removed at the end of the tick.
 #[derive(Component, Debug)]
 #[component(NullStorage)]
@@ -43,6 +61,7 @@ pub fn get_class_id(world: &World, name: &str) -> Option<EntityClassId> {
     world.read_resource::<ClassIds>().0.get(name).cloned()
 }
 
+/// Register a new entity class with a base constructor to add components that are always present.
 pub fn register_class(reg: &mut Registry, name: &str, ctor: Ctor) -> EntityClassId {
     let world = reg.world();
 
@@ -62,6 +81,8 @@ pub fn register_class(reg: &mut Registry, name: &str, ctor: Ctor) -> EntityClass
     class_id
 }
 
+/// Add a constructor to an existing entity class. This can be used by clients, for example, to add
+/// rendering-specific components to entities.
 pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
     let world = reg.world();
 
@@ -75,6 +96,9 @@ pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
     ctor_vec.push(ctor);
 }
 
+/// Create a new entity of the given entity class, using the constructors associated with the
+/// class. Note that entities created with this function are not replicated automatically.
+/// Replicated entities should be created with `repl::entity::create`.
 pub fn create<F>(world: &mut World, class_id: EntityClassId, ctor: F) -> Entity
 where
     F: FnOnce(EntityBuilder) -> EntityBuilder,
@@ -82,7 +106,10 @@ where
     let ctors = world.read_resource::<Ctors>().0[&class_id].clone();
 
     // Build entity
-    let builder = world.create_entity().with(Meta { class_id });
+    let builder = world
+        .create_entity()
+        .with(Meta { class_id })
+        .with(Status::active());
 
     let builder = ctors.iter().fold(builder, |builder, ctor| ctor(builder));
 
@@ -92,10 +119,14 @@ where
     builder.build()
 }
 
+/// Register that an entity should be removed. The entity is tagged with a `Remove` component,
+/// giving systems a chance to know about the removal. The entities are removed with the next call
+/// to `perform_removals`.
 pub fn deferred_remove(world: &World, entity: Entity) {
     world.write::<Remove>().insert(entity, Remove);
 }
 
+/// Remove entities tagged with `Remove` from the world.
 pub fn perform_removals(world: &mut World) {
     {
         let entities = world.entities();

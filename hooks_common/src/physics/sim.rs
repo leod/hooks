@@ -42,8 +42,10 @@ pub fn run(world: &World) {
     profile!("physics");
 
     ClearSys.run_now(&world.res);
-    collision::MaintainSys.run_now(&world.res);
-    // TODO: Remove entities from `ncollide`
+
+    // Update CollisionWorld
+    collision::CreateObjectSys.run_now(&world.res);
+    collision::RemoveObjectSys.run_now(&world.res);
 
     FrictionForceSys.run_now(&world.res);
     JointForceSys.run_now(&world.res);

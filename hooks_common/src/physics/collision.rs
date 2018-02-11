@@ -101,10 +101,10 @@ impl<'a> System<'a> for UpdateSys {
     }
 }
 
-/// System for creating collision objects for entities tagged with CreateObject.
-pub struct MaintainSys;
+/// System for creating collision objects for entities tagged with `CreateObject`.
+pub struct CreateObjectSys;
 
-impl<'a> System<'a> for MaintainSys {
+impl<'a> System<'a> for CreateObjectSys {
     type SystemData = (
         FetchMut<'a, CollisionWorld>,
         Entities<'a>,
@@ -158,35 +158,21 @@ impl<'a> System<'a> for MaintainSys {
     }
 }
 
-/// System for removing collision objects for entities tagged with RemoveObject.
-struct RemovalSys;
+/// System for removing collision objects for entities tagged with `RemoveObject`.
+pub struct RemoveObjectSys;
 
-impl<'a> System<'a> for RemovalSys {
+impl<'a> System<'a> for RemoveObjectSys {
     type SystemData = (
         Entities<'a>,
         FetchMut<'a, CollisionWorld>,
-        ReadStorage<'a, entity::Remove>,
+        WriteStorage<'a, RemoveObject>,
         WriteStorage<'a, ObjectHandle>,
     );
 
     fn run(
         &mut self,
-        (entities, mut collision_world, remove, mut object_handle): Self::SystemData,
+        (entities, mut collision_world, mut remove_object, mut object_handle): Self::SystemData,
     ) {
-        // Remove collision objects of entities that are about to be deleted
-        let removed_entities = (&*entities, &remove, &mut object_handle)
-            .join()
-            .map(|(entity, _, object_handle)| {
-                collision_world.remove(&[object_handle.0]);
-                entity
-            })
-            .collect::<Vec<_>>();
-
-        for entity in removed_entities {
-            object_handle.remove(entity);
-        }
-
-        /*// Remove collision objects of entities tagged with our `RemoveObject` component
         let removed_entities = (&*entities, &mut remove_object, &mut object_handle)
             .join()
             .map(|(entity, _, object_handle)| {
@@ -202,6 +188,35 @@ impl<'a> System<'a> for RemovalSys {
 
         for (entity, _) in (&*entities, &remove_object).join() {
             panic!("Entity {:?} has RemoveObject but no ObjectHandle", entity);
-        }*/
+        }
+    }
+}
+
+/// System for removing collision objects for entities tagged with `entity::Remove`.
+struct RemovalSys;
+
+impl<'a> System<'a> for RemovalSys {
+    type SystemData = (
+        Entities<'a>,
+        FetchMut<'a, CollisionWorld>,
+        ReadStorage<'a, entity::Remove>,
+        WriteStorage<'a, ObjectHandle>,
+    );
+
+    fn run(
+        &mut self,
+        (entities, mut collision_world, remove, mut object_handle): Self::SystemData,
+    ) {
+        let removed_entities = (&*entities, &remove, &mut object_handle)
+            .join()
+            .map(|(entity, _, object_handle)| {
+                collision_world.remove(&[object_handle.0]);
+                entity
+            })
+            .collect::<Vec<_>>();
+
+        for entity in removed_entities {
+            object_handle.remove(entity);
+        }
     }
 }
