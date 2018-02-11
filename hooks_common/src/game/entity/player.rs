@@ -4,6 +4,7 @@ use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, Join, ReadStor
 
 use defs::{EntityId, EntityIndex, PlayerId};
 use registry::Registry;
+use entity;
 use physics::{interaction, Dynamic, Friction, Joint, Joints, Mass, Orientation, Position, Velocity};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use repl::{self, player, EntityMap};
@@ -127,16 +128,16 @@ fn hook_segment_wall_interaction(
     }
 }
 
-/// Given the entity id of the first segment of a hook, returns a vector of the entity indices of
-/// all segments belonging to this hook.
-pub fn hook_segment_indices(
+/// Given the entity id of the first segment of a hook, returns a vector of the entities of all
+/// segments belonging to this hook.
+pub fn hook_segment_entities(
     entity_map: &EntityMap,
     segments: &ReadStorage<HookSegment>,
     first_segment_id: EntityId,
-) -> Result<Vec<EntityIndex>, repl::Error> {
+) -> Result<Vec<Entity>, repl::Error> {
     let (first_segment_owner, first_segment_index) = first_segment_id;
 
-    let mut indices = Vec::new();
+    let mut entities = Vec::new();
     let mut cur_index = first_segment_index;
 
     loop {
@@ -144,7 +145,7 @@ pub fn hook_segment_indices(
         let cur_entity = entity_map.try_id_to_entity(cur_id)?;
 
         if let Some(segment) = segments.get(cur_entity) {
-            indices.push(cur_index);
+            entities.push(cur_entity);
 
             if !segment.is_last {
                 cur_index += 1;
@@ -159,7 +160,7 @@ pub fn hook_segment_indices(
         }
     }
 
-    Ok(indices)
+    Ok(entities)
 }
 
 pub mod auth {
@@ -198,33 +199,51 @@ pub mod auth {
             Fetch<'a, EntityMap>,
             Entities<'a>,
             ReadStorage<'a, repl::Id>,
-            ReadStorage<'a, Hook>,
             ReadStorage<'a, HookSegment>,
+            WriteStorage<'a, Hook>,
             WriteStorage<'a, Joints>,
+            WriteStorage<'a, entity::Active>,
         );
 
+        #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
         fn run(
             &mut self,
-            (entity_map, entities, repl_id, hook, segment, mut joints): Self::SystemData,
+            (
+                entity_map,
+                entities,
+                repl_id,
+                segment,
+                mut hook,
+                mut joints,
+                mut active,
+            ): Self::SystemData,
         ) {
             // Reset all joints of hook segments
             for (_, joints) in (&segment, &mut joints).join() {
                 joints.0.clear();
             }
 
-            // Add joints of hook segments
             for (hook_entity, &repl::Id((owner, _index)), hook) in
-                (&*entities, &repl_id, &hook).join()
+                (&*entities, &repl_id, &mut hook).join()
             {
-                let segment_id = (owner, hook.first_segment_index);
+                hook.is_active = false;
 
-                // TODO: Grr... repl unwrap. I think I understand monads now.
-                let indices = hook_segment_indices(&entity_map, &segment, segment_id).unwrap();
+                let first_segment_id = (owner, hook.first_segment_index);
+
+                // TODO: Grr... repl unwrap. I think I understand monads now?
+                let segments =
+                    hook_segment_entities(&entity_map, &segment, first_segment_id).unwrap();
+
+                for &segment in &segments {
+                    if hook.is_active {
+                        active.insert(segment, entity::Active);
+                    } else {
+                        active.remove(segment);
+                    }
+                }
 
                 // Join player with first hook segment
-                if let Some(&first_index) = indices.get(0) {
-                    let first_entity = entity_map.try_id_to_entity((owner, first_index)).unwrap();
-
+                if let Some(&first_segment) = segments.get(0) {
                     /*{
                         let entity_joints = joints.get_mut(hook_entity).unwrap();
                         entity_joints.0.clear(); // TODO: Where to clear joints?
@@ -232,27 +251,24 @@ pub mod auth {
                     }*/
 
                     joints
-                        .get_mut(first_entity)
+                        .get_mut(first_segment)
                         .unwrap()
                         .0
                         .push((hook_entity, HOOK_JOINT.clone()));
                 }
 
                 // Join successive hook segments
-                for (&a_index, &b_index) in indices.iter().zip(indices.iter().skip(1)) {
-                    let a_entity = entity_map.try_id_to_entity((owner, a_index)).unwrap();
-                    let b_entity = entity_map.try_id_to_entity((owner, b_index)).unwrap();
-
+                for (&entity_a, &entity_b) in segments.iter().zip(segments.iter().skip(1)) {
                     joints
-                        .get_mut(a_entity)
+                        .get_mut(entity_a)
                         .unwrap()
                         .0
-                        .push((b_entity, HOOK_JOINT.clone()));
+                        .push((entity_b, HOOK_JOINT.clone()));
                     joints
-                        .get_mut(b_entity)
+                        .get_mut(entity_b)
                         .unwrap()
                         .0
-                        .push((a_entity, HOOK_JOINT.clone()));
+                        .push((entity_a, HOOK_JOINT.clone()));
                 }
             }
         }

@@ -31,7 +31,7 @@ impl Event for RemoveOrder {
 
 /// Register a new entity class. This should only be called in register functions that are used by
 /// both the server and the clients. Server and clients can attach their specific entity
-/// constructors locally via `add_ctor`.
+/// constructors locally via `entity::add_ctor`.
 ///
 /// Note that this function must only be called after this module's register function.
 pub fn register_class<T: ComponentType>(

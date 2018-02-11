@@ -6,6 +6,7 @@ use specs::{self, Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, 
 use hooks_util::profile;
 
 use defs::GameInfo;
+use entity::Active;
 use physics::{collision, interaction, Dynamic, Friction, Joints, Mass, Position, Velocity};
 use physics::collision::CollisionWorld;
 use registry::Registry;
@@ -72,14 +73,17 @@ struct FrictionForceSys;
 
 impl<'a> System<'a> for FrictionForceSys {
     type SystemData = (
+        ReadStorage<'a, Active>,
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Friction>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Force>,
     );
 
-    fn run(&mut self, (dynamic, friction, mut velocity, mut force): Self::SystemData) {
-        for (_, _, velocity, force) in (&dynamic, &friction, &mut velocity, &mut force).join() {
+    fn run(&mut self, (active, dynamic, friction, mut velocity, mut force): Self::SystemData) {
+        for (_, _, _, velocity, force) in
+            (&active, &dynamic, &friction, &mut velocity, &mut force).join()
+        {
             let speed = norm(&velocity.0);
 
             if speed < MIN_SPEED {
@@ -95,16 +99,26 @@ struct JointForceSys;
 
 impl<'a> System<'a> for JointForceSys {
     type SystemData = (
+        ReadStorage<'a, Active>,
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Joints>,
         ReadStorage<'a, Position>,
         WriteStorage<'a, Force>,
     );
 
-    fn run(&mut self, (dynamic, joints, positions, mut force): Self::SystemData) {
-        for (_, joints, position_a, force) in (&dynamic, &joints, &positions, &mut force).join() {
+    fn run(&mut self, (active, dynamic, joints, positions, mut force): Self::SystemData) {
+        for (_, _, joints, position_a, force) in
+            (&active, &dynamic, &joints, &positions, &mut force).join()
+        {
             for &(entity_b, ref joint) in &joints.0 {
+                if active.get(entity_b).is_none() {
+                    // Both endpoints of the joint need to be active
+                    continue;
+                }
+
                 // TODO: Should we lazily remove joints whose endpoint entity no longer exists?
+                //       => Probably better to do it in a `RemovalSys`. We don't need this
+                //          currently as all joints are created in "immediate mode".
 
                 let position_b = positions.get(entity_b).unwrap();
 
@@ -125,16 +139,19 @@ struct ApplyForceSys;
 impl<'a> System<'a> for ApplyForceSys {
     type SystemData = (
         Fetch<'a, GameInfo>,
+        ReadStorage<'a, Active>,
         ReadStorage<'a, Mass>,
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Force>,
         WriteStorage<'a, Velocity>,
     );
 
-    fn run(&mut self, (game_info, mass, dynamic, force, mut velocity): Self::SystemData) {
+    fn run(&mut self, (game_info, active, mass, dynamic, force, mut velocity): Self::SystemData) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (_, mass, force, velocity) in (&dynamic, &mass, &force, &mut velocity).join() {
+        for (_, _, mass, force, velocity) in
+            (&active, &dynamic, &mass, &force, &mut velocity).join()
+        {
             velocity.0 += force.0 / mass.0 * dt;
             //velocity.0 *= 0.9;
         }
@@ -147,6 +164,7 @@ impl<'a> System<'a> for PredictSys {
     type SystemData = (
         Fetch<'a, GameInfo>,
         Entities<'a>,
+        ReadStorage<'a, Active>,
         ReadStorage<'a, Dynamic>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Position>,
@@ -159,6 +177,7 @@ impl<'a> System<'a> for PredictSys {
         (
             game_info,
             entities,
+            active,
             dynamic,
             mut velocity,
             mut position,
@@ -167,11 +186,11 @@ impl<'a> System<'a> for PredictSys {
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (entity, position, _dynamic) in (&*entities, &position, &dynamic).join() {
+        for (entity, _, _, position) in (&*entities, &active, &dynamic, &position).join() {
             old_position.insert(entity, OldPosition(position.0));
         }
 
-        for (velocity, position, _dynamic) in (&mut velocity, &mut position, &dynamic).join() {
+        for (velocity, _, _, position) in (&mut velocity, &active, &dynamic, &mut position).join() {
             // TODO: Only mutate position when velocity is non-zero
             position.0 += velocity.0 * dt;
         }
@@ -185,6 +204,7 @@ impl<'a> System<'a> for ApplySys {
         Fetch<'a, GameInfo>,
         Fetch<'a, CollisionWorld>,
         FetchMut<'a, Interactions>,
+        ReadStorage<'a, Active>,
         ReadStorage<'a, Dynamic>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Position>,
@@ -199,6 +219,7 @@ impl<'a> System<'a> for ApplySys {
             game_info,
             collision_world,
             mut interactions,
+            active,
             dynamic,
             mut velocity,
             mut position,
@@ -218,6 +239,10 @@ impl<'a> System<'a> for ApplySys {
 
                 let dynamic_a = dynamic.get(entity_a).is_some();
                 let dynamic_b = dynamic.get(entity_b).is_some();
+
+                // Only active objects should be involved in the collision pipeline
+                assert!(active.get(entity_a).is_some());
+                assert!(active.get(entity_b).is_some());
 
                 /*debug!(
                     "contact {} {} with depth {}",
@@ -261,13 +286,13 @@ impl<'a> System<'a> for ApplySys {
             }
         }
 
-        for (position, old_position, _dynamic) in (&mut position, &old_position, &dynamic).join() {
+        for (_, _, position, old_position) in
+            (&active, &dynamic, &mut position, &old_position).join() {
             // TODO: Only mutate position when position has changed
             position.0 = old_position.0;
         }
 
-        for (velocity, position, _dynamic) in
-            (&mut velocity, &mut position, &dynamic).join()
+        for (_, _, velocity, position) in (&active, &dynamic, &mut velocity, &mut position).join()
         {
             // TODO: Only mutate position when velocity is non-zero
             position.0 += velocity.0 * dt;
