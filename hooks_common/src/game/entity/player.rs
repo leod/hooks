@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use nalgebra::{zero, Point2, Rotation2, Vector2};
+use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
 use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, Join, MaskedStorage,
             NullStorage, ReadStorage, RunNow, Storage, System, World, WriteStorage};
 
@@ -73,6 +73,7 @@ pub struct Hook {
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[component(BTreeStorage)]
 pub struct HookSegment {
+    // TODO: `player_index` and `is_last`  could be inferred in theory, but it wouldn't look pretty
     pub player_index: EntityIndex,
     pub is_last: bool,
     pub fixed: Option<(f32, f32)>,
@@ -93,10 +94,10 @@ const MOVE_SPEED: f32 = 100.0;
 
 const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const HOOK_SHOOT_SPEED: f32 = 2000.0;
+const HOOK_SHOOT_SPEED: f32 = 200.0;
 const HOOK_JOINT: Joint = Joint {
     stiffness: 200.0,
-    resting_length: 1.0,
+    resting_length: 30.0,
 };
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
@@ -144,7 +145,27 @@ where
         }
     }
 
+    assert!(entities.len() == HOOK_NUM_SEGMENTS);
+
     Ok(entities)
+}
+
+pub fn active_hook_segment_entities<D1, D2>(
+    entity_map: &EntityMap,
+    active: &Storage<Active, D1>,
+    segments: &Storage<HookSegment, D2>,
+    first_segment_id: EntityId,
+) -> Result<Vec<Entity>, repl::Error>
+where
+    D1: Deref<Target = MaskedStorage<Active>>,
+    D2: Deref<Target = MaskedStorage<HookSegment>>,
+{
+    let entities = hook_segment_entities(entity_map, segments, first_segment_id)?;
+
+    Ok(entities
+        .into_iter()
+        .filter(|&entity| active.get(entity).unwrap().0)
+        .collect())
 }
 
 pub mod auth {
@@ -321,47 +342,78 @@ impl<'a> System<'a> for InputSys {
                 if hook.state == HookState::Inactive {
                     hook.state = HookState::Shooting { time_secs: 0.0 };
 
-                    for &segment in &segments {
-                        let segment_velocity = if data.segment.get(segment).unwrap().is_last {
-                            let xvel = Vector2::x_axis().unwrap() * orientation.0.cos();
-                            let yvel = Vector2::y_axis().unwrap() * orientation.0.sin();
-                            (xvel + yvel) * HOOK_SHOOT_SPEED
-                        } else {
-                            zero()
-                        };
+                    let last_segment = *segments.last().unwrap();
 
-                        data.activate_segment.insert(
-                            segment,
-                            ActivateHookSegment {
-                                position: position.0,
-                                velocity: segment_velocity + velocity.0,
-                            },
-                        );
-                    }
+                    let xvel = Vector2::x_axis().unwrap() * orientation.0.cos();
+                    let yvel = Vector2::y_axis().unwrap() * orientation.0.sin();
+                    let segment_velocity = (xvel + yvel) * HOOK_SHOOT_SPEED;
+
+                    data.activate_segment.insert(
+                        last_segment,
+                        ActivateHookSegment {
+                            position: position.0,
+                            velocity: segment_velocity + velocity.0,
+                        },
+                    );
                 }
             }
 
-            hook.state = match hook.state {
-                HookState::Inactive => HookState::Inactive,
+            /*
+             * Update hook state.
+             */
+            match hook.state.clone() {
+                HookState::Inactive => {}
                 HookState::Shooting { time_secs } => {
-                    let new_time_secs = time_secs + dt;
-
+                    let new_time_secs = time_secs; //+ dt;
                     if new_time_secs >= HOOK_MAX_SHOOT_TIME_SECS {
                         for &segment in &segments {
                             data.deactivate_segment
                                 .insert(segment, DeactivateHookSegment);
                         }
 
-                        HookState::Inactive
+                        hook.state = HookState::Inactive;
                     } else {
-                        HookState::Shooting {
+                        hook.state = HookState::Shooting {
                             time_secs: new_time_secs,
+                        };
+
+                        let active_segments = active_hook_segment_entities(
+                            &data.entity_map,
+                            &data.active,
+                            &data.segment,
+                            first_segment_id,
+                        ).unwrap();
+
+                        if let Some(&first_segment) = active_segments.first() {
+                            let first_position = data.position.get(first_segment).unwrap().0.coords;
+                            let distance = norm(&(first_position - position.0.coords));
+
+                            if distance >= HOOK_JOINT.resting_length {
+                                if active_segments.len() < segments.len() {
+                                    let next_segment =
+                                        segments[segments.len() - (active_segments.len() + 1)];
+
+                                    let xvel = Vector2::x_axis().unwrap() * orientation.0.cos();
+                                    let yvel = Vector2::y_axis().unwrap() * orientation.0.sin();
+                                    let segment_velocity = (xvel + yvel) * HOOK_SHOOT_SPEED;
+
+                                    data.activate_segment.insert(
+                                        next_segment,
+                                        ActivateHookSegment {
+                                            position: position.0,
+                                            velocity: segment_velocity + velocity.0,
+                                        },
+                                    );
+                                }
+                            }
                         }
                     }
                 }
             };
 
-            // Join player with first hook segment
+            /*
+             * Join player with first hook segment.
+             */
             if let Some(&first_segment) = segments.get(0) {
                 /*{
                     let entity_joints = joints.get_mut(hook_entity).unwrap();
@@ -376,7 +428,9 @@ impl<'a> System<'a> for InputSys {
                     .push((entity, HOOK_JOINT.clone()));
             }
 
-            // Join successive hook segments
+            /*
+             * Join successive hook segments.
+             */
             for (&entity_a, &entity_b) in segments.iter().zip(segments.iter().skip(1)) {
                 data.joints
                     .get_mut(entity_a)
