@@ -80,7 +80,9 @@ impl<'a> System<'a> for UpdateSys {
                 }*/
 
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
+                debug!("{:?} {:?}", object_handle.0, isometry);
                 collision_world.set_position(object_handle.0, isometry);
+                debug!("done");
             }
         }
 
