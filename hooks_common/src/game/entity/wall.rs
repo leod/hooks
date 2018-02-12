@@ -24,7 +24,7 @@ pub fn create(world: &mut World, pos: Point2<f32>, size: Vector2<f32>, angle: f3
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_WALL]);
-    groups.set_whitelist(&[collision::GROUP_PLAYER]);
+    groups.set_whitelist(&[collision::GROUP_PLAYER, collision::GROUP_PLAYER_ENTITY]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 

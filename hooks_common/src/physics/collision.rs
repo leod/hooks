@@ -27,6 +27,7 @@ pub type CollisionWorld = CollisionWorld2<f32, Entity>;
 // Collision groups. Put them here for now.
 pub const GROUP_WALL: usize = 0;
 pub const GROUP_PLAYER: usize = 1;
+pub const GROUP_PLAYER_ENTITY: usize = 2;
 
 /// Collision shape.
 /// For now, we assume that an object's shape will not change in its lifetime.
@@ -80,9 +81,7 @@ impl<'a> System<'a> for UpdateSys {
                 }*/
 
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
-                debug!("{:?} {:?}", object_handle.0, isometry);
                 collision_world.set_position(object_handle.0, isometry);
-                debug!("done");
             }
         }
 

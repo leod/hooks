@@ -1,7 +1,8 @@
+use std::ops::Deref;
 use std::collections::BTreeMap;
 
 use nalgebra::Point2;
-use specs::{Entity, World};
+use specs::{Entity, Fetch, MaskedStorage, Storage, World};
 
 use hooks_util::ordered_pair::OrderedPair;
 
@@ -16,19 +17,38 @@ pub fn register(reg: &mut Registry) {
 
 type Handler = fn(&World, Entity, Entity, Point2<f32>);
 
+/// An action that should be taken when two entities overlap in a physics prediction step.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum Action {
+    /// Prevent these entities from overlapping.
+    PreventOverlap,
+}
+
+#[derive(Clone)]
+struct Def {
+    action: Option<Action>,
+    handler: Option<Handler>,
+}
+
 /// In a module's `register` function, it can happen that another entity class that it wants to
 /// interact with has not been registered yet. Thus, we store class names while registering, and
 /// only resolve to ids later in `setup`.
-struct HandlersSetup(Vec<(String, String, Handler)>);
+struct HandlersSetup(Vec<(String, String, Def)>);
 
-struct Handlers(BTreeMap<OrderedPair<EntityClassId>, Vec<(EntityClassId, EntityClassId, Handler)>>);
+pub struct Handlers(BTreeMap<OrderedPair<EntityClassId>, (EntityClassId, EntityClassId, Def)>);
 
-pub fn add(reg: &mut Registry, entity_class_a: &str, entity_class_b: &str, handler: Handler) {
+pub fn set(
+    reg: &mut Registry,
+    entity_class_a: &str,
+    entity_class_b: &str,
+    action: Option<Action>,
+    handler: Option<Handler>,
+) {
     let mut setup = reg.world().write_resource::<HandlersSetup>();
     setup.0.push((
         entity_class_a.to_string(),
         entity_class_b.to_string(),
-        handler,
+        Def { action, handler },
     ));
 }
 
@@ -38,16 +58,44 @@ fn setup(world: &World) {
     let mut setup = world.write_resource::<HandlersSetup>();
     let mut handlers = world.write_resource::<Handlers>();
 
-    for &(ref entity_class_a, ref entity_class_b, handler) in &setup.0 {
-        let id_a = entity::get_class_id(world, entity_class_a).unwrap();
-        let id_b = entity::get_class_id(world, entity_class_b).unwrap();
+    for (entity_class_a, entity_class_b, def) in setup.0.drain(..) {
+        let id_a = entity::get_class_id(world, &entity_class_a).unwrap();
+        let id_b = entity::get_class_id(world, &entity_class_b).unwrap();
         let id_pair = OrderedPair::new(id_a, id_b);
 
-        let list = handlers.0.entry(id_pair).or_insert(Vec::new());
-        list.push((id_a, id_b, handler));
-    }
+        assert!(
+            !handlers.0.contains_key(&id_pair),
+            format!(
+                "interaction between {} and {} was set twice",
+                entity_class_a, entity_class_b
+            )
+        );
 
-    setup.0.clear();
+        handlers.0.insert(id_pair, (id_a, id_b, def));
+    }
+}
+
+pub fn get_action<D>(
+    handlers: &Fetch<Handlers>,
+    meta: &Storage<entity::Meta, D>,
+    entity_a: Entity,
+    entity_b: Entity,
+) -> Option<Action>
+where
+    D: Deref<Target = MaskedStorage<entity::Meta>>,
+{
+    // TODO: In a bit of an extreme edge case, we might have an interaction here, but not have
+    //       called `setup` yet.
+
+    let id_a = meta.get(entity_a).unwrap().class_id;
+    let id_b = meta.get(entity_b).unwrap().class_id;
+    let id_pair = OrderedPair::new(id_a, id_b);
+
+    handlers
+        .0
+        .get(&id_pair)
+        .map(|&(_, _, ref def)| def.action.clone())
+        .and_then(|x| x)
 }
 
 pub fn run(world: &World, entity_a: Entity, entity_b: Entity, pos: Point2<f32>) {
@@ -65,14 +113,12 @@ pub fn run(world: &World, entity_a: Entity, entity_b: Entity, pos: Point2<f32>) 
     };
     let id_pair = OrderedPair::new(id_a, id_b);
 
-    //debug!("{:?} with {:?}", id_a, id_b);
+    let def = world.read_resource::<Handlers>().0.get(&id_pair).cloned();
 
-    let handlers = world.read_resource::<Handlers>().0.get(&id_pair).cloned();
+    if let Some((handler_id_a, handler_id_b, def)) = def {
+        assert!(id_pair == OrderedPair::new(handler_id_a, handler_id_b));
 
-    if let Some(handlers) = handlers {
-        for &(handler_id_a, handler_id_b, handler) in &handlers {
-            assert!(id_pair == OrderedPair::new(handler_id_a, handler_id_b));
-
+        if let Some(handler) = def.handler {
             // Make sure to pass the entities in the order in which the handler expects them
             if id_a == handler_id_a {
                 handler(world, entity_a, entity_b, pos);

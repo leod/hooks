@@ -6,7 +6,7 @@ use specs::{self, Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, 
 use hooks_util::profile;
 
 use defs::GameInfo;
-use entity::Active;
+use entity::{self, Active};
 use physics::{collision, interaction, Dynamic, Friction, Joints, Mass, Position, Velocity};
 use physics::collision::CollisionWorld;
 use registry::Registry;
@@ -20,9 +20,8 @@ pub fn register(reg: &mut Registry) {
     reg.resource(Interactions(Vec::new()));
 }
 
-const JOINT_MIN_DISTANCE: f32 = 0.01;
+const JOINT_MIN_DISTANCE: f32 = 0.001;
 const MIN_SPEED: f32 = 0.01;
-const FRICTION: f32 = 0.8;
 
 /// Tag component for debugging visually
 #[derive(Component)]
@@ -81,7 +80,7 @@ impl<'a> System<'a> for FrictionForceSys {
     );
 
     fn run(&mut self, (active, dynamic, friction, mut velocity, mut force): Self::SystemData) {
-        for (active, _, _, velocity, force) in
+        for (active, _, friction, velocity, force) in
             (&active, &dynamic, &friction, &mut velocity, &mut force).join()
         {
             if !active.0 {
@@ -93,7 +92,7 @@ impl<'a> System<'a> for FrictionForceSys {
             if speed < MIN_SPEED {
                 velocity.0 = zero();
             } else {
-                force.0 -= velocity.0 * FRICTION;
+                force.0 -= velocity.0 * friction.0;
             }
         }
     }
@@ -134,12 +133,20 @@ impl<'a> System<'a> for JointForceSys {
                 let distance = norm(&delta);
                 let r = distance - joint.resting_length;
 
-                if distance <= 0.0001 && joint.resting_length > 0.0 {
-                    // TODO: Joint if distance is close to zero
-                    force.0 += joint.stiffness * r * Vector2::new(1.0, 0.0);
+                let sym = true;
+
+                if sym {
+                    if distance < JOINT_MIN_DISTANCE && joint.resting_length > 0.0 {
+                        // TODO: Joint force if distance is close to zero
+                        force.0 += joint.stiffness * r * Vector2::new(1.0, 0.0);
+                    } else if distance >= JOINT_MIN_DISTANCE {
+                        //if t.abs() >= JOINT_MIN_DISTANCE {
+                        force.0 += joint.stiffness * r * delta / distance;
+                    }
                 } else {
-                    //if t.abs() >= JOINT_MIN_DISTANCE {
-                    force.0 += joint.stiffness * r * delta / distance;
+                    if r > JOINT_MIN_DISTANCE {
+                        force.0 += joint.stiffness * r * delta / distance;
+                    }
                 }
             }
         }
@@ -228,7 +235,9 @@ impl<'a> System<'a> for ApplySys {
     type SystemData = (
         Fetch<'a, GameInfo>,
         Fetch<'a, CollisionWorld>,
+        Fetch<'a, interaction::Handlers>,
         FetchMut<'a, Interactions>,
+        ReadStorage<'a, entity::Meta>,
         ReadStorage<'a, Active>,
         ReadStorage<'a, Dynamic>,
         WriteStorage<'a, Velocity>,
@@ -243,7 +252,9 @@ impl<'a> System<'a> for ApplySys {
         (
             game_info,
             collision_world,
+            interaction_handlers,
             mut interactions,
+            meta,
             active,
             dynamic,
             mut velocity,
@@ -282,23 +293,34 @@ impl<'a> System<'a> for ApplySys {
                     //debug!("-> {:?}", v.0);
                 }
 
-                if dynamic_a && !dynamic_b {
-                    //velocity.get_mut(a).unwrap().0 -= contact.normal * contact.depth / dt;
-                    resolve(
-                        dt,
-                        &contact.normal,
-                        contact.depth,
-                        velocity.get_mut(entity_a).unwrap(),
-                    );
-                } else if !dynamic_a && dynamic_b {
-                    resolve(
-                        dt,
-                        &contact.normal,
-                        contact.depth,
-                        velocity.get_mut(entity_b).unwrap(),
-                    );
-                } else {
-                    unimplemented!();
+                let action = interaction::get_action(
+                    &interaction_handlers,
+                    &meta,
+                    entity_a,
+                    entity_b
+                );
+
+                if action == Some(interaction::Action::PreventOverlap) {
+                    if dynamic_a && !dynamic_b {
+                        //velocity.get_mut(a).unwrap().0 -= contact.normal * contact.depth / dt;
+                        resolve(
+                            dt,
+                            &contact.normal,
+                            contact.depth,
+                            velocity.get_mut(entity_a).unwrap(),
+                        );
+                    } else if !dynamic_a && dynamic_b {
+                        resolve(
+                            dt,
+                            &contact.normal,
+                            contact.depth,
+                            velocity.get_mut(entity_b).unwrap(),
+                        );
+                    } else if dynamic_a && dynamic_b {
+                        unimplemented!();
+                    } else {
+                        // Static object with static object --- nothing we can do
+                    }
                 }
 
                 collided.insert(entity_a, Collided { other: entity_b });

@@ -31,7 +31,6 @@ pub fn register(reg: &mut Registry) {
         ],
         build_player,
     );
-
     repl::entity::register_class(
         reg,
         "hook_segment",
@@ -44,7 +43,27 @@ pub fn register(reg: &mut Registry) {
         build_hook_segment,
     );
 
-    interaction::add(reg, "hook_segment", "wall", hook_segment_wall_interaction);
+    interaction::set(
+        reg,
+        "player",
+        "wall",
+        Some(interaction::Action::PreventOverlap),
+        None,
+    );
+    interaction::set(
+        reg,
+        "hook_segment",
+        "wall",
+        Some(interaction::Action::PreventOverlap),
+        Some(hook_segment_wall_interaction),
+    );
+    interaction::set(
+        reg,
+        "hook_segment",
+        "player",
+        None,
+        Some(hook_segment_player_interaction),
+    );
 }
 
 /// Component that is attached whenever player input should be executed for an entity.
@@ -60,7 +79,7 @@ pub struct Player;
 pub enum HookState {
     Inactive,
     Shooting { time_secs: f32 },
-    //Contracting,
+    Contracting,
 }
 
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
@@ -73,7 +92,7 @@ pub struct Hook {
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[component(BTreeStorage)]
 pub struct HookSegment {
-    // TODO: `player_index` and `is_last`  could be inferred in theory, but it wouldn't look pretty
+    // TODO: `player_index` and `is_last` could be inferred in theory, but it wouldn't look pretty
     pub player_index: EntityIndex,
     pub is_last: bool,
     pub fixed: Option<(f32, f32)>,
@@ -90,14 +109,23 @@ struct ActivateHookSegment {
 #[component(NullStorage)]
 struct DeactivateHookSegment;
 
+const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
 const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const HOOK_SHOOT_SPEED: f32 = 200.0;
+const HOOK_SHOOT_SPEED: f32 = 300.0;
 const HOOK_JOINT: Joint = Joint {
-    stiffness: 200.0,
+    stiffness: 50.0,
     resting_length: 30.0,
+};
+const HOOK_JOINT_2: Joint = Joint {
+    stiffness: 100.0,
+    resting_length: 60.0,
+};
+const HOOK_JOINT_CONTRACT: Joint = Joint {
+    stiffness: 100.0,
+    resting_length: 0.0,
 };
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
@@ -206,7 +234,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER]);
-    groups.set_whitelist(&[collision::GROUP_WALL]);
+    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER_ENTITY]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
@@ -214,7 +242,9 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
     builder
         .with(Orientation(0.0))
         .with(Velocity(zero()))
+        .with(Mass(10.0))
         .with(Dynamic)
+        .with(Friction(15.0))
         .with(Joints(Vec::new()))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
@@ -226,8 +256,8 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
     let shape = Cuboid::new(Vector2::new(4.0, 4.0));
 
     let mut groups = CollisionGroups::new();
-    groups.set_membership(&[collision::GROUP_PLAYER]);
-    groups.set_whitelist(&[collision::GROUP_WALL]);
+    groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
+    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
@@ -237,7 +267,7 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
         .with(Velocity(zero()))
         .with(Mass(1.0))
         .with(Dynamic)
-        .with(Friction)
+        .with(Friction(1.0))
         .with(Joints(Vec::new()))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
@@ -252,8 +282,41 @@ fn hook_segment_wall_interaction(
     let mut segments = world.write::<HookSegment>();
     let segment = segments.get_mut(segment_entity).unwrap();
 
-    if segment.is_last {
+    if segment.is_last && segment.fixed.is_none() {
         segment.fixed = Some((pos.x, pos.y));
+    }
+}
+
+fn hook_segment_player_interaction(
+    world: &World,
+    segment_entity: Entity,
+    player_entity: Entity,
+    _pos: Point2<f32>,
+) {
+    debug!("yo");
+
+    let mut hooks = world.write::<Hook>();
+    let hook = hooks.get_mut(player_entity).unwrap();
+
+    if hook.state == HookState::Contracting {
+        // Eat up the first segment if it comes close enough to our mouth.
+
+        let &repl::Id((owner, _)) = world.read::<repl::Id>().get(player_entity).unwrap();
+        let first_segment_id = (owner, hook.first_segment_index);
+
+        let active_segments = active_hook_segment_entities(
+            &world.read_resource::<EntityMap>(),
+            &world.read::<Active>(),
+            &world.read::<HookSegment>(),
+            first_segment_id,
+        ).unwrap();
+
+        if active_segments.first().cloned() == Some(segment_entity) {
+            // Yummy!
+            let mut actives = world.write::<Active>();
+            let active = actives.get_mut(segment_entity).unwrap();
+            active.0 = false;
+        }
     }
 }
 
@@ -267,10 +330,13 @@ struct InputData<'a> {
     repl_id: ReadStorage<'a, repl::Id>,
 
     active: WriteStorage<'a, Active>,
+    dynamic: WriteStorage<'a, Dynamic>,
+
     position: WriteStorage<'a, Position>,
     velocity: WriteStorage<'a, Velocity>,
     orientation: WriteStorage<'a, Orientation>,
     joints: WriteStorage<'a, Joints>,
+
     hook: WriteStorage<'a, Hook>,
     segment: WriteStorage<'a, HookSegment>,
     activate_segment: WriteStorage<'a, ActivateHookSegment>,
@@ -291,20 +357,20 @@ impl<'a> System<'a> for InputSys {
         for (input, orientation, velocity) in
             (&data.input, &mut data.orientation, &mut data.velocity).join()
         {
-            // TODO: Only mutate if changed
-
             if input.0.rot_angle != orientation.0 {
+                // TODO: Only mutate if changed
                 orientation.0 = input.0.rot_angle;
             }
 
             let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
 
             if input.0.move_forward {
-                velocity.0 = forward * MOVE_SPEED;
+                velocity.0 += forward * MOVE_ACCEL * dt;
+            //velocity.0 = forward * MOVE_SPEED;
             } else if input.0.move_backward {
-                velocity.0 = -forward * MOVE_SPEED;
+                velocity.0 -= forward * MOVE_SPEED * dt;
             } else {
-                velocity.0 = Vector2::new(0.0, 0.0);
+                //velocity.0 = Vector2::new(0.0, 0.0);
             }
         }
 
@@ -322,8 +388,10 @@ impl<'a> System<'a> for InputSys {
         ).join()
         {
             /*
-             * Reset all joints of hook segments
+             * Reset all joints
              */
+            data.joints.get_mut(entity).unwrap().0.clear();
+
             for (segment_id, _, joints) in (&data.repl_id, &data.segment, &mut data.joints).join() {
                 if (segment_id.0).0 == (repl_id.0).0 {
                     joints.0.clear();
@@ -359,35 +427,36 @@ impl<'a> System<'a> for InputSys {
             }
 
             /*
-             * Update hook state.
+             * Update hook state
              */
+            let active_segments = active_hook_segment_entities(
+                &data.entity_map,
+                &data.active,
+                &data.segment,
+                first_segment_id,
+            ).unwrap();
+
             match hook.state.clone() {
                 HookState::Inactive => {}
                 HookState::Shooting { time_secs } => {
                     let new_time_secs = time_secs; //+ dt;
                     if new_time_secs >= HOOK_MAX_SHOOT_TIME_SECS {
-                        for &segment in &segments {
-                            data.deactivate_segment
-                                .insert(segment, DeactivateHookSegment);
-                        }
-
-                        hook.state = HookState::Inactive;
-                    } else {
+                    } else if !active_segments.is_empty() {
                         hook.state = HookState::Shooting {
                             time_secs: new_time_secs,
                         };
 
-                        let active_segments = active_hook_segment_entities(
-                            &data.entity_map,
-                            &data.active,
-                            &data.segment,
-                            first_segment_id,
-                        ).unwrap();
+                        let last_segment = *active_segments.last().unwrap();
+                        let is_last_fixed = data.segment.get(last_segment).unwrap().fixed.is_some();
 
-                        if let Some(&first_segment) = active_segments.first() {
+                        if !input.0.shoot_one || is_last_fixed {
+                            hook.state = HookState::Contracting;
+                        } else {
+                            let first_segment = *active_segments.first().unwrap();
                             let first_position = data.position.get(first_segment).unwrap().0.coords;
-                            let distance = norm(&(first_position - position.0.coords));
 
+                            // Activate new segment when the newest one is far enough from us
+                            let distance = norm(&(first_position - position.0.coords));
                             if distance >= HOOK_JOINT.resting_length {
                                 if active_segments.len() < segments.len() {
                                     let next_segment =
@@ -404,34 +473,70 @@ impl<'a> System<'a> for InputSys {
                                             velocity: segment_velocity + velocity.0,
                                         },
                                     );
+                                } else {
+                                    hook.state = HookState::Contracting;
                                 }
                             }
                         }
                     }
                 }
+                HookState::Contracting => {
+                    if active_segments.is_empty() {
+                        hook.state = HookState::Inactive;
+                    }
+                }
             };
 
             /*
-             * Join player with first hook segment.
+             * Join player with first hook segments
              */
-            if let Some(&first_segment) = segments.get(0) {
-                /*{
-                    let entity_joints = joints.get_mut(hook_entity).unwrap();
-                    entity_joints.0.clear(); // TODO: Where to clear joints?
-                    entity_joints.0.push((first_entity, HOOK_JOINT.clone()));
-                }*/
+            if let Some(&first_segment) = active_segments.get(0) {
+                let joint = match hook.state {
+                    HookState::Contracting => HOOK_JOINT_CONTRACT.clone(),
+                    _ => HOOK_JOINT.clone(),
+                };
+
+                let is_fixed = data.segment
+                    .get(*active_segments.last().unwrap())
+                    .unwrap()
+                    .fixed
+                    .is_some();
+
+                if hook.state != HookState::Contracting || is_fixed {
+                    let entity_joints = data.joints.get_mut(entity).unwrap();
+                    entity_joints.0.clear();
+                    entity_joints.0.push((first_segment, joint.clone()));
+                }
 
                 data.joints
                     .get_mut(first_segment)
                     .unwrap()
                     .0
-                    .push((entity, HOOK_JOINT.clone()));
+                    .push((entity, joint.clone()));
+
+                if hook.state != HookState::Contracting {
+                    // Join with second hook segment
+                    if let Some(&second_segment) = active_segments.get(1) {
+                        {
+                            let entity_joints = data.joints.get_mut(entity).unwrap();
+                            entity_joints.0.clear();
+                            entity_joints.0.push((second_segment, HOOK_JOINT_2.clone()));
+                        }
+
+                        data.joints
+                            .get_mut(second_segment)
+                            .unwrap()
+                            .0
+                            .push((entity, HOOK_JOINT_2.clone()));
+                    }
+                }
             }
 
             /*
-             * Join successive hook segments.
+             * Join successive hook segments
              */
-            for (&entity_a, &entity_b) in segments.iter().zip(segments.iter().skip(1)) {
+            let active_segment_pairs = active_segments.iter().zip(active_segments.iter().skip(1));
+            for (&entity_a, &entity_b) in active_segment_pairs {
                 data.joints
                     .get_mut(entity_a)
                     .unwrap()
@@ -442,6 +547,23 @@ impl<'a> System<'a> for InputSys {
                     .unwrap()
                     .0
                     .push((entity_a, HOOK_JOINT.clone()));
+            }
+
+            /*
+             * Join hook segments with a distance of two
+             */
+            let active_segment_pairs = active_segments.iter().zip(active_segments.iter().skip(2));
+            for (&entity_a, &entity_b) in active_segment_pairs {
+                data.joints
+                    .get_mut(entity_a)
+                    .unwrap()
+                    .0
+                    .push((entity_b, HOOK_JOINT_2.clone()));
+                data.joints
+                    .get_mut(entity_b)
+                    .unwrap()
+                    .0
+                    .push((entity_a, HOOK_JOINT_2.clone()));
             }
         }
 
@@ -463,6 +585,20 @@ impl<'a> System<'a> for InputSys {
         }
 
         data.activate_segment.clear();
+
+        /*
+         * Maintain dynamic flag: a fixed hook segment should not move in the physics simulation
+         */
+        for (entity, segment, position) in
+            (&*data.entities, &data.segment, &mut data.position).join()
+        {
+            if let Some((x, y)) = segment.fixed {
+                position.0 = Point2::new(x, y);
+                data.dynamic.remove(entity);
+            } else {
+                data.dynamic.insert(entity, Dynamic);
+            }
+        }
 
         /*
          * Deactivate hook segments
