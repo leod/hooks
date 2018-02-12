@@ -406,6 +406,13 @@ impl<'a> System<'a> for InputSys {
             /*
              * Throw the hook
              */
+            let active_segments = active_hook_segment_entities(
+                &data.entity_map,
+                &data.active,
+                &data.segment,
+                first_segment_id,
+            ).unwrap();
+
             if input.0.shoot_one {
                 if hook.state == HookState::Inactive {
                     hook.state = HookState::Shooting { time_secs: 0.0 };
@@ -424,18 +431,13 @@ impl<'a> System<'a> for InputSys {
                         },
                     );
                 }
+            } else if let Some(&last_segment) = active_segments.last() {
+                data.segment.get_mut(last_segment).unwrap().fixed = None;
             }
 
             /*
              * Update hook state
              */
-            let active_segments = active_hook_segment_entities(
-                &data.entity_map,
-                &data.active,
-                &data.segment,
-                first_segment_id,
-            ).unwrap();
-
             match hook.state.clone() {
                 HookState::Inactive => {}
                 HookState::Shooting { time_secs } => {
