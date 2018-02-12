@@ -51,7 +51,7 @@ pub struct Dynamic;
 /// Whether to apply friction to this entity.
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(NullStorage)]
-pub struct Friction;
+pub struct Friction(pub f32);
 
 /// Some kind of joint thingy.
 #[derive(PartialEq, Clone, Debug, BitStore)]
