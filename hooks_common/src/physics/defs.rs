@@ -10,6 +10,7 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Position>();
     reg.component::<Velocity>();
     reg.component::<Orientation>();
+    reg.component::<AngularVelocity>();
 
     reg.component::<Mass>();
     reg.component::<Dynamic>();
@@ -43,7 +44,12 @@ impl Component for Orientation {
     type Storage = FlaggedStorage<Self, VecStorage<Self>>;
 }
 
-/// Non-static entities
+/// Angular velocity.
+#[derive(Component, PartialEq, Clone, Debug, BitStore)]
+#[component(VecStorage)]
+pub struct AngularVelocity(pub f32);
+
+/// Non-static entities.
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(NullStorage)]
 pub struct Dynamic;
