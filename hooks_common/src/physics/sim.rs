@@ -110,6 +110,8 @@ impl<'a> System<'a> for JointForceSys {
     );
 
     fn run(&mut self, (active, dynamic, joints, positions, mut force): Self::SystemData) {
+        return;
+
         for (is_active, _, joints, position_a, force) in
             (&active, &dynamic, &joints, &positions, &mut force).join()
         {

@@ -103,6 +103,7 @@ pub struct HookSegment {
 struct ActivateHookSegment {
     position: Point2<f32>,
     velocity: Vector2<f32>,
+    orientation: f32,
 }
 
 #[derive(Component, PartialEq, Clone, Debug, Default)]
@@ -116,11 +117,11 @@ const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 300.0;
 const HOOK_JOINT: Joint = Joint {
-    stiffness: 50.0,
+    stiffness: 0.0,
     resting_length: 30.0,
 };
 const HOOK_JOINT_2: Joint = Joint {
-    stiffness: 100.0,
+    stiffness: 0.0,
     resting_length: 60.0,
 };
 const HOOK_JOINT_CONTRACT: Joint = Joint {
@@ -253,7 +254,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 
 fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
     // TODO
-    let shape = Cuboid::new(Vector2::new(4.0, 4.0));
+    let shape = Cuboid::new(Vector2::new(10.0, 2.0));
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
@@ -428,6 +429,7 @@ impl<'a> System<'a> for InputSys {
                         ActivateHookSegment {
                             position: position.0,
                             velocity: segment_velocity + velocity.0,
+                            orientation: orientation.0,
                         },
                     );
                 }
@@ -473,6 +475,7 @@ impl<'a> System<'a> for InputSys {
                                         ActivateHookSegment {
                                             position: position.0,
                                             velocity: segment_velocity + velocity.0,
+                                            orientation: orientation.0,
                                         },
                                     );
                                 } else {
@@ -572,17 +575,19 @@ impl<'a> System<'a> for InputSys {
         /*
          * Activate new hook segments
          */
-        for (activate, active, position, velocity, segment) in (
+        for (activate, active, position, velocity, orientation, segment) in (
             &data.activate_segment,
             &mut data.active,
             &mut data.position,
             &mut data.velocity,
+            &mut data.orientation,
             &mut data.segment,
         ).join()
         {
             active.0 = true;
             position.0 = activate.position;
             velocity.0 = activate.velocity;
+            orientation.0 = activate.orientation;
             segment.fixed = None;
         }
 
