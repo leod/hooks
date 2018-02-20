@@ -2,7 +2,7 @@
 
 use specs::Entity;
 
-use nalgebra::{dot, norm_squared, Point2, Rotation2, RowVector6, Vector2, Vector3, Vector6};
+use nalgebra::{dot, norm_squared, Point2, Rotation2, RowVector6, Vector2, Vector6};
 
 #[derive(Clone, Debug)]
 pub struct Position {
@@ -29,13 +29,13 @@ pub enum Kind {
 
 #[derive(Clone, Debug)]
 pub struct Def {
-    kind: Kind,
+    pub kind: Kind,
 
     /// Object-space coordinates.
-    p_object_a: Point2<f32>,
+    pub p_object_a: Point2<f32>,
 
     /// Object-space coordinates.
-    p_object_b: Point2<f32>,
+    pub p_object_b: Point2<f32>,
 }
 
 /// Which values can change in solving a constraint?
