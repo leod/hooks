@@ -7,7 +7,8 @@ use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, Join, MaskedSt
 use defs::{EntityId, EntityIndex, GameInfo, PlayerId, PlayerInput};
 use registry::Registry;
 use entity::Active;
-use physics::{interaction, Dynamic, Friction, Joint, Joints, Mass, Orientation, Position, Velocity};
+use physics::{interaction, Dynamic, Friction, InvAngularMass, InvMass, Joint, Joints, Orientation,
+              Position, Velocity};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use repl::{self, player, EntityMap};
 use game::ComponentType;
@@ -243,7 +244,8 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
     builder
         .with(Orientation(0.0))
         .with(Velocity(zero()))
-        .with(Mass(10.0))
+        .with(InvMass(1.0 / 10.0))
+        .with(InvAngularMass(1.0 / 10.0))
         .with(Dynamic)
         .with(Friction(15.0))
         .with(Joints(Vec::new()))
@@ -266,7 +268,8 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
     builder
         .with(Orientation(0.0))
         .with(Velocity(zero()))
-        .with(Mass(1.0))
+        .with(InvMass(1.0))
+        .with(InvAngularMass(1.0))
         .with(Dynamic)
         .with(Friction(1.0))
         .with(Joints(Vec::new()))
