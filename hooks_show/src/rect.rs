@@ -7,7 +7,6 @@ use ggez::graphics::{self, Drawable};
 use hooks_common;
 use hooks_common::entity::Active;
 use hooks_common::physics::{Orientation, Position};
-use hooks_common::physics::sim::Collided;
 
 use {Assets, Registry};
 
@@ -32,11 +31,10 @@ type DrawData<'a> = (
     ReadStorage<'a, Position>,
     ReadStorage<'a, Orientation>,
     ReadStorage<'a, Draw>,
-    ReadStorage<'a, Collided>,
 );
 
 fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
-    let (entities, active, position, orientation, draw, collided) = DrawData::fetch(&world.res, 0);
+    let (entities, active, position, orientation, draw) = DrawData::fetch(&world.res, 0);
 
     for (entity, active, position, orientation, draw) in
         (&*entities, &active, &position, &orientation, &draw).join()
@@ -57,16 +55,7 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
         graphics::push_transform(ctx, Some(curr_transform * matrix));
         graphics::apply_transformations(ctx)?;
 
-        let color = if collided.get(entity).is_some() {
-            graphics::Color {
-                r: 1.0,
-                g: 0.0,
-                b: 0.0,
-                a: 1.0,
-            }
-        } else {
-            graphics::WHITE
-        };
+        let color = graphics::WHITE;
         graphics::set_color(ctx, color)?;
 
         assets.rect_line.draw(ctx, Point2::origin(), 0.0)?;

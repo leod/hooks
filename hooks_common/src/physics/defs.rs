@@ -12,7 +12,8 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Orientation>();
     reg.component::<AngularVelocity>();
 
-    reg.component::<Mass>();
+    reg.component::<InvMass>();
+    reg.component::<InvAngularMass>();
     reg.component::<Dynamic>();
     reg.component::<Friction>();
     reg.component::<Joints>();
@@ -21,7 +22,12 @@ pub fn register(reg: &mut Registry) {
 /// Physical mass.
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(VecStorage)]
-pub struct Mass(pub f32);
+pub struct InvMass(pub f32);
+
+/// Angular inertia.
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(VecStorage)]
+pub struct InvAngularMass(pub f32);
 
 /// Two-dimensional velocity.
 #[derive(Component, PartialEq, Clone, Debug)]
