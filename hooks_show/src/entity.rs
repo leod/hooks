@@ -22,8 +22,8 @@ pub fn register(reg: &mut hooks_common::Registry) {
 
     entity::add_ctor(reg, "hook_segment", |builder| {
         builder.with(rect::Draw {
-            width: 10.0,
-            height: 2.0,
+            width: 15.0,
+            height: 3.0,
         })
     });
 }

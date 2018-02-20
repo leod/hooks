@@ -1,15 +1,18 @@
 use std::ops::Deref;
 
 use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
-use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, Join, MaskedStorage,
+use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, FetchMut, Join, MaskedStorage,
             NullStorage, ReadStorage, RunNow, Storage, System, World, WriteStorage};
 
 use defs::{EntityId, EntityIndex, GameInfo, PlayerId, PlayerInput};
 use registry::Registry;
 use entity::Active;
-use physics::{interaction, Dynamic, Friction, InvAngularMass, InvMass, Joint, Joints, Orientation,
-              Position, Velocity};
+use physics::interaction;
+use physics::constraint::{self, Constraint};
+use physics::{AngularVelocity, Dynamic, Friction, InvAngularMass, InvMass, Orientation, Position,
+              Velocity};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
+use physics::sim::Constraints;
 use repl::{self, player, EntityMap};
 use game::ComponentType;
 
@@ -117,18 +120,8 @@ const MOVE_SPEED: f32 = 100.0;
 const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 300.0;
-const HOOK_JOINT: Joint = Joint {
-    stiffness: 0.0,
-    resting_length: 30.0,
-};
-const HOOK_JOINT_2: Joint = Joint {
-    stiffness: 0.0,
-    resting_length: 60.0,
-};
-const HOOK_JOINT_CONTRACT: Joint = Joint {
-    stiffness: 100.0,
-    resting_length: 0.0,
-};
+const HOOK_SEGMENT_LENGTH: f32 = 15.0;
+const HOOK_SEGMENT_MARGIN: f32 = 1.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
     world
@@ -232,7 +225,7 @@ pub mod auth {
 }
 
 fn build_player(builder: EntityBuilder) -> EntityBuilder {
-    let shape = Cuboid::new(Vector2::new(10.0, 10.0));
+    let shape = Cuboid::new(Vector2::new(15.0, 15.0));
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER]);
@@ -244,11 +237,11 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
     builder
         .with(Orientation(0.0))
         .with(Velocity(zero()))
+        .with(AngularVelocity(0.0))
         .with(InvMass(1.0 / 10.0))
         .with(InvAngularMass(1.0 / 10.0))
         .with(Dynamic)
         .with(Friction(15.0))
-        .with(Joints(Vec::new()))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
         .with(Player)
@@ -256,7 +249,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 
 fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
     // TODO
-    let shape = Cuboid::new(Vector2::new(10.0, 2.0));
+    let shape = Cuboid::new(Vector2::new(HOOK_SEGMENT_LENGTH, 3.0));
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
@@ -268,11 +261,11 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
     builder
         .with(Orientation(0.0))
         .with(Velocity(zero()))
+        .with(AngularVelocity(0.0))
         .with(InvMass(1.0))
         .with(InvAngularMass(1.0))
         .with(Dynamic)
         .with(Friction(1.0))
-        .with(Joints(Vec::new()))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
 }
@@ -329,6 +322,7 @@ struct InputData<'a> {
     game_info: Fetch<'a, GameInfo>,
     entity_map: Fetch<'a, EntityMap>,
     entities: Entities<'a>,
+    constraints: FetchMut<'a, Constraints>,
 
     input: ReadStorage<'a, CurrentInput>,
     repl_id: ReadStorage<'a, repl::Id>,
@@ -339,7 +333,6 @@ struct InputData<'a> {
     position: WriteStorage<'a, Position>,
     velocity: WriteStorage<'a, Velocity>,
     orientation: WriteStorage<'a, Orientation>,
-    joints: WriteStorage<'a, Joints>,
 
     hook: WriteStorage<'a, Hook>,
     segment: WriteStorage<'a, HookSegment>,
@@ -355,9 +348,7 @@ impl<'a> System<'a> for InputSys {
     fn run(&mut self, mut data: InputData<'a>) {
         let dt = data.game_info.tick_duration_secs() as f32;
 
-        /*
-         * Movement
-         */
+        // Movement
         for (input, orientation, velocity) in
             (&data.input, &mut data.orientation, &mut data.velocity).join()
         {
@@ -378,9 +369,7 @@ impl<'a> System<'a> for InputSys {
             }
         }
 
-        /*
-         * Update hook
-         */
+        // Update hook
         for (entity, input, repl_id, orientation, position, velocity, hook) in (
             &*data.entities,
             &data.input,
@@ -391,25 +380,12 @@ impl<'a> System<'a> for InputSys {
             &mut data.hook,
         ).join()
         {
-            /*
-             * Reset all joints
-             */
-            data.joints.get_mut(entity).unwrap().0.clear();
-
-            for (segment_id, _, joints) in (&data.repl_id, &data.segment, &mut data.joints).join() {
-                if (segment_id.0).0 == (repl_id.0).0 {
-                    joints.0.clear();
-                }
-            }
-
             // TODO: repl unwrap
             let first_segment_id = ((repl_id.0).0, hook.first_segment_index);
             let segments =
                 hook_segment_entities(&data.entity_map, &data.segment, first_segment_id).unwrap();
 
-            /*
-             * Throw the hook
-             */
+            // Throw the hook
             let active_segments = active_hook_segment_entities(
                 &data.entity_map,
                 &data.active,
@@ -440,9 +416,7 @@ impl<'a> System<'a> for InputSys {
                 data.segment.get_mut(last_segment).unwrap().fixed = None;
             }
 
-            /*
-             * Update hook state
-             */
+            // Update hook state
             match hook.state.clone() {
                 HookState::Inactive => {}
                 HookState::Shooting { time_secs } => {
@@ -464,7 +438,7 @@ impl<'a> System<'a> for InputSys {
 
                             // Activate new segment when the newest one is far enough from us
                             let distance = norm(&(first_position - position.0.coords));
-                            if distance >= HOOK_JOINT.resting_length {
+                            if distance >= 100.0 {
                                 if active_segments.len() < segments.len() {
                                     let next_segment =
                                         segments[segments.len() - (active_segments.len() + 1)];
@@ -495,89 +469,47 @@ impl<'a> System<'a> for InputSys {
                 }
             };
 
-            /*
-             * Join player with first hook segments
-             */
-            if let Some(&first_segment) = active_segments.get(0) {
-                let joint = match hook.state {
-                    HookState::Contracting => HOOK_JOINT_CONTRACT.clone(),
-                    _ => HOOK_JOINT.clone(),
+            // Join player with first hook segments
+            /*if let Some(&first_segment) = active_segments.get(0) {
+                let constraint = Constraint {
+                    entity_a: entity,
+                    entity_b: first_segment,
+                    vars_a: constraint::Vars { p: true, angle: true },
+                    vars_b: constraint::Vars { p: true, angle: true },
+                    def: constraint::Def {
+                        kind: constraint::Kind::Joint,
+                        p_object_a: Point2::origin(),
+                        p_object_b: Point2::origin(),
+                    },
                 };
+                data.constraints.add(constraint);
+            }*/
 
-                let is_fixed = data.segment
-                    .get(*active_segments.last().unwrap())
-                    .unwrap()
-                    .fixed
-                    .is_some();
-
-                if hook.state != HookState::Contracting || is_fixed {
-                    let entity_joints = data.joints.get_mut(entity).unwrap();
-                    entity_joints.0.clear();
-                    entity_joints.0.push((first_segment, joint.clone()));
-                }
-
-                data.joints
-                    .get_mut(first_segment)
-                    .unwrap()
-                    .0
-                    .push((entity, joint.clone()));
-
-                if hook.state != HookState::Contracting {
-                    // Join with second hook segment
-                    if let Some(&second_segment) = active_segments.get(1) {
-                        {
-                            let entity_joints = data.joints.get_mut(entity).unwrap();
-                            entity_joints.0.clear();
-                            entity_joints.0.push((second_segment, HOOK_JOINT_2.clone()));
-                        }
-
-                        data.joints
-                            .get_mut(second_segment)
-                            .unwrap()
-                            .0
-                            .push((entity, HOOK_JOINT_2.clone()));
-                    }
-                }
-            }
-
-            /*
-             * Join successive hook segments
-             */
+            // Join successive hook segments
             let active_segment_pairs = active_segments.iter().zip(active_segments.iter().skip(1));
             for (&entity_a, &entity_b) in active_segment_pairs {
-                data.joints
-                    .get_mut(entity_a)
-                    .unwrap()
-                    .0
-                    .push((entity_b, HOOK_JOINT.clone()));
-                data.joints
-                    .get_mut(entity_b)
-                    .unwrap()
-                    .0
-                    .push((entity_a, HOOK_JOINT.clone()));
-            }
-
-            /*
-             * Join hook segments with a distance of two
-             */
-            let active_segment_pairs = active_segments.iter().zip(active_segments.iter().skip(2));
-            for (&entity_a, &entity_b) in active_segment_pairs {
-                data.joints
-                    .get_mut(entity_a)
-                    .unwrap()
-                    .0
-                    .push((entity_b, HOOK_JOINT_2.clone()));
-                data.joints
-                    .get_mut(entity_b)
-                    .unwrap()
-                    .0
-                    .push((entity_a, HOOK_JOINT_2.clone()));
+                let constraint = Constraint {
+                    entity_a,
+                    entity_b,
+                    vars_a: constraint::Vars {
+                        p: true,
+                        angle: true,
+                    },
+                    vars_b: constraint::Vars {
+                        p: true,
+                        angle: true,
+                    },
+                    def: constraint::Def {
+                        kind: constraint::Kind::Joint,
+                        p_object_a: Point2::new(HOOK_SEGMENT_LENGTH + HOOK_SEGMENT_MARGIN, 0.0),
+                        p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH + HOOK_SEGMENT_MARGIN, 0.0),
+                    },
+                };
+                data.constraints.add(constraint);
             }
         }
 
-        /*
-         * Activate new hook segments
-         */
+        // Activate new hook segments
         for (activate, active, position, velocity, orientation, segment) in (
             &data.activate_segment,
             &mut data.active,
@@ -596,9 +528,8 @@ impl<'a> System<'a> for InputSys {
 
         data.activate_segment.clear();
 
-        /*
-         * Maintain dynamic flag: a fixed hook segment should not move in the physics simulation
-         */
+        // Maintain dynamic flag: a fixed hook segment should not move in the physics simulation
+        // TODO: Update with constraints!
         for (entity, segment, position) in
             (&*data.entities, &data.segment, &mut data.position).join()
         {
@@ -610,9 +541,7 @@ impl<'a> System<'a> for InputSys {
             }
         }
 
-        /*
-         * Deactivate hook segments
-         */
+        // Deactivate hook segments
         for (_, active) in (&data.deactivate_segment, &mut data.active).join() {
             active.0 = false;
         }

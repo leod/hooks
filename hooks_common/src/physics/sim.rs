@@ -1,7 +1,7 @@
 use nalgebra::{norm, zero, Point2, Vector2};
 
-use specs::{self, Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, System,
-            VecStorage, World, WriteStorage};
+use specs::{Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage,
+            World, WriteStorage};
 
 use hooks_util::profile;
 use defs::GameInfo;
@@ -27,7 +27,7 @@ const MIN_SPEED: f32 = 0.01;
 struct Interactions(Vec<(Entity, Entity, Point2<f32>)>);
 
 /// Resource to store the constraints that are to be applied in the current time step.
-struct Constraints(Vec<Constraint>);
+pub struct Constraints(Vec<Constraint>);
 
 impl Constraints {
     pub fn add(&mut self, c: Constraint) {
@@ -131,8 +131,6 @@ impl<'a> System<'a> for JointForceSys {
     );
 
     fn run(&mut self, (active, dynamic, joints, positions, mut force): Self::SystemData) {
-        return;
-
         for (is_active, _, joints, position_a, force) in
             (&active, &dynamic, &joints, &positions, &mut force).join()
         {
@@ -327,8 +325,8 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     &x_b,
                     &v_a,
                     &v_b,
-                    &m_a,
-                    &m_b,
+                    &m_a.zero_out_constants(&c.vars_a),
+                    &m_b.zero_out_constants(&c.vars_b),
                     beta,
                     dt
                 );
@@ -371,13 +369,11 @@ impl<'a> System<'a> for IntegrateVelocitySys {
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (active, _, velocity, angular_velocity, position, orientation) in (
+        for (active, _, velocity, position) in (
             &active,
             &dynamic,
             &velocity,
-            &angular_velocity,
             &mut position,
-            &mut orientation,
         ).join()
         {
             if !active.0 {
@@ -385,6 +381,19 @@ impl<'a> System<'a> for IntegrateVelocitySys {
             }
 
             position.0 += velocity.0 * dt;
+        }
+
+        for (active, _, angular_velocity, orientation) in (
+            &active,
+            &dynamic,
+            &angular_velocity,
+            &mut orientation,
+        ).join()
+        {
+            if !active.0 {
+                continue;
+            }
+
             orientation.0 += angular_velocity.0 * dt;
         }
     }
