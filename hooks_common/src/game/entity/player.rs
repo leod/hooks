@@ -267,7 +267,9 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
         .with(Velocity(zero()))
         .with(AngularVelocity(0.0))
         .with(InvMass(1.0 / 5.0))
-        .with(InvAngularMass(1.0 / 5.0))
+        .with(InvAngularMass(
+            12.0 / (5.0 * (HOOK_SEGMENT_LENGTH.powi(2) + 9.0)),
+        ))
         .with(Dynamic)
         .with(Friction(1.0))
         .with(collision::Shape(ShapeHandle::new(shape)))
@@ -297,7 +299,7 @@ fn hook_segment_player_interaction(
     let mut hooks = world.write::<Hook>();
     let hook = hooks.get_mut(player_entity).unwrap();
 
-    if hook.state == HookState::Contracting && false {
+    if hook.state == HookState::Contracting {
         // Eat up the first segment if it comes close enough to our mouth.
 
         let &repl::Id((owner, _)) = world.read::<repl::Id>().get(player_entity).unwrap();
@@ -440,7 +442,7 @@ impl<'a> System<'a> for InputSys {
 
                             // Activate new segment when the newest one is far enough from us
                             let distance = norm(&(first_position - position.0.coords));
-                            if distance >= HOOK_SEGMENT_LENGTH {
+                            if distance >= HOOK_SEGMENT_LENGTH / 2.0 {
                                 if active_segments.len() < segments.len() {
                                     let next_segment =
                                         segments[segments.len() - (active_segments.len() + 1)];
@@ -472,14 +474,15 @@ impl<'a> System<'a> for InputSys {
             };
 
             // Join player with first hook segments
+            // activate spook hier
             if let Some(&first_segment) = active_segments.get(0) {
                 if hook.state == HookState::Contracting {
                     let constraint = Constraint {
                         entity_a: entity,
                         entity_b: first_segment,
                         vars_a: constraint::Vars {
-                            p: false,
-                            angle: false,
+                            p: true,
+                            angle: true,
                         },
                         vars_b: constraint::Vars {
                             p: true,
