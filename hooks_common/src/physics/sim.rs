@@ -205,28 +205,24 @@ struct HandleContactsSys;
 
 impl<'a> System<'a> for HandleContactsSys {
     type SystemData = (
-        Fetch<'a, GameInfo>,
         Fetch<'a, CollisionWorld>,
         Fetch<'a, interaction::Handlers>,
         FetchMut<'a, Interactions>,
         FetchMut<'a, Constraints>,
         ReadStorage<'a, entity::Meta>,
-        ReadStorage<'a, Active>,
-        ReadStorage<'a, Position>,
+        ReadStorage<'a, Dynamic>,
     );
 
     #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
     fn run(
         &mut self,
         (
-            game_info,
             collision_world,
             interaction_handlers,
             mut interactions,
             mut constraints,
             meta,
-            active,
-            position,
+            dynamic,
         ): Self::SystemData
     ) {
         for (oa, ob, gen) in collision_world.contact_pairs() {
@@ -245,10 +241,26 @@ impl<'a> System<'a> for HandleContactsSys {
 				);
 
                 if action == Some(interaction::Action::PreventOverlap) {
-                    /*let constraint = Constraint {
-                        entity_a: *oa.data(),
-                        entity_b: *ob.data(),
-                    };*/
+                    // TODO: Easier way to get object-space contact coordinates?
+                    let p_object_a = oa.position().inverse() * contact.world1;
+                    let p_object_b = ob.position().inverse() * contact.world2;
+
+                    // TODO
+                    let dynamic_a = dynamic.get(entity_a).is_some();
+                    let dynamic_b = dynamic.get(entity_b).is_some();
+
+                    let constraint = Constraint {
+                        entity_a,
+                        entity_b,
+                        vars_a: constraint::Vars { p: dynamic_a, angle: dynamic_a },
+                        vars_b: constraint::Vars { p: dynamic_b, angle: dynamic_b },
+                        def: constraint::Def {
+                            kind: constraint::Kind::Contact { normal: contact.normal.unwrap() },
+                            p_object_a,
+                            p_object_b,
+                        },
+                    };
+                    constraints.add(constraint);
                 }
 
                 // TODO: Fix this position
@@ -294,50 +306,62 @@ impl<'a> System<'a> for SolveConstraintsSys {
 
         for _ in 1..num_iterations {
             for c in &constraints.0 {
-                // Set up input for constraint solving
-                let x_a = constraint::Position {
-                    p: position.get(c.entity_a).unwrap().0,
-                    angle: orientation.get(c.entity_a).unwrap().0,
-                };
-                let x_b = constraint::Position {
-                    p: position.get(c.entity_b).unwrap().0,
-                    angle: orientation.get(c.entity_b).unwrap().0,
-                };
-                let v_a = constraint::Velocity {
-                    linear: velocity.get(c.entity_a).unwrap().0,
-                    angular: angular_velocity.get(c.entity_a).unwrap().0,
-                };
-                let v_b = constraint::Velocity {
-                    linear: velocity.get(c.entity_b).unwrap().0,
-                    angular: angular_velocity.get(c.entity_b).unwrap().0,
-                };
-                let m_a = constraint::Mass {
-                    inv: inv_mass.get(c.entity_a).unwrap().0,
-                    inv_angular: inv_angular_mass.get(c.entity_a).unwrap().0,
-                };
-                let m_b = constraint::Mass {
-                    inv: inv_mass.get(c.entity_b).unwrap().0,
-                    inv_angular: inv_angular_mass.get(c.entity_b).unwrap().0,
-                };
-                let beta = 0.2;
+                let (v_new_a, v_new_b) = {
+                    // Set up input for constraint solving
+                    let x = |entity| {
+                        constraint::Position {
+                            p: position.get(entity).unwrap().0,
+                            angle: orientation.get(entity).unwrap().0,
+                        }
+                    };
+                    let v = |entity| {
+                        constraint::Velocity {
+                            linear: velocity.get(entity).map(|v| v.0).unwrap_or(zero()),
+                            angular: angular_velocity.get(entity).map(|v| v.0).unwrap_or(zero()),
+                        }
+                    };
+                    let m = |entity| {
+                        constraint::Mass {
+                            inv: inv_mass.get(entity).map(|m| m.0).unwrap_or(0.0),
+                            inv_angular: inv_angular_mass.get(entity).map(|m| m.0).unwrap_or(0.0),
+                        }
+                    };
 
-                let (v_new_a, v_new_b) = constraint::solve_for_velocity(
-                    &c.def,
-                    &x_a,
-                    &x_b,
-                    &v_a,
-                    &v_b,
-                    &m_a.zero_out_constants(&c.vars_a),
-                    &m_b.zero_out_constants(&c.vars_b),
-                    beta,
-                    dt
-                );
+                    let x_a = x(c.entity_a);
+                    let x_b = x(c.entity_b);
+                    let v_a = v(c.entity_a);
+                    let v_b = v(c.entity_b);
+                    let m_a = m(c.entity_a);
+                    let m_b = m(c.entity_b);
 
-                velocity.insert(c.entity_a, Velocity(v_new_a.linear));
-                velocity.insert(c.entity_b, Velocity(v_new_b.linear));
+                    let beta = 0.2;
 
-                angular_velocity.insert(c.entity_a, AngularVelocity(v_new_a.angular));
-                angular_velocity.insert(c.entity_b, AngularVelocity(v_new_b.angular));
+                    constraint::solve_for_velocity(
+                        &c.def,
+                        &x_a,
+                        &x_b,
+                        &v_a,
+                        &v_b,
+                        &m_a.zero_out_constants(&c.vars_a),
+                        &m_b.zero_out_constants(&c.vars_b),
+                        beta,
+                        dt
+                    )
+                };
+
+                if c.vars_a.p {
+                    velocity.insert(c.entity_a, Velocity(v_new_a.linear));
+                }
+                if c.vars_b.p {
+                    velocity.insert(c.entity_b, Velocity(v_new_b.linear));
+                }
+
+                if c.vars_a.angle {
+                    angular_velocity.insert(c.entity_a, AngularVelocity(v_new_a.angular));
+                }
+                if c.vars_b.angle {
+                    angular_velocity.insert(c.entity_b, AngularVelocity(v_new_b.angular));
+                }
             }
         }
     }
