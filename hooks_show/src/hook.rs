@@ -13,7 +13,7 @@ use {Assets, Registry};
 
 /// Draw joints for debugging.
 pub fn register_show(reg: &mut Registry) {
-    reg.draw_fn(draw);
+    //reg.draw_fn(draw);
 }
 
 type DrawData<'a> = (

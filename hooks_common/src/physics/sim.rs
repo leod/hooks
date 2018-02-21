@@ -334,7 +334,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     let m_a = m(c.entity_a);
                     let m_b = m(c.entity_b);
 
-                    let beta = 0.2;
+                    let beta = 0.8;
 
                     constraint::solve_for_velocity(
                         &c.def,
