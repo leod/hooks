@@ -243,7 +243,7 @@ fn main() {
         show,
         font,
         fps: 0.0,
-        show_debug: true,
+        show_debug: false,
         show_profiler: false,
     };
 

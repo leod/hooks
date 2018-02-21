@@ -3,25 +3,34 @@ N_STRESS=20
 
 all: build
 
-build:
+build-release:
 	cargo build -j8 --release
 
+build:
+	cargo build -j8 
+
 run: build
+	tmux \
+		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server; cat"' \; \
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game; cat"' \; \
+		select-layout even-horizontal
+
+run-release: build-release
 	tmux \
 		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server; cat"' \; \
 		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game; cat"' \; \
 		select-layout even-horizontal
 
 run-game: build
-	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game
+	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game
 
 run-server: build
-	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server
+	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server
 
 random-bot:
 	cargo run -j8 --release --example random_bot
 
-stress: build
+stress: build-release
 	cargo build -j8 --release --examples
 	tmux \
 		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server; cat"' \; \
