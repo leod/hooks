@@ -147,9 +147,12 @@ pub fn solve_for_velocity(
     );
 
     let (value, jacobian) = constraint.calculate(x_a, x_b);
-    let bias = beta / dt * value;
 
-    let numerator = dot(&jacobian.transpose(), &v) + bias;
+    // Baumgarte stabilization
+    let bias = beta / dt * value;
+    //let bias = 0.0;
+
+    let numerator = dot(&jacobian, &v.transpose()) + bias;
     let denumerator = dot(&jacobian.component_mul(&inv_m), &jacobian);
     let lambda = -numerator / denumerator;
 

@@ -125,7 +125,7 @@ const MOVE_SPEED: f32 = 100.0;
 const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 400.0;
-const HOOK_SEGMENT_LENGTH: f32 = 15.0;
+const HOOK_SEGMENT_LENGTH: f32 = 30.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
     world
@@ -253,7 +253,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 
 fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
     // TODO
-    let shape = Cuboid::new(Vector2::new(HOOK_SEGMENT_LENGTH, 3.0));
+    let shape = Cuboid::new(Vector2::new(HOOK_SEGMENT_LENGTH / 2.0, 3.0));
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
@@ -511,8 +511,8 @@ impl<'a> System<'a> for InputSys {
                     },
                     def: constraint::Def {
                         kind: constraint::Kind::Joint,
-                        p_object_a: Point2::new(HOOK_SEGMENT_LENGTH, 0.0),
-                        p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH, 0.0),
+                        p_object_a: Point2::new(HOOK_SEGMENT_LENGTH / 2.0, 0.0),
+                        p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                     },
                 };
                 data.constraints.add(constraint);
