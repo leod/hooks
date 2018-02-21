@@ -15,8 +15,8 @@ pub fn register(reg: &mut hooks_common::Registry) {
 
     entity::add_ctor(reg, "player", |builder| {
         builder.with(rect::Draw {
-            width: 15.0,
-            height: 15.0,
+            width: 3.0,
+            height: 3.0,
         })
     });
 

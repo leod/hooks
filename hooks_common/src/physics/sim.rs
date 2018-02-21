@@ -109,8 +109,8 @@ impl<'a> System<'a> for FrictionForceSys {
             if speed < MIN_SPEED {
                 velocity.0 = zero();
             } else {
-                //force.0 -= velocity.0 / speed * friction.0;
-                force.0 -= velocity.0 * friction.0;
+                force.0 -= velocity.0 / speed * friction.0;
+                //force.0 -= velocity.0 * friction.0;
             }
         }
     }
@@ -217,7 +217,7 @@ impl<'a> System<'a> for IntegrateForceSys {
             // TODO: Angular friction
             if ang_velocity.0.abs() > 0.01 {
                 let signum = ang_velocity.0.signum();
-                ang_velocity.0 -= 30.0 * signum * dt;
+                ang_velocity.0 -= 100.0 * signum * dt;
                 if ang_velocity.0.signum() != signum {
                     ang_velocity.0 = 0.0;
                 }
@@ -363,7 +363,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     let m_a = m(c.entity_a);
                     let m_b = m(c.entity_b);
 
-                    let beta = 0.05;
+                    let beta = 0.1;
 
                     constraint::solve_for_velocity(
                         &c.def,
