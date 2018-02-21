@@ -124,7 +124,7 @@ const MOVE_SPEED: f32 = 100.0;
 
 const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const HOOK_SHOOT_SPEED: f32 = 400.0;
+const HOOK_SHOOT_SPEED: f32 = 100.0;
 const HOOK_SEGMENT_LENGTH: f32 = 30.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
@@ -266,8 +266,8 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
         .with(Orientation(0.0))
         .with(Velocity(zero()))
         .with(AngularVelocity(0.0))
-        .with(InvMass(1.0))
-        .with(InvAngularMass(1.0))
+        .with(InvMass(1.0 / 5.0))
+        .with(InvAngularMass(1.0 / 5.0))
         .with(Dynamic)
         .with(Friction(1.0))
         .with(collision::Shape(ShapeHandle::new(shape)))
@@ -297,7 +297,7 @@ fn hook_segment_player_interaction(
     let mut hooks = world.write::<Hook>();
     let hook = hooks.get_mut(player_entity).unwrap();
 
-    if hook.state == HookState::Contracting {
+    if hook.state == HookState::Contracting && false {
         // Eat up the first segment if it comes close enough to our mouth.
 
         let &repl::Id((owner, _)) = world.read::<repl::Id>().get(player_entity).unwrap();
@@ -478,8 +478,8 @@ impl<'a> System<'a> for InputSys {
                         entity_a: entity,
                         entity_b: first_segment,
                         vars_a: constraint::Vars {
-                            p: true,
-                            angle: true,
+                            p: false,
+                            angle: false,
                         },
                         vars_b: constraint::Vars {
                             p: true,
@@ -488,7 +488,7 @@ impl<'a> System<'a> for InputSys {
                         def: constraint::Def {
                             kind: constraint::Kind::Joint,
                             p_object_a: Point2::origin(),
-                            p_object_b: Point2::origin(),
+                            p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                         },
                     };
                     data.constraints.add(constraint);

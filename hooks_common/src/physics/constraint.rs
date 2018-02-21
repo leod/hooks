@@ -86,7 +86,7 @@ impl Def {
                     RowVector6::new(
                         p_a.x - p_b.x,
                         p_a.y - p_b.y,
-                        -(p_a - p_b).perp(&(p_a - x_a.p.coords)),
+                        (p_b - p_a).perp(&(p_a - x_a.p.coords)),
                         p_b.x - p_a.x,
                         p_b.y - p_a.y,
                         (p_a - p_b).perp(&(p_b - x_b.p.coords)),
@@ -152,8 +152,12 @@ pub fn solve_for_velocity(
     let bias = beta / dt * value;
     //let bias = 0.0;
 
-    let numerator = dot(&jacobian, &v.transpose()) + bias;
     let denumerator = dot(&jacobian.component_mul(&inv_m), &jacobian);
+    if denumerator < 1e-12 {
+        return (v_a.clone(), v_b.clone());
+    }
+
+    let numerator = dot(&jacobian, &v.transpose()) + bias;
     let lambda = -numerator / denumerator;
 
     let clamped_lambda = if constraint.is_inequality() {

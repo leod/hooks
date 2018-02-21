@@ -47,7 +47,7 @@ pub fn run(world: &World) {
     collision::UpdateSys.run_now(&world.res);
 
     PrepareSys.run_now(&world.res);
-    FrictionForceSys.run_now(&world.res);
+    //FrictionForceSys.run_now(&world.res);
     JointForceSys.run_now(&world.res);
     IntegrateForceSys.run_now(&world.res);
     HandleContactsSys.run_now(&world.res);
@@ -181,22 +181,49 @@ impl<'a> System<'a> for IntegrateForceSys {
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Force>,
         WriteStorage<'a, Velocity>,
+        WriteStorage<'a, AngularVelocity>,
     );
 
+    #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
     fn run(
         &mut self,
-        (game_info, active, inv_mass, dynamic, force, mut velocity): Self::SystemData,
+        (
+            game_info,
+            active,
+            inv_mass,
+            dynamic,
+            force,
+            mut velocity,
+            mut ang_velocity,
+        ): Self::SystemData,
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (active, _, inv_mass, force, velocity) in
-            (&active, &dynamic, &inv_mass, &force, &mut velocity).join()
+        for (active, _, inv_mass, force, velocity, ang_velocity) in (
+            &active,
+            &dynamic,
+            &inv_mass,
+            &force,
+            &mut velocity,
+            &mut ang_velocity,
+        ).join()
         {
             if !active.0 {
                 continue;
             }
 
             velocity.0 += force.0 * inv_mass.0 * dt;
+
+            // TODO: Angular friction
+            if ang_velocity.0.abs() > 0.01 {
+                let signum = ang_velocity.0.signum();
+                ang_velocity.0 -= 30.0 * signum * dt;
+                if ang_velocity.0.signum() != signum {
+                    ang_velocity.0 = 0.0;
+                }
+            } else {
+                ang_velocity.0 = 0.0;
+            }
         }
     }
 }
@@ -302,7 +329,9 @@ impl<'a> System<'a> for SolveConstraintsSys {
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        let num_iterations = 4;
+        let num_iterations = 20;
+
+        // FIXME: Jacobian should be reused between iterations
 
         for _ in 1..num_iterations {
             for c in &constraints.0 {
@@ -317,7 +346,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     let v = |entity| {
                         constraint::Velocity {
                             linear: velocity.get(entity).map(|v| v.0).unwrap_or(zero()),
-                            angular: angular_velocity.get(entity).map(|v| v.0).unwrap_or(zero()),
+                            angular: angular_velocity.get(entity).map(|v| v.0).unwrap_or(0.0),
                         }
                     };
                     let m = |entity| {
@@ -334,7 +363,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     let m_a = m(c.entity_a);
                     let m_b = m(c.entity_b);
 
-                    let beta = 0.8;
+                    let beta = 0.05;
 
                     constraint::solve_for_velocity(
                         &c.def,
