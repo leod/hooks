@@ -1,4 +1,6 @@
-// http://myselph.de/gamePhysics/equalityConstraints.html
+// Two great resources for velocity constraints:
+//    http://myselph.de/gamePhysics/equalityConstraints.html
+//    http://myselph.de/gamePhysics/inequalityConstraints.html
 
 use specs::Entity;
 
@@ -22,9 +24,10 @@ pub struct Mass {
     pub inv_angular: f32,
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum Kind {
     Joint,
+    Contact { normal: Vector2<f32> },
 }
 
 #[derive(Clone, Debug)]
@@ -41,6 +44,7 @@ pub struct Def {
 /// Which values can change in solving a constraint?
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Vars {
+    // TODO: These two are kind of misnomers, they should refer to velocity
     pub p: bool,
     pub angle: bool,
 }
@@ -72,14 +76,12 @@ impl Mass {
 impl Def {
     /// Calculate the constraint value as well as the jacobian at some position.
     pub fn calculate(&self, x_a: &Position, x_b: &Position) -> (f32, RowVector6<f32>) {
+        let p_a = Rotation2::new(x_a.angle).matrix() * self.p_object_a.coords + x_a.p.coords;
+        let p_b = Rotation2::new(x_b.angle).matrix() * self.p_object_b.coords + x_b.p.coords;
+
         match self.kind {
             Kind::Joint => {
-                let p_a =
-                    Rotation2::new(x_a.angle).matrix() * self.p_object_a.coords + x_a.p.coords;
-                let p_b =
-                    Rotation2::new(x_b.angle).matrix() * self.p_object_b.coords + x_b.p.coords;
-
-                let c = norm_squared(&(p_a - p_b));
+                let value = norm_squared(&(p_a - p_b));
                 let jacobian = 2.0 *
                     RowVector6::new(
                         p_a.x - p_b.x,
@@ -89,8 +91,28 @@ impl Def {
                         p_b.y - p_a.y,
                         (p_a - p_b).perp(&(p_b - x_b.p.coords)),
                     );
-                (c, jacobian)
+                (value, jacobian)
             }
+            Kind::Contact { normal } => {
+                let value = dot(&(p_a - p_b), &normal);
+                let jacobian = RowVector6::new(
+                    normal.x,
+                    normal.y,
+                    (p_a - x_a.p.coords).perp(&normal),
+                    -normal.x,
+                    -normal.y,
+                    -(p_b - x_b.p.coords).perp(&normal),
+                );
+                (value, jacobian)
+            }
+        }
+    }
+
+    /// Is this an inequality constraint, i.e. `C >= 0`, or an equality constraint, i.e. `C = 0`?
+    pub fn is_inequality(&self) -> bool {
+        match self.kind {
+            Kind::Joint => false,
+            Kind::Contact { .. } => true,
         }
     }
 }
@@ -131,7 +153,13 @@ pub fn solve_for_velocity(
     let denumerator = dot(&jacobian.component_mul(&inv_m), &jacobian);
     let lambda = -numerator / denumerator;
 
-    let v_new = v + lambda * jacobian.component_mul(&inv_m).transpose();
+    let clamped_lambda = if constraint.is_inequality() {
+        lambda.min(0.0)
+    } else {
+        lambda
+    };
+
+    let v_new = v + clamped_lambda * jacobian.component_mul(&inv_m).transpose();
 
     (
         Velocity {
