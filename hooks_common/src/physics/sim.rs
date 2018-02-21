@@ -64,10 +64,6 @@ pub fn run(world: &World) {
 
 #[derive(Component)]
 #[component(VecStorage)]
-struct OldPosition(Point2<f32>);
-
-#[derive(Component)]
-#[component(VecStorage)]
 struct Force(Vector2<f32>);
 
 struct PrepareSys;
@@ -113,6 +109,7 @@ impl<'a> System<'a> for FrictionForceSys {
             if speed < MIN_SPEED {
                 velocity.0 = zero();
             } else {
+                //force.0 -= velocity.0 / speed * friction.0;
                 force.0 -= velocity.0 * friction.0;
             }
         }
@@ -232,8 +229,6 @@ impl<'a> System<'a> for HandleContactsSys {
             position,
         ): Self::SystemData
     ) {
-        let dt = game_info.tick_duration_secs() as f32;
-
         for (oa, ob, gen) in collision_world.contact_pairs() {
             let mut contacts = Vec::new();
             gen.contacts(&mut contacts);
@@ -242,17 +237,24 @@ impl<'a> System<'a> for HandleContactsSys {
                 let entity_a = *oa.data();
                 let entity_b = *ob.data();
 
-                /*if action == Some(interaction::Action::PreventOverlap) {
-                    let constraint = Constraint {
+                let action = interaction::get_action(
+                    &interaction_handlers,
+                    &meta,
+                    entity_a,
+                    entity_b
+				);
+
+                if action == Some(interaction::Action::PreventOverlap) {
+                    /*let constraint = Constraint {
                         entity_a: *oa.data(),
                         entity_b: *ob.data(),
-                    };
+                    };*/
                 }
 
                 // TODO: Fix this position
                 let pos = contact.world1;
 
-                interactions.0.push((entity_a, entity_b, pos));*/
+                interactions.0.push((entity_a, entity_b, pos));
             }
         }
     }

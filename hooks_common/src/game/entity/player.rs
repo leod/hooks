@@ -16,6 +16,11 @@ use physics::sim::Constraints;
 use repl::{self, player, EntityMap};
 use game::ComponentType;
 
+// NOTE: This module is heavily work-in-progress and is mostly used for prototyping hook mechanics.
+//       Implementation of hook interactions are currently hairy since it involves lots of
+//       unwrapping entities/components. Since this kind of interaction will occur more frequently
+//       in the game, we need to find a better way to do this.
+
 pub fn register(reg: &mut Registry) {
     reg.component::<CurrentInput>();
     reg.component::<Player>();
@@ -119,9 +124,8 @@ const MOVE_SPEED: f32 = 100.0;
 
 const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const HOOK_SHOOT_SPEED: f32 = 300.0;
+const HOOK_SHOOT_SPEED: f32 = 400.0;
 const HOOK_SEGMENT_LENGTH: f32 = 15.0;
-const HOOK_SEGMENT_MARGIN: f32 = 1.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
     world
@@ -290,8 +294,6 @@ fn hook_segment_player_interaction(
     player_entity: Entity,
     _pos: Point2<f32>,
 ) {
-    debug!("yo");
-
     let mut hooks = world.write::<Hook>();
     let hook = hooks.get_mut(player_entity).unwrap();
 
@@ -438,7 +440,7 @@ impl<'a> System<'a> for InputSys {
 
                             // Activate new segment when the newest one is far enough from us
                             let distance = norm(&(first_position - position.0.coords));
-                            if distance >= 100.0 {
+                            if distance >= HOOK_SEGMENT_LENGTH {
                                 if active_segments.len() < segments.len() {
                                     let next_segment =
                                         segments[segments.len() - (active_segments.len() + 1)];
@@ -470,20 +472,28 @@ impl<'a> System<'a> for InputSys {
             };
 
             // Join player with first hook segments
-            /*if let Some(&first_segment) = active_segments.get(0) {
-                let constraint = Constraint {
-                    entity_a: entity,
-                    entity_b: first_segment,
-                    vars_a: constraint::Vars { p: true, angle: true },
-                    vars_b: constraint::Vars { p: true, angle: true },
-                    def: constraint::Def {
-                        kind: constraint::Kind::Joint,
-                        p_object_a: Point2::origin(),
-                        p_object_b: Point2::origin(),
-                    },
-                };
-                data.constraints.add(constraint);
-            }*/
+            if let Some(&first_segment) = active_segments.get(0) {
+                if hook.state == HookState::Contracting {
+                    let constraint = Constraint {
+                        entity_a: entity,
+                        entity_b: first_segment,
+                        vars_a: constraint::Vars {
+                            p: true,
+                            angle: true,
+                        },
+                        vars_b: constraint::Vars {
+                            p: true,
+                            angle: true,
+                        },
+                        def: constraint::Def {
+                            kind: constraint::Kind::Joint,
+                            p_object_a: Point2::origin(),
+                            p_object_b: Point2::origin(),
+                        },
+                    };
+                    data.constraints.add(constraint);
+                }
+            }
 
             // Join successive hook segments
             let active_segment_pairs = active_segments.iter().zip(active_segments.iter().skip(1));
@@ -501,8 +511,8 @@ impl<'a> System<'a> for InputSys {
                     },
                     def: constraint::Def {
                         kind: constraint::Kind::Joint,
-                        p_object_a: Point2::new(HOOK_SEGMENT_LENGTH + HOOK_SEGMENT_MARGIN, 0.0),
-                        p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH + HOOK_SEGMENT_MARGIN, 0.0),
+                        p_object_a: Point2::new(HOOK_SEGMENT_LENGTH, 0.0),
+                        p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH, 0.0),
                     },
                 };
                 data.constraints.add(constraint);

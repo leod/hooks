@@ -1,5 +1,5 @@
 use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
-use specs::{Entities, Join, ReadStorage, SystemData, VecStorage, World};
+use specs::{Join, ReadStorage, SystemData, VecStorage, World};
 
 use ggez;
 use ggez::graphics::{self, Drawable};
@@ -26,7 +26,6 @@ pub struct Draw {
 }
 
 type DrawData<'a> = (
-    Entities<'a>,
     ReadStorage<'a, Active>,
     ReadStorage<'a, Position>,
     ReadStorage<'a, Orientation>,
@@ -34,11 +33,9 @@ type DrawData<'a> = (
 );
 
 fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
-    let (entities, active, position, orientation, draw) = DrawData::fetch(&world.res, 0);
+    let (active, position, orientation, draw) = DrawData::fetch(&world.res, 0);
 
-    for (entity, active, position, orientation, draw) in
-        (&*entities, &active, &position, &orientation, &draw).join()
-    {
+    for (active, position, orientation, draw) in (&active, &position, &orientation, &draw).join() {
         if !active.0 {
             continue;
         }
