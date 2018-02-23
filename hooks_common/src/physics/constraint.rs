@@ -2,20 +2,16 @@
 //    http://myselph.de/gamePhysics/equalityConstraints.html
 //    http://myselph.de/gamePhysics/inequalityConstraints.html
 
+use std::f32;
+
 use specs::Entity;
 
-use nalgebra::{dot, norm_squared, Point2, Rotation2, RowVector6, Vector2, Vector6};
+use nalgebra::{dot, norm, Matrix2, Matrix2x6, Point2, Rotation2, RowVector6, Vector2, Vector6};
 
 #[derive(Clone, Debug)]
 pub struct Position {
     pub p: Point2<f32>,
     pub angle: f32,
-}
-
-#[derive(Clone, Debug)]
-pub struct Velocity {
-    pub linear: Vector2<f32>,
-    pub angular: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -76,34 +72,47 @@ impl Mass {
 impl Def {
     /// Calculate the constraint value as well as the jacobian at some position.
     pub fn calculate(&self, x_a: &Position, x_b: &Position) -> (f32, RowVector6<f32>) {
-        let p_a = Rotation2::new(x_a.angle).matrix() * self.p_object_a.coords + x_a.p.coords;
-        let p_b = Rotation2::new(x_b.angle).matrix() * self.p_object_b.coords + x_b.p.coords;
+        let rot_a = Rotation2::new(x_a.angle).matrix().clone();
+        let rot_b = Rotation2::new(x_b.angle).matrix().clone();
+        let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
+            .matrix()
+            .clone();
+        let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
+            .matrix()
+            .clone();
+
+        let p_a = rot_a * self.p_object_a.coords + x_a.p.coords;
+        let p_b = rot_b * self.p_object_b.coords + x_b.p.coords;
 
         match self.kind {
             Kind::Joint => {
-                let value = norm_squared(&(p_a - p_b));
-                let jacobian = 2.0 *
-                    RowVector6::new(
-                        p_a.x - p_b.x,
-                        p_a.y - p_b.y,
-                        (p_b - p_a).perp(&(p_a - x_a.p.coords)),
-                        p_b.x - p_a.x,
-                        p_b.y - p_a.y,
-                        (p_a - p_b).perp(&(p_b - x_b.p.coords)),
-                    );
-                (value, jacobian)
+                let f = p_a - p_b;
+                let value_f = norm(&f);
+                let value = value_f; // TODO: -d
+                let jacobian_f = Matrix2x6::new(
+                    1.0,
+                    0.0,
+                    self.p_object_a.coords.x * deriv_rot_a.m11 +
+                        self.p_object_a.coords.y * deriv_rot_a.m12,
+                    -1.0,
+                    0.0,
+                    -self.p_object_b.coords.x * deriv_rot_b.m11 -
+                        self.p_object_b.coords.y * deriv_rot_b.m12,
+                    0.0,
+                    1.0,
+                    self.p_object_a.coords.x * deriv_rot_a.m21 +
+                        self.p_object_a.coords.y * deriv_rot_a.m22,
+                    0.0,
+                    -1.0,
+                    -self.p_object_b.coords.x * deriv_rot_b.m21 -
+                        self.p_object_b.coords.y * deriv_rot_b.m22,
+                );
+                let jacobian = jacobian_f.transpose() * f / value_f;
+
+                (value, jacobian.transpose())
             }
             Kind::Contact { normal } => {
-                let value = dot(&(p_a - p_b), &normal);
-                let jacobian = RowVector6::new(
-                    normal.x,
-                    normal.y,
-                    (p_a - x_a.p.coords).perp(&normal),
-                    -normal.x,
-                    -normal.y,
-                    -(p_b - x_b.p.coords).perp(&normal),
-                );
-                (value, jacobian)
+                unimplemented!();
             }
         }
     }
@@ -118,17 +127,13 @@ impl Def {
 }
 
 /// Solve for the velocity update of one constraint.
-pub fn solve_for_velocity(
+pub fn solve_for_position(
     constraint: &Def,
     x_a: &Position,
     x_b: &Position,
-    v_a: &Velocity,
-    v_b: &Velocity,
     m_a: &Mass,
     m_b: &Mass,
-    beta: f32,
-    dt: f32,
-) -> (Velocity, Velocity) {
+) -> (Position, Position) {
     let inv_m = RowVector6::new(
         m_a.inv,
         m_a.inv,
@@ -137,45 +142,46 @@ pub fn solve_for_velocity(
         m_b.inv,
         m_b.inv_angular,
     );
-    let v = Vector6::new(
-        v_a.linear.x,
-        v_a.linear.y,
-        v_a.angular,
-        v_b.linear.x,
-        v_b.linear.y,
-        v_b.angular,
-    );
-
     let (value, jacobian) = constraint.calculate(x_a, x_b);
 
-    // Baumgarte stabilization
-    let bias = beta / dt * value;
-    //let bias = 0.0;
-
-    let denumerator = dot(&jacobian.component_mul(&inv_m), &jacobian);
-    if denumerator < 1e-12 {
-        return (v_a.clone(), v_b.clone());
+    if value <= 0.0001 {
+        return (x_a.clone(), x_b.clone());
     }
 
-    let numerator = dot(&jacobian, &v.transpose()) + bias;
-    let lambda = -numerator / denumerator;
+    let lambda = value / dot(&jacobian.component_mul(&inv_m), &jacobian);
 
-    let clamped_lambda = if constraint.is_inequality() {
-        lambda.min(0.0)
-    } else {
-        lambda
-    };
+    let delta = -lambda * jacobian.component_mul(&inv_m).transpose();
 
-    let v_new = v + clamped_lambda * jacobian.component_mul(&inv_m).transpose();
+    debug!("value {}", value);
+    debug!("jacobian {}", jacobian);
+    debug!("error {}", value + dot(&jacobian, &delta.transpose()));
+
+    /*(Position {
+        p: x_a.p + Vector2::new(delta.w, delta.a), 
+        angle: x_a.angle + delta.b,
+    },
+    Position {
+        p: x_b.p + Vector2::new(delta.x, delta.y), 
+        angle: x_b.angle + delta.z,
+    })*/
 
     (
-        Velocity {
-            linear: Vector2::new(v_new.x, v_new.y),
-            angular: v_new.z,
+        Position {
+            p: x_a.p + Vector2::new(delta.x, delta.y),
+            angle: x_a.angle + delta.z,
         },
-        Velocity {
-            linear: Vector2::new(v_new.w, v_new.a),
-            angular: v_new.b,
+        Position {
+            p: x_b.p + Vector2::new(delta.w, delta.a),
+            angle: x_b.angle + delta.b,
         },
     )
+
+    /*(Position {
+        p: x_a.p,
+        angle: x_a.angle,
+    },
+    Position {
+        p: x_b.p,
+        angle: x_b.angle,
+    })*/
 }

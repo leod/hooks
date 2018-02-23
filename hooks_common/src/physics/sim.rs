@@ -14,6 +14,8 @@ use physics::collision::CollisionWorld;
 use physics::constraint::Constraint;
 
 pub fn register(reg: &mut Registry) {
+    reg.component::<OldPosition>();
+    reg.component::<OldOrientation>();
     reg.component::<Force>();
 
     reg.resource(Interactions(Vec::new()));
@@ -22,6 +24,14 @@ pub fn register(reg: &mut Registry) {
 
 const JOINT_MIN_DISTANCE: f32 = 0.001;
 const MIN_SPEED: f32 = 0.01;
+
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(VecStorage)]
+struct OldPosition(Point2<f32>);
+
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(VecStorage)]
+struct OldOrientation(f32);
 
 /// Resource to store the interactions that were detected in a time step.
 struct Interactions(Vec<(Entity, Entity, Point2<f32>)>);
@@ -48,11 +58,13 @@ pub fn run(world: &World) {
 
     PrepareSys.run_now(&world.res);
     //FrictionForceSys.run_now(&world.res);
-    JointForceSys.run_now(&world.res);
+    //JointForceSys.run_now(&world.res);
     IntegrateForceSys.run_now(&world.res);
-    HandleContactsSys.run_now(&world.res);
-    SolveConstraintsSys.run_now(&world.res);
+    SavePositionSys.run_now(&world.res);
     IntegrateVelocitySys.run_now(&world.res);
+    //HandleContactsSys.run_now(&world.res);
+    SolveConstraintsSys.run_now(&world.res);
+    CorrectVelocitySys.run_now(&world.res);
 
     let interactions = world.read_resource::<Interactions>().0.clone();
     for &(entity_a, entity_b, pos) in &interactions {
@@ -171,6 +183,80 @@ impl<'a> System<'a> for JointForceSys {
     }
 }
 
+struct SavePositionSys;
+
+impl<'a> System<'a> for SavePositionSys {
+    type SystemData = (
+        Entities<'a>,
+        ReadStorage<'a, Dynamic>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Orientation>,
+        WriteStorage<'a, OldPosition>,
+        WriteStorage<'a, OldOrientation>,
+    );
+
+    #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
+    fn run(
+        &mut self,
+        (
+            entities,
+            dynamic,
+            position,
+            orientation,
+            mut old_position,
+            mut old_orientation,
+        ): Self::SystemData
+    ) {
+        for (entity, _, position) in (&*entities, &dynamic, &position).join() {
+            old_position.insert(entity, OldPosition(position.0.clone()));
+        }
+        for (entity, _, orientation) in (&*entities, &dynamic, &orientation).join() {
+            old_orientation.insert(entity, OldOrientation(orientation.0.clone()));
+        }
+    }
+}
+
+struct CorrectVelocitySys;
+
+impl<'a> System<'a> for CorrectVelocitySys {
+    type SystemData = (
+        Fetch<'a, GameInfo>,
+        Entities<'a>,
+        ReadStorage<'a, Dynamic>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, OldPosition>,
+        ReadStorage<'a, Orientation>,
+        ReadStorage<'a, OldOrientation>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, AngularVelocity>,
+    );
+
+    #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
+    fn run(
+        &mut self,
+        (
+            game_info,
+            entities,
+            dynamic,
+            position,
+            old_position,
+            orientation,
+            old_orientation,
+            mut velocity,
+            mut angular_velocity,
+        ): Self::SystemData
+    ) {
+        let dt = game_info.tick_duration_secs() as f32;
+
+        for (_, position, old_position, velocity) in (&dynamic, &position, &old_position, &mut velocity).join() {
+            velocity.0 = (position.0 - old_position.0) / dt;
+        }
+        for (_, orientation, old_orientation, angular_velocity) in (&dynamic, &orientation, &old_orientation, &mut angular_velocity).join() {
+            angular_velocity.0 = (orientation.0 - old_orientation.0) / dt;
+        }
+    }
+}
+
 struct IntegrateForceSys;
 
 impl<'a> System<'a> for IntegrateForceSys {
@@ -214,7 +300,7 @@ impl<'a> System<'a> for IntegrateForceSys {
 
             velocity.0 += force.0 * inv_mass.0 * dt;
 
-            // TODO: Angular friction
+            /*// TODO: Angular friction
             if ang_velocity.0.abs() > 0.01 {
                 let signum = ang_velocity.0.signum();
                 ang_velocity.0 -= 100.0 * signum * dt;
@@ -223,7 +309,7 @@ impl<'a> System<'a> for IntegrateForceSys {
                 }
             } else {
                 ang_velocity.0 = 0.0;
-            }
+            }*/
         }
     }
 }
@@ -303,50 +389,34 @@ struct SolveConstraintsSys;
 
 impl<'a> System<'a> for SolveConstraintsSys {
     type SystemData = (
-        Fetch<'a, GameInfo>,
         Fetch<'a, Constraints>,
         ReadStorage<'a, InvMass>,
         ReadStorage<'a, InvAngularMass>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, Orientation>,
-        WriteStorage<'a, Velocity>,
-        WriteStorage<'a, AngularVelocity>,
+        WriteStorage<'a, Position>,
+        WriteStorage<'a, Orientation>,
     );
 
     #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
     fn run(
         &mut self,
         (
-            game_info,
             constraints,
             inv_mass,
             inv_angular_mass,
-            position,
-            orientation,
-            mut velocity,
-            mut angular_velocity,
+            mut position,
+            mut orientation,
         ): Self::SystemData
     ) {
-        let dt = game_info.tick_duration_secs() as f32;
+        let num_iterations = 2;
 
-        let num_iterations = 20;
-
-        // FIXME: Jacobian should be reused between iterations
-
-        for _ in 1..num_iterations {
+        for _ in 0..num_iterations {
             for c in &constraints.0 {
-                let (v_new_a, v_new_b) = {
+                let (p_new_a, p_new_b) = {
                     // Set up input for constraint solving
                     let x = |entity| {
                         constraint::Position {
                             p: position.get(entity).unwrap().0,
                             angle: orientation.get(entity).unwrap().0,
-                        }
-                    };
-                    let v = |entity| {
-                        constraint::Velocity {
-                            linear: velocity.get(entity).map(|v| v.0).unwrap_or(zero()),
-                            angular: angular_velocity.get(entity).map(|v| v.0).unwrap_or(0.0),
                         }
                     };
                     let m = |entity| {
@@ -358,38 +428,30 @@ impl<'a> System<'a> for SolveConstraintsSys {
 
                     let x_a = x(c.entity_a);
                     let x_b = x(c.entity_b);
-                    let v_a = v(c.entity_a);
-                    let v_b = v(c.entity_b);
                     let m_a = m(c.entity_a);
                     let m_b = m(c.entity_b);
 
-                    let beta = 0.1;
-
-                    constraint::solve_for_velocity(
+                    constraint::solve_for_position(
                         &c.def,
                         &x_a,
                         &x_b,
-                        &v_a,
-                        &v_b,
                         &m_a.zero_out_constants(&c.vars_a),
                         &m_b.zero_out_constants(&c.vars_b),
-                        beta,
-                        dt
                     )
                 };
 
                 if c.vars_a.p {
-                    velocity.insert(c.entity_a, Velocity(v_new_a.linear));
+                    position.insert(c.entity_a, Position(p_new_a.p));
                 }
                 if c.vars_b.p {
-                    velocity.insert(c.entity_b, Velocity(v_new_b.linear));
+                    position.insert(c.entity_b, Position(p_new_b.p));
                 }
 
                 if c.vars_a.angle {
-                    angular_velocity.insert(c.entity_a, AngularVelocity(v_new_a.angular));
+                    orientation.insert(c.entity_a, Orientation(p_new_a.angle));
                 }
                 if c.vars_b.angle {
-                    angular_velocity.insert(c.entity_b, AngularVelocity(v_new_b.angular));
+                    orientation.insert(c.entity_b, Orientation(p_new_b.angle));
                 }
             }
         }
