@@ -122,7 +122,7 @@ struct DeactivateHookSegment;
 const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
-const HOOK_NUM_SEGMENTS: usize = 10;
+const HOOK_NUM_SEGMENTS: usize = 2;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 100.0;
 const HOOK_SEGMENT_LENGTH: f32 = 30.0;
@@ -476,17 +476,17 @@ impl<'a> System<'a> for InputSys {
             // Join player with first hook segments
             // activate spook hier
             if let Some(&first_segment) = active_segments.get(0) {
-                if hook.state == HookState::Contracting {
+                if hook.state == HookState::Contracting && false {
                     let constraint = Constraint {
                         entity_a: entity,
                         entity_b: first_segment,
                         vars_a: constraint::Vars {
                             p: true,
-                            angle: true,
+                            angle: false,
                         },
                         vars_b: constraint::Vars {
                             p: true,
-                            angle: true,
+                            angle: false,
                         },
                         def: constraint::Def {
                             kind: constraint::Kind::Joint,
@@ -506,11 +506,11 @@ impl<'a> System<'a> for InputSys {
                     entity_b,
                     vars_a: constraint::Vars {
                         p: true,
-                        angle: true,
+                        angle: false,
                     },
                     vars_b: constraint::Vars {
                         p: true,
-                        angle: true,
+                        angle: false,
                     },
                     def: constraint::Def {
                         kind: constraint::Kind::Joint,
