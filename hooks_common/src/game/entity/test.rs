@@ -1,6 +1,10 @@
+use nalgebra::{Point2, Vector2};
+
 use defs::GameInfo;
 use game::ComponentType;
-use physics::{Orientation, Position};
+use physics::{AngularVelocity, Dynamic, InvAngularMass, InvMass, Orientation, Position, Velocity};
+use physics::constraint::{self, Constraint};
+use physics::sim::Constraints;
 use registry::Registry;
 use entity;
 use repl;
@@ -15,7 +19,7 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub mod auth {
-    use specs::{BTreeStorage, Fetch, Join, System, WriteStorage};
+    use specs::{BTreeStorage, Entities, Fetch, FetchMut, Join, ReadStorage, System, WriteStorage};
 
     use super::*;
 
@@ -26,7 +30,13 @@ pub mod auth {
         reg.tick_system(TickSys, "test", &[]);
 
         entity::add_ctor(reg, "test", |builder| {
-            builder.with(Orientation(0.0)).with(Test(0.0))
+            builder
+                .with(Orientation(0.0))
+                .with(AngularVelocity(0.1))
+                .with(Test(0.0))
+                .with(Dynamic)
+                .with(InvMass(1.0))
+                .with(InvAngularMass(1.0))
         });
     }
 
@@ -38,18 +48,36 @@ pub mod auth {
 
     impl<'a> System<'a> for TickSys {
         type SystemData = (
-            Fetch<'a, GameInfo>,
-            WriteStorage<'a, Position>,
-            WriteStorage<'a, Orientation>,
-            WriteStorage<'a, Test>,
+            Entities<'a>,
+            FetchMut<'a, Constraints>,
+            ReadStorage<'a, Position>,
+            ReadStorage<'a, Test>,
         );
 
-        fn run(&mut self, (game_info, mut position, mut orientation, mut test): Self::SystemData) {
-            for (position, orientation, test) in (&mut position, &mut orientation, &mut test).join()
-            {
-                position.0.x = (test.0.sin() * 100.0) as f32;
-                orientation.0 = test.0 as f32;
-                test.0 += game_info.tick_duration_secs();
+        fn run(&mut self, (entities, mut constraints, position, test): Self::SystemData) {
+            let test_entities = (&*entities, &test)
+                .join()
+                .map(|(e, _)| e)
+                .collect::<Vec<_>>();
+            for (&a, &b) in test_entities.iter().zip(test_entities.iter().skip(1)) {
+                let constraint = Constraint {
+                    entity_a: a,
+                    entity_b: b,
+                    vars_a: constraint::Vars {
+                        p: true,
+                        angle: true,
+                    },
+                    vars_b: constraint::Vars {
+                        p: true,
+                        angle: true,
+                    },
+                    def: constraint::Def {
+                        kind: constraint::Kind::Joint,
+                        p_object_a: Point2::new(0.0, 100.0),
+                        p_object_b: Point2::origin(),
+                    },
+                };
+                constraints.add(constraint);
             }
         }
     }
