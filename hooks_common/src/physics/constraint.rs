@@ -153,33 +153,7 @@ pub fn solve_for_position(
 
     let lambda = value / dot(&jacobian.component_mul(&inv_m), &jacobian);
 
-    let delta = -lambda * jacobian.component_mul(&inv_m).transpose();
-
-    //debug!("value {}", value);
-    //debug!("jacobian {}", jacobian);
-    //debug!("error {}", value + dot(&jacobian, &delta.transpose()));
-    //debug!("delta {}", delta);
-    //panic!("bubadu");
-
-    /*(Position {
-        p: x_a.p + Vector2::new(delta.w, delta.a), 
-        angle: x_a.angle + delta.b,
-    },
-    Position {
-        p: x_b.p + Vector2::new(delta.x, delta.y), 
-        angle: x_b.angle + delta.z,
-    })*/
-
-    /*(
-        Position {
-            p: x_a.p + Vector2::new(delta.x, delta.y),
-            angle: x_a.angle + delta.z.atan(),
-        },
-        Position {
-            p: x_b.p + Vector2::new(delta.w, delta.a),
-            angle: x_b.angle + delta.b.atan(),
-        },
-    )*/
+    let delta = -lambda * 0.5 * jacobian.component_mul(&inv_m).transpose();
 
     (
         Position {
@@ -191,13 +165,4 @@ pub fn solve_for_position(
             angle: x_b.angle + delta.b,
         },
     )
-
-    /*(Position {
-        p: x_a.p,
-        angle: x_a.angle,
-    },
-    Position {
-        p: x_b.p,
-        angle: x_b.angle,
-    })*/
 }

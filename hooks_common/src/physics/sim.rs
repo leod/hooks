@@ -258,7 +258,11 @@ impl<'a> System<'a> for CorrectVelocitySys {
         {
             let x = orientation.0;
             let y = old_orientation.0;
+
+            // TODO: trigonometric functions are not necessary to find minimal angle
             let d = (x - y).sin().atan2((x - y).cos());
+            //let d = x - y;
+
             angular_velocity.0 = d / dt;
         }
     }
@@ -414,7 +418,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
             mut orientation,
         ): Self::SystemData
     ) {
-        let num_iterations = 100;
+        let num_iterations = 20;
 
         for _ in 0..num_iterations {
             for c in &constraints.0 {
