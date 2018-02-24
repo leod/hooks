@@ -71,7 +71,7 @@ pub mod auth {
                         angle: true,
                     },
                     def: constraint::Def {
-                        kind: constraint::Kind::Joint { distance: 300.0 },
+                        kind: constraint::Kind::Joint { distance: 0.0 },
                         p_object_a: Point2::new(0.0, 100.0),
                         p_object_b: Point2::origin(),
                     },

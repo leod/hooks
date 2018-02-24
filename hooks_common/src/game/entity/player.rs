@@ -124,7 +124,7 @@ const MOVE_SPEED: f32 = 100.0;
 
 const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const HOOK_SHOOT_SPEED: f32 = 300.0;
+const HOOK_SHOOT_SPEED: f32 = 500.0;
 const HOOK_SEGMENT_LENGTH: f32 = 30.0;
 const HOOK_LUNCH_TIME_SECS: f32 = 1.0;
 
@@ -230,7 +230,7 @@ pub mod auth {
 }
 
 fn build_player(builder: EntityBuilder) -> EntityBuilder {
-    let shape = Cuboid::new(Vector2::new(15.0, 15.0));
+    let shape = Cuboid::new(Vector2::new(10.0, 10.0));
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER]);
@@ -243,7 +243,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         .with(Orientation(0.0))
         .with(Velocity(zero()))
         .with(AngularVelocity(0.0))
-        .with(InvMass(1.0 / 10.0))
+        .with(InvMass(1.0 / 200.0))
         .with(InvAngularMass(1.0 / 10.0))
         .with(Dynamic)
         .with(Friction(15.0))
@@ -272,7 +272,7 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
             12.0 / (5.0 * (HOOK_SEGMENT_LENGTH.powi(2) + 9.0)),
         ))
         .with(Dynamic)
-        .with(Friction(1.0))
+        .with(Friction(5.0))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
 }
@@ -477,7 +477,9 @@ impl<'a> System<'a> for InputSys {
 
                     // Join player with first hook segments
                     // activate spook hier
-                    if let Some(&first_segment) = active_segments.get(0) {
+                    if let (Some(&first_segment), Some(&last_segment)) =
+                        (active_segments.first(), active_segments.last())
+                    {
                         let new_lunch_timer = (lunch_timer + dt).min(HOOK_LUNCH_TIME_SECS);
                         hook.state = HookState::Contracting {
                             lunch_timer: new_lunch_timer,
@@ -489,11 +491,13 @@ impl<'a> System<'a> for InputSys {
                             norm(&(data.position.get(first_segment).unwrap().0 - position.0));
                         let distance = cur_distance.min(target_distance);
 
+                        let is_last_fixed = data.segment.get(last_segment).unwrap().fixed.is_some();
+
                         let constraint = Constraint {
                             entity_a: entity,
                             entity_b: first_segment,
                             vars_a: constraint::Vars {
-                                p: true,
+                                p: is_last_fixed,
                                 angle: false,
                             },
                             vars_b: constraint::Vars {
@@ -520,7 +524,7 @@ impl<'a> System<'a> for InputSys {
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
-                        p: false,
+                        p: true,
                         angle: false,
                     },
                     vars_b: constraint::Vars {
