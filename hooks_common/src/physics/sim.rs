@@ -57,7 +57,7 @@ pub fn run(world: &World) {
     collision::UpdateSys.run_now(&world.res);
 
     PrepareSys.run_now(&world.res);
-    //FrictionForceSys.run_now(&world.res);
+    FrictionForceSys.run_now(&world.res);
     //JointForceSys.run_now(&world.res);
     IntegrateForceSys.run_now(&world.res);
     SavePositionSys.run_now(&world.res);

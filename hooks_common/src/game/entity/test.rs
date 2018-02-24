@@ -50,11 +50,10 @@ pub mod auth {
         type SystemData = (
             Entities<'a>,
             FetchMut<'a, Constraints>,
-            ReadStorage<'a, Position>,
             ReadStorage<'a, Test>,
         );
 
-        fn run(&mut self, (entities, mut constraints, position, test): Self::SystemData) {
+        fn run(&mut self, (entities, mut constraints, test): Self::SystemData) {
             let test_entities = (&*entities, &test)
                 .join()
                 .map(|(e, _)| e)
@@ -72,7 +71,7 @@ pub mod auth {
                         angle: true,
                     },
                     def: constraint::Def {
-                        kind: constraint::Kind::Joint,
+                        kind: constraint::Kind::Joint { distance: 300.0 },
                         p_object_a: Point2::new(0.0, 100.0),
                         p_object_b: Point2::origin(),
                     },
