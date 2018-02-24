@@ -109,6 +109,9 @@ impl Def {
                 );
                 let jacobian = jacobian_f.transpose() * f / value_f;
 
+                //debug!("f {}", f);
+                //debug!("jacobian_f {}", jacobian_f);
+
                 (value, jacobian.transpose())
             }
             Kind::Contact { normal } => {
@@ -152,9 +155,11 @@ pub fn solve_for_position(
 
     let delta = -lambda * jacobian.component_mul(&inv_m).transpose();
 
-    debug!("value {}", value);
-    debug!("jacobian {}", jacobian);
-    debug!("error {}", value + dot(&jacobian, &delta.transpose()));
+    //debug!("value {}", value);
+    //debug!("jacobian {}", jacobian);
+    //debug!("error {}", value + dot(&jacobian, &delta.transpose()));
+    //debug!("delta {}", delta);
+    //panic!("bubadu");
 
     /*(Position {
         p: x_a.p + Vector2::new(delta.w, delta.a), 
@@ -164,6 +169,17 @@ pub fn solve_for_position(
         p: x_b.p + Vector2::new(delta.x, delta.y), 
         angle: x_b.angle + delta.z,
     })*/
+
+    /*(
+        Position {
+            p: x_a.p + Vector2::new(delta.x, delta.y),
+            angle: x_a.angle + delta.z.atan(),
+        },
+        Position {
+            p: x_b.p + Vector2::new(delta.w, delta.a),
+            angle: x_b.angle + delta.b.atan(),
+        },
+    )*/
 
     (
         Position {

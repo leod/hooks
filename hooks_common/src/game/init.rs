@@ -26,7 +26,7 @@ fn create_state(world: &mut World) {
 }
 
 pub mod auth {
-    use physics::Position;
+    use physics::{Position, Velocity};
     use repl;
 
     use super::*;
@@ -36,15 +36,22 @@ pub mod auth {
 
         // Just some stupid entities for initial testing
 
-        repl::entity::auth::create(world, 0, "test", |builder| {
+        /*repl::entity::auth::create(world, 0, "test", |builder| {
             builder.with(Position(Point2::new(0.0, -50.0)))
+        });*/
+        repl::entity::auth::create(world, 0, "test", |builder| {
+            builder
+                .with(Position(Point2::origin()))
+                .with(Velocity(Vector2::new(1.0, 0.0)))
         });
         repl::entity::auth::create(world, 0, "test", |builder| {
-            builder.with(Position(Point2::origin()))
+            builder
+                .with(Position(Point2::origin()))
+                .with(Velocity(Vector2::new(10.0, 0.0)))
         });
-        repl::entity::auth::create(world, 0, "test", |builder| {
+        /*repl::entity::auth::create(world, 0, "test", |builder| {
             builder.with(Position(Point2::new(0.0, 50.0)))
-        });
+        });*/
     }
 }
 

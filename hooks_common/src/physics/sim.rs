@@ -62,7 +62,7 @@ pub fn run(world: &World) {
     IntegrateForceSys.run_now(&world.res);
     SavePositionSys.run_now(&world.res);
     IntegrateVelocitySys.run_now(&world.res);
-    //HandleContactsSys.run_now(&world.res);
+    HandleContactsSys.run_now(&world.res);
     SolveConstraintsSys.run_now(&world.res);
     CorrectVelocitySys.run_now(&world.res);
 
@@ -248,11 +248,18 @@ impl<'a> System<'a> for CorrectVelocitySys {
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (_, position, old_position, velocity) in (&dynamic, &position, &old_position, &mut velocity).join() {
+        for (_, position, old_position, velocity) in
+            (&dynamic, &position, &old_position, &mut velocity).join()
+        {
             velocity.0 = (position.0 - old_position.0) / dt;
         }
-        for (_, orientation, old_orientation, angular_velocity) in (&dynamic, &orientation, &old_orientation, &mut angular_velocity).join() {
-            angular_velocity.0 = (orientation.0 - old_orientation.0) / dt;
+        for (_, orientation, old_orientation, angular_velocity) in
+            (&dynamic, &orientation, &old_orientation, &mut angular_velocity).join()
+        {
+            let x = orientation.0;
+            let y = old_orientation.0;
+            let d = (x - y).sin().atan2((x - y).cos());
+            angular_velocity.0 = d / dt;
         }
     }
 }
@@ -373,7 +380,7 @@ impl<'a> System<'a> for HandleContactsSys {
                             p_object_b,
                         },
                     };
-                    constraints.add(constraint);
+                    //constraints.add(constraint);
                 }
 
                 // TODO: Fix this position
@@ -407,7 +414,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
             mut orientation,
         ): Self::SystemData
     ) {
-        let num_iterations = 2;
+        let num_iterations = 100;
 
         for _ in 0..num_iterations {
             for c in &constraints.0 {
