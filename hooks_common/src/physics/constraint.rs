@@ -22,7 +22,7 @@ pub struct Mass {
 
 #[derive(Clone, Debug)]
 pub enum Kind {
-    Joint,
+    Joint { distance: f32 },
     Contact { normal: Vector2<f32> },
 }
 
@@ -85,10 +85,10 @@ impl Def {
         let p_b = rot_b * self.p_object_b.coords + x_b.p.coords;
 
         match self.kind {
-            Kind::Joint => {
+            Kind::Joint { distance } => {
                 let f = p_a - p_b;
                 let value_f = norm(&f);
-                let value = value_f; // TODO: -d
+                let value = value_f - distance;
                 let jacobian_f = Matrix2x6::new(
                     1.0,
                     0.0,
@@ -123,7 +123,7 @@ impl Def {
     /// Is this an inequality constraint, i.e. `C >= 0`, or an equality constraint, i.e. `C = 0`?
     pub fn is_inequality(&self) -> bool {
         match self.kind {
-            Kind::Joint => false,
+            Kind::Joint { .. } => false,
             Kind::Contact { .. } => true,
         }
     }

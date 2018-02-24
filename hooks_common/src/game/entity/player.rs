@@ -88,7 +88,7 @@ pub struct Player;
 pub enum HookState {
     Inactive,
     Shooting { time_secs: f32 },
-    Contracting,
+    Contracting { lunch_timer: f32 },
 }
 
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
@@ -122,10 +122,11 @@ struct DeactivateHookSegment;
 const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
-const HOOK_NUM_SEGMENTS: usize = 15;
+const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const HOOK_SHOOT_SPEED: f32 = 100.0;
+const HOOK_SHOOT_SPEED: f32 = 300.0;
 const HOOK_SEGMENT_LENGTH: f32 = 30.0;
+const HOOK_LUNCH_TIME_SECS: f32 = 1.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
     world
@@ -299,7 +300,11 @@ fn hook_segment_player_interaction(
     let mut hooks = world.write::<Hook>();
     let hook = hooks.get_mut(player_entity).unwrap();
 
-    if hook.state == HookState::Contracting {
+    if let HookState::Contracting { lunch_timer } = hook.state {
+        /*if lunch_timer < HOOK_LUNCH_TIME_SECS {
+            return;
+        }*/
+
         // Eat up the first segment if it comes close enough to our mouth.
 
         let &repl::Id((owner, _)) = world.read::<repl::Id>().get(player_entity).unwrap();
@@ -317,6 +322,8 @@ fn hook_segment_player_interaction(
             let mut actives = world.write::<Active>();
             let active = actives.get_mut(segment_entity).unwrap();
             active.0 = false;
+
+            hook.state = HookState::Contracting { lunch_timer: 0.0 };
         }
     }
 }
@@ -389,7 +396,6 @@ impl<'a> System<'a> for InputSys {
             let segments =
                 hook_segment_entities(&data.entity_map, &data.segment, first_segment_id).unwrap();
 
-            // Throw the hook
             let active_segments = active_hook_segment_entities(
                 &data.entity_map,
                 &data.active,
@@ -397,47 +403,43 @@ impl<'a> System<'a> for InputSys {
                 first_segment_id,
             ).unwrap();
 
-            if input.0.shoot_one {
-                if hook.state == HookState::Inactive {
-                    hook.state = HookState::Shooting { time_secs: 0.0 };
-
-                    let last_segment = *segments.last().unwrap();
-
-                    let xvel = Vector2::x_axis().unwrap() * orientation.0.cos();
-                    let yvel = Vector2::y_axis().unwrap() * orientation.0.sin();
-                    let segment_velocity = (xvel + yvel) * HOOK_SHOOT_SPEED;
-
-                    data.activate_segment.insert(
-                        last_segment,
-                        ActivateHookSegment {
-                            position: position.0,
-                            velocity: segment_velocity + velocity.0,
-                            orientation: orientation.0,
-                        },
-                    );
-                }
-            } else if let Some(&last_segment) = active_segments.last() {
-                data.segment.get_mut(last_segment).unwrap().fixed = None;
-            }
-
             // Update hook state
             match hook.state.clone() {
-                HookState::Inactive => {}
+                HookState::Inactive => {
+                    if input.0.shoot_one {
+                        hook.state = HookState::Shooting { time_secs: 0.0 };
+
+                        let last_segment = *segments.last().unwrap();
+
+                        let xvel = Vector2::x_axis().unwrap() * orientation.0.cos();
+                        let yvel = Vector2::y_axis().unwrap() * orientation.0.sin();
+                        let segment_velocity = (xvel + yvel) * HOOK_SHOOT_SPEED;
+
+                        data.activate_segment.insert(
+                            last_segment,
+                            ActivateHookSegment {
+                                position: position.0,
+                                velocity: segment_velocity + velocity.0,
+                                orientation: orientation.0,
+                            },
+                        );
+                    }
+                }
                 HookState::Shooting { time_secs } => {
                     let new_time_secs = time_secs; //+ dt;
                     if new_time_secs >= HOOK_MAX_SHOOT_TIME_SECS {
-                    } else if !active_segments.is_empty() {
+                    } else if let (Some(&first_segment), Some(&last_segment)) =
+                        (active_segments.first(), active_segments.last())
+                    {
                         hook.state = HookState::Shooting {
                             time_secs: new_time_secs,
                         };
 
-                        let last_segment = *active_segments.last().unwrap();
                         let is_last_fixed = data.segment.get(last_segment).unwrap().fixed.is_some();
 
                         if !input.0.shoot_one || is_last_fixed {
-                            hook.state = HookState::Contracting;
+                            hook.state = HookState::Contracting { lunch_timer: 0.0 };
                         } else {
-                            let first_segment = *active_segments.first().unwrap();
                             let first_position = data.position.get(first_segment).unwrap().0.coords;
 
                             // Activate new segment when the newest one is far enough from us
@@ -460,43 +462,56 @@ impl<'a> System<'a> for InputSys {
                                         },
                                     );
                                 } else {
-                                    hook.state = HookState::Contracting;
+                                    hook.state = HookState::Contracting { lunch_timer: 0.0 };
                                 }
                             }
                         }
                     }
                 }
-                HookState::Contracting => {
-                    if active_segments.is_empty() {
+                HookState::Contracting { lunch_timer } => {
+                    if !input.0.shoot_one {
+                        if let Some(&last_segment) = active_segments.last() {
+                            data.segment.get_mut(last_segment).unwrap().fixed = None;
+                        }
+                    }
+
+                    // Join player with first hook segments
+                    // activate spook hier
+                    if let Some(&first_segment) = active_segments.get(0) {
+                        let new_lunch_timer = (lunch_timer + dt).min(HOOK_LUNCH_TIME_SECS);
+                        hook.state = HookState::Contracting {
+                            lunch_timer: new_lunch_timer,
+                        };
+
+                        let target_distance =
+                            (1.0 - new_lunch_timer / HOOK_LUNCH_TIME_SECS) * HOOK_SEGMENT_LENGTH;
+                        let cur_distance =
+                            norm(&(data.position.get(first_segment).unwrap().0 - position.0));
+                        let distance = cur_distance.min(target_distance);
+
+                        let constraint = Constraint {
+                            entity_a: entity,
+                            entity_b: first_segment,
+                            vars_a: constraint::Vars {
+                                p: true,
+                                angle: false,
+                            },
+                            vars_b: constraint::Vars {
+                                p: true,
+                                angle: true,
+                            },
+                            def: constraint::Def {
+                                kind: constraint::Kind::Joint { distance },
+                                p_object_a: Point2::origin(),
+                                p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
+                            },
+                        };
+                        data.constraints.add(constraint);
+                    } else {
                         hook.state = HookState::Inactive;
                     }
                 }
             };
-
-            // Join player with first hook segments
-            // activate spook hier
-            if let Some(&first_segment) = active_segments.get(0) {
-                if hook.state == HookState::Contracting {
-                    let constraint = Constraint {
-                        entity_a: entity,
-                        entity_b: first_segment,
-                        vars_a: constraint::Vars {
-                            p: true,
-                            angle: false,
-                        },
-                        vars_b: constraint::Vars {
-                            p: true,
-                            angle: true,
-                        },
-                        def: constraint::Def {
-                            kind: constraint::Kind::Joint,
-                            p_object_a: Point2::origin(),
-                            p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
-                        },
-                    };
-                    data.constraints.add(constraint);
-                }
-            }
 
             // Join successive hook segments
             let active_segment_pairs = active_segments.iter().zip(active_segments.iter().skip(1));
@@ -505,15 +520,15 @@ impl<'a> System<'a> for InputSys {
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
-                        p: true,
-                        angle: true,
+                        p: false,
+                        angle: false,
                     },
                     vars_b: constraint::Vars {
                         p: true,
                         angle: true,
                     },
                     def: constraint::Def {
-                        kind: constraint::Kind::Joint,
+                        kind: constraint::Kind::Joint { distance: 0.0 },
                         p_object_a: Point2::new(HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                         p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                     },
