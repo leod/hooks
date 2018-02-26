@@ -32,7 +32,6 @@ pub mod auth {
         entity::add_ctor(reg, "test", |builder| {
             builder
                 .with(Orientation(0.0))
-                .with(AngularVelocity(0.1))
                 .with(Test(0.0))
                 .with(Dynamic)
                 .with(InvMass(1.0))
@@ -64,15 +63,15 @@ pub mod auth {
                     entity_b: b,
                     vars_a: constraint::Vars {
                         p: true,
-                        angle: true,
+                        angle: false,
                     },
                     vars_b: constraint::Vars {
                         p: true,
-                        angle: true,
+                        angle: false,
                     },
                     def: constraint::Def {
-                        kind: constraint::Kind::Joint { distance: 0.0 },
-                        p_object_a: Point2::new(0.0, 100.0),
+                        kind: constraint::Kind::Joint { distance: 300.0 },
+                        p_object_a: Point2::origin(),
                         p_object_b: Point2::origin(),
                     },
                 };

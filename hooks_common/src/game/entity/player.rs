@@ -66,13 +66,13 @@ pub fn register(reg: &mut Registry) {
         Some(interaction::Action::PreventOverlap),
         Some(hook_segment_wall_interaction),
     );
-    interaction::set(
+    /*interaction::set(
         reg,
         "hook_segment",
         "player",
         None,
         Some(hook_segment_player_interaction),
-    );
+    );*/
 }
 
 /// Component that is attached whenever player input should be executed for an entity.
@@ -126,7 +126,8 @@ const HOOK_NUM_SEGMENTS: usize = 10;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 500.0;
 const HOOK_SEGMENT_LENGTH: f32 = 30.0;
-const HOOK_LUNCH_TIME_SECS: f32 = 1.0;
+const HOOK_LUNCH_TIME_SECS: f32 = 0.3;
+const HOOK_LUNCH_RADIUS: f32 = 5.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
     world
@@ -246,7 +247,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         .with(InvMass(1.0 / 200.0))
         .with(InvAngularMass(1.0 / 10.0))
         .with(Dynamic)
-        .with(Friction(15.0))
+        .with(Friction(200.0 * 100.0))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
         .with(Player)
@@ -305,8 +306,6 @@ fn hook_segment_player_interaction(
             return;
         }*/
 
-        // Eat up the first segment if it comes close enough to our mouth.
-
         let &repl::Id((owner, _)) = world.read::<repl::Id>().get(player_entity).unwrap();
         let first_segment_id = (owner, hook.first_segment_index);
 
@@ -324,6 +323,8 @@ fn hook_segment_player_interaction(
             active.0 = false;
 
             hook.state = HookState::Contracting { lunch_timer: 0.0 };
+            
+            debug!("eat");
         }
     }
 }
@@ -485,32 +486,49 @@ impl<'a> System<'a> for InputSys {
                             lunch_timer: new_lunch_timer,
                         };
 
+                        let segment_p = data.position.get(first_segment).unwrap().0;
+                        let segment_rot = Rotation2::new(data.orientation.get(first_segment).unwrap().0).matrix().clone();
+                        let segment_attach_p = segment_rot * Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0) + segment_p.coords;
+
                         let target_distance =
                             (1.0 - new_lunch_timer / HOOK_LUNCH_TIME_SECS) * HOOK_SEGMENT_LENGTH;
-                        let cur_distance =
-                            norm(&(data.position.get(first_segment).unwrap().0 - position.0));
-                        let distance = cur_distance.min(target_distance);
+                        let cur_distance = norm(&(segment_attach_p - position.0));
 
-                        let is_last_fixed = data.segment.get(last_segment).unwrap().fixed.is_some();
+                        debug!("target {} cur {}", target_distance, cur_distance);
 
-                        let constraint = Constraint {
-                            entity_a: entity,
-                            entity_b: first_segment,
-                            vars_a: constraint::Vars {
-                                p: is_last_fixed,
-                                angle: false,
-                            },
-                            vars_b: constraint::Vars {
-                                p: true,
-                                angle: true,
-                            },
-                            def: constraint::Def {
-                                kind: constraint::Kind::Joint { distance },
-                                p_object_a: Point2::origin(),
-                                p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
-                            },
-                        };
-                        data.constraints.add(constraint);
+                        // Eat up the first segment if it comes close enough to our mouth.
+                        /*if cur_distance < HOOK_LUNCH_RADIUS {
+                            // Yummy!
+                            let segment_active = data.active.get_mut(first_segment).unwrap();
+                            segment_active.0 = false;
+
+                            hook.state = HookState::Contracting { lunch_timer: 0.0 };
+                        
+                            debug!("eat");
+                        } else {
+                            let constraint_distance = cur_distance.min(target_distance);
+
+                            let is_last_fixed = data.segment.get(last_segment).unwrap().fixed.is_some();
+
+                            let constraint = Constraint {
+                                entity_a: entity,
+                                entity_b: first_segment,
+                                vars_a: constraint::Vars {
+                                    p: is_last_fixed,
+                                    angle: false,
+                                },
+                                vars_b: constraint::Vars {
+                                    p: true,
+                                    angle: true,
+                                },
+                                def: constraint::Def {
+                                    kind: constraint::Kind::Joint { distance: constraint_distance },
+                                    p_object_a: Point2::origin(),
+                                    p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
+                                },
+                            };
+                            data.constraints.add(constraint);
+                        }*/
                     } else {
                         hook.state = HookState::Inactive;
                     }
