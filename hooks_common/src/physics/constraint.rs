@@ -147,13 +147,14 @@ pub fn solve_for_position(
     );
     let (value, jacobian) = constraint.calculate(x_a, x_b);
 
-    if value <= 0.0001 {
+    if value.abs() <= 0.0001 {
         return (x_a.clone(), x_b.clone());
     }
 
     let lambda = value / dot(&jacobian.component_mul(&inv_m), &jacobian);
+    //debug!("{} {}", value, lambda);
 
-    let delta = -lambda * 0.5 * jacobian.component_mul(&inv_m).transpose();
+    let delta = -lambda * 1.0 * jacobian.component_mul(&inv_m).transpose();
 
     (
         Position {

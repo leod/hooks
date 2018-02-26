@@ -145,7 +145,8 @@ impl Game {
         }
 
         // Start ticks
-        while self.tick_timer.trigger() {
+        //while self.tick_timer.trigger() {
+        while self.last_tick < self.tick_history.max_num() {
             let tick = if let Some(last_tick) = self.last_tick {
                 let next_tick = last_tick + 1;
                 self.tick_history.get(next_tick).map(|_| next_tick)

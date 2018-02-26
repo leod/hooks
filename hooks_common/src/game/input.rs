@@ -15,8 +15,9 @@ pub mod auth {
             player::run_input(world, entity, input);
         }
 
-        // TODO: Player-owned entities should move *only* in `run_player_input`. This should make
-        //       prediction easier. However, it means that we need to apply the physics simulation
-        //       separately for each player! Need to think about how best to do this.
+        // TODO: Physics simulation should run for player-owned entities every time that input is
+        //       given. However, we need to be careful and limit the number of inputs that may be
+        //       applied in one tick. Currently, it is possible to explode the simulation by
+        //       lagging the client and assumably applying too many inputs at once.
     }
 }
