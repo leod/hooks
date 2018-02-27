@@ -1,11 +1,12 @@
 use specs::{Dispatcher, RunNow, World};
 
+use defs::{PlayerId, PlayerInput};
 use registry::{EventHandler, Registry, TickFn};
 use event::{self, Event};
 use entity;
 use physics;
 use repl::{self, tick};
-use game;
+use game::{self, input};
 
 pub struct State {
     pub world: World,
@@ -94,10 +95,18 @@ impl State {
     }
 
     /// Running a tick on the server side.
-    pub fn run_tick_auth(&mut self) -> Result<Vec<Box<Event>>, repl::Error> {
+    pub fn run_tick_auth(
+        &mut self,
+        inputs: Vec<(PlayerId, PlayerInput)>,
+    ) -> Result<Vec<Box<Event>>, repl::Error> {
         self.run_pre_tick()?;
+
+        // TODO: For now, just run everyone's input here. This might need to get refined!
+        for (player_id, input) in inputs {
+            input::auth::run_player_input(&mut self.world, player_id, &input);
+        }
+
         self.run_tick()?;
-        physics::sim::run(&self.world);
         self.run_post_tick()
     }
 
@@ -120,6 +129,8 @@ impl State {
             let mut sys = game::LoadSnapshotSys(snapshot);
             sys.run_now(&self.world.res);
         }
+
+        // TODO: Client-side prediction here? What about input frequency > tick frequency?
 
         self.run_tick()?;
         self.run_post_tick()

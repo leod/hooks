@@ -2,6 +2,7 @@ pub mod auth {
     use specs::World;
 
     use defs::{PlayerId, PlayerInput};
+    use physics;
     use repl::player::Players;
     use game::entity::player;
 
@@ -15,9 +16,11 @@ pub mod auth {
             player::run_input(world, entity, input);
         }
 
-        // TODO: Physics simulation should run for player-owned entities every time that input is
-        //       given. However, we need to be careful and limit the number of inputs that may be
-        //       applied in one tick. Currently, it is possible to explode the simulation by
-        //       lagging the client and assumably applying too many inputs at once.
+        // TODO: We need to be careful and limit the number of inputs that may be applied in one
+        //       tick. Currently, it is possible to explode the simulation by lagging the client
+        //       and assumably applying too many inputs at once.
+        // TODO: Physics simulation should run *only* for player-owned entities every time that
+        //       input is given.
+        physics::sim::run(world);
     }
 }
