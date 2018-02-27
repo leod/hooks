@@ -4,7 +4,6 @@ use defs::{PlayerId, PlayerInput};
 use registry::{EventHandler, Registry, TickFn};
 use event::{self, Event};
 use entity;
-use physics;
 use repl::{self, tick};
 use game::{self, input};
 

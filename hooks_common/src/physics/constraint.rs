@@ -33,6 +33,7 @@ pub enum Def {
     },
     Contact {
         normal: Vector2<f32>,
+        margin: f32,
 
         /// Object-space coordinates.
         p_object_a: Point2<f32>,
@@ -95,7 +96,6 @@ impl Def {
                 let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
                     .matrix()
                     .clone();
-
                 let p_a = rot_a * p_object_a.coords + x_a.p.coords;
                 let p_b = rot_b * p_object_b.coords + x_b.p.coords;
 
@@ -124,16 +124,39 @@ impl Def {
                 (value, jacobian.transpose())
             }
             &Def::Angle { angle } => {
-                let value = x_a.angle - x_b.angle;
+                let value = x_a.angle - x_b.angle - angle;
                 let jacobian = RowVector6::new(0.0, 0.0, 1.0, 0.0, 0.0, -1.0);
                 (value, jacobian)
             }
             &Def::Contact {
                 normal,
+                margin,
                 p_object_a,
                 p_object_b,
             } => {
-                unimplemented!();
+                // TODO: Create functions for this stuff
+                let rot_a = Rotation2::new(x_a.angle).matrix().clone();
+                let rot_b = Rotation2::new(x_b.angle).matrix().clone();
+                let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
+                    .matrix()
+                    .clone();
+                let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
+                    .matrix()
+                    .clone();
+                let p_a = rot_a * p_object_a.coords + x_a.p.coords;
+                let p_b = rot_b * p_object_b.coords + x_b.p.coords;
+
+                let value = dot(&(p_a - p_b), &normal) - margin;
+                let jacobian = RowVector6::new(
+                    normal.x,
+                    normal.y,
+                    dot(&(deriv_rot_a * p_object_a.coords), &normal),
+                    -normal.x,
+                    -normal.y,
+                    -dot(&(deriv_rot_b * p_object_b.coords), &normal),
+                );
+
+                (value, jacobian)
             }
             &Def::Sum(ref k1, ref k2) => {
                 let (value_1, jacobian_1) = k1.calculate(x_a, x_b);
