@@ -21,7 +21,7 @@ type Handler = fn(&World, Entity, Entity, Point2<f32>);
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Action {
     /// Prevent these entities from overlapping.
-    PreventOverlap,
+    PreventOverlap { rotate_a: bool, rotate_b: bool },
 }
 
 #[derive(Clone)]
@@ -94,7 +94,19 @@ where
     handlers
         .0
         .get(&id_pair)
-        .map(|&(_, _, ref def)| def.action.clone())
+        .map(|&(handler_id_a, _handler_id_b, ref handler)| {
+            if id_a == handler_id_a {
+                handler.action.clone()
+            } else {
+                // Fix up actions so that it is in the order of `entity_a` and `entity_b`
+                handler.action.as_ref().map(|action| match action {
+                    &Action::PreventOverlap { rotate_a, rotate_b } => Action::PreventOverlap {
+                        rotate_a: rotate_b,
+                        rotate_b: rotate_a,
+                    },
+                })
+            }
+        })
         .and_then(|x| x)
 }
 

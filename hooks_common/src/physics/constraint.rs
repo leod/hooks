@@ -6,7 +6,7 @@ use std::f32;
 
 use specs::Entity;
 
-use nalgebra::{dot, norm, Matrix2, Matrix2x6, Point2, Rotation2, RowVector6, Vector2, Vector6};
+use nalgebra::{dot, norm, Matrix2x6, Point2, Rotation2, RowVector6, Vector2};
 
 #[derive(Clone, Debug)]
 pub struct Position {

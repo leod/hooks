@@ -221,7 +221,6 @@ struct CorrectVelocitySys;
 impl<'a> System<'a> for CorrectVelocitySys {
     type SystemData = (
         Fetch<'a, GameInfo>,
-        Entities<'a>,
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, OldPosition>,
@@ -236,7 +235,6 @@ impl<'a> System<'a> for CorrectVelocitySys {
         &mut self,
         (
             game_info,
-            entities,
             dynamic,
             position,
             old_position,
@@ -311,7 +309,7 @@ impl<'a> System<'a> for IntegrateForceSys {
 
             velocity.0 += force.0 * inv_mass.0 * dt;
 
-            /*// TODO: Angular friction
+            // TODO: Angular friction
             if ang_velocity.0.abs() > 0.01 {
                 let signum = ang_velocity.0.signum();
                 ang_velocity.0 -= 100.0 * signum * dt;
@@ -320,7 +318,7 @@ impl<'a> System<'a> for IntegrateForceSys {
                 }
             } else {
                 ang_velocity.0 = 0.0;
-            }*/
+            }
         }
     }
 }
@@ -364,28 +362,32 @@ impl<'a> System<'a> for HandleContactsSys {
                     entity_b
 				);
 
-                if action == Some(interaction::Action::PreventOverlap) {
-                    // TODO: Easier way to get object-space contact coordinates?
-                    let p_object_a = oa.position().inverse() * contact.world1;
-                    let p_object_b = ob.position().inverse() * contact.world2;
+                if let Some(action) = action {
+                    match action {
+                        interaction::Action::PreventOverlap { rotate_a, rotate_b } => {
+                            // TODO: Easier way to get object-space contact coordinates?
+                            let p_object_a = oa.position().inverse() * contact.world1;
+                            let p_object_b = ob.position().inverse() * contact.world2;
 
-                    // TODO
-                    let dynamic_a = dynamic.get(entity_a).is_some();
-                    let dynamic_b = dynamic.get(entity_b).is_some();
+                            // TODO
+                            let dynamic_a = dynamic.get(entity_a).is_some();
+                            let dynamic_b = dynamic.get(entity_b).is_some();
 
-                    let constraint = Constraint {
-                        entity_a,
-                        entity_b,
-                        vars_a: constraint::Vars { p: dynamic_a, angle: dynamic_a },
-                        vars_b: constraint::Vars { p: dynamic_b, angle: dynamic_b },
-                        def: constraint::Def::Contact {
-                            normal: contact.normal.unwrap(),
-                            margin: 0.1,
-                            p_object_a,
-                            p_object_b,
-                        },
-                    };
-                    constraints.add(constraint);
+                            let constraint = Constraint {
+                                entity_a,
+                                entity_b,
+                                vars_a: constraint::Vars { p: dynamic_a, angle: rotate_a },
+                                vars_b: constraint::Vars { p: dynamic_b, angle: rotate_b },
+                                def: constraint::Def::Contact {
+                                    normal: contact.normal.unwrap(),
+                                    margin: 0.1,
+                                    p_object_a,
+                                    p_object_b,
+                                },
+                            };
+                            constraints.add(constraint);
+                        }
+                    }
                 }
 
                 // TODO: Fix this position

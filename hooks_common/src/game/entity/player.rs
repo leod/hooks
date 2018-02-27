@@ -56,14 +56,20 @@ pub fn register(reg: &mut Registry) {
         reg,
         "player",
         "wall",
-        Some(interaction::Action::PreventOverlap),
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
         None,
     );
     interaction::set(
         reg,
         "hook_segment",
         "wall",
-        Some(interaction::Action::PreventOverlap),
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
         //None,
         Some(hook_segment_wall_interaction),
     );
@@ -123,10 +129,10 @@ struct DeactivateHookSegment;
 const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
-const HOOK_NUM_SEGMENTS: usize = 15;
+pub const HOOK_NUM_SEGMENTS: usize = 15;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 500.0;
-const HOOK_SEGMENT_LENGTH: f32 = 20.0;
+pub const HOOK_SEGMENT_LENGTH: f32 = 20.0;
 const HOOK_LUNCH_TIME_SECS: f32 = 0.1;
 const HOOK_LUNCH_RADIUS: f32 = 5.0;
 
@@ -483,7 +489,7 @@ impl<'a> System<'a> for InputSys {
                                 p_object_a: Point2::origin(),
                                 p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                             };
-                            let angle_def = constraint::Def::Angle { angle: 0.0 };
+                            //let angle_def = constraint::Def::Angle { angle: 0.0 };
 
                             let joint_constraint = Constraint {
                                 entity_a: entity,
@@ -498,7 +504,9 @@ impl<'a> System<'a> for InputSys {
                                 },
                                 def: joint_def,
                             };
-                            let angle_constraint = Constraint {
+                            data.constraints.add(joint_constraint);
+
+                            /*let angle_constraint = Constraint {
                                 entity_a: entity,
                                 entity_b: first_segment,
                                 vars_a: constraint::Vars {
@@ -511,8 +519,7 @@ impl<'a> System<'a> for InputSys {
                                 },
                                 def: angle_def,
                             };
-                            data.constraints.add(joint_constraint);
-                            //data.constraints.add(angle_constraint);
+                            data.constraints.add(angle_constraint);*/
                         }
                     } else {
                         hook.state = HookState::Inactive;
