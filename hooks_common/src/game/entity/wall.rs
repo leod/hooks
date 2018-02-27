@@ -1,22 +1,29 @@
 use nalgebra::{Point2, Vector2};
 use specs::{DenseVecStorage, Entity, World};
 
+use defs::{EntityId, INVALID_PLAYER_ID};
+use registry::Registry;
 use physics::{Orientation, Position};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
-use registry::Registry;
-use entity;
+use repl;
+use game;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Size>();
 
-    entity::register_class(reg, "wall", |builder| builder);
+    repl::entity::register_class::<game::ComponentType>(reg, "wall", &[], |builder| builder);
 }
 
 #[derive(Component)]
 #[component(DenseVecStorage)]
 pub struct Size(pub Vector2<f32>);
 
-pub fn create(world: &mut World, pos: Point2<f32>, size: Vector2<f32>, angle: f32) -> Entity {
+pub fn create(
+    world: &mut World,
+    pos: Point2<f32>,
+    size: Vector2<f32>,
+    angle: f32,
+) -> (EntityId, Entity) {
     assert!(size.x > 0.0);
     assert!(size.y > 0.0);
 
@@ -28,14 +35,15 @@ pub fn create(world: &mut World, pos: Point2<f32>, size: Vector2<f32>, angle: f3
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
-    let class_id = entity::get_class_id(world, "wall").unwrap();
+    let (entity_index, entity) =
+        repl::entity::auth::create(world, INVALID_PLAYER_ID, "wall", |builder| {
+            builder
+                .with(Position(pos))
+                .with(Orientation(angle))
+                .with(Size(size * 2.0))
+                .with(collision::Shape(ShapeHandle::new(shape)))
+                .with(collision::Object { groups, query_type })
+        });
 
-    entity::create(world, class_id, |builder| {
-        builder
-            .with(Position(pos))
-            .with(Orientation(angle))
-            .with(Size(size * 2.0))
-            .with(collision::Shape(ShapeHandle::new(shape)))
-            .with(collision::Object { groups, query_type })
-    })
+    ((entity_index, INVALID_PLAYER_ID), entity)
 }
