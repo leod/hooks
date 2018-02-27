@@ -1,5 +1,4 @@
 use std::ops::Deref;
-use std::f32;
 
 use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
 use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, FetchMut, Join, MaskedStorage,
@@ -65,6 +64,7 @@ pub fn register(reg: &mut Registry) {
         "hook_segment",
         "wall",
         Some(interaction::Action::PreventOverlap),
+        //None,
         Some(hook_segment_wall_interaction),
     );
     /*interaction::set(
@@ -483,9 +483,7 @@ impl<'a> System<'a> for InputSys {
                                 p_object_a: Point2::origin(),
                                 p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                             };
-                            let angle_def = constraint::Def::Angle {
-                                angle: f32::consts::PI,
-                            };
+                            let angle_def = constraint::Def::Angle { angle: 0.0 };
 
                             let joint_constraint = Constraint {
                                 entity_a: entity,
@@ -530,9 +528,7 @@ impl<'a> System<'a> for InputSys {
                     p_object_a: Point2::new(HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                     p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                 };
-                let angle_def = constraint::Def::Angle {
-                    angle: f32::consts::PI,
-                };
+                let angle_def = constraint::Def::Angle { angle: 0.0 };
 
                 /*let sum_def = constraint::Def::Sum(
                     Box::new(joint_def),

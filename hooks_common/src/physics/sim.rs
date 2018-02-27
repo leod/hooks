@@ -380,11 +380,12 @@ impl<'a> System<'a> for HandleContactsSys {
                         vars_b: constraint::Vars { p: dynamic_b, angle: dynamic_b },
                         def: constraint::Def::Contact {
                             normal: contact.normal.unwrap(),
+                            margin: 0.1,
                             p_object_a,
                             p_object_b,
                         },
                     };
-                    //constraints.add(constraint);
+                    constraints.add(constraint);
                 }
 
                 // TODO: Fix this position

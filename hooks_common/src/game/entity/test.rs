@@ -1,4 +1,4 @@
-use nalgebra::{Point2, Vector2};
+use nalgebra::Point2;
 
 use defs::GameInfo;
 use game::ComponentType;
