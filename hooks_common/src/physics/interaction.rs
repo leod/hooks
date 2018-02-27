@@ -15,7 +15,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(Handlers(BTreeMap::new()));
 }
 
-type Handler = fn(&World, Entity, Entity, Point2<f32>);
+type Handler = fn(&World, Entity, Entity, Point2<f32>, Point2<f32>);
 
 /// An action that should be taken when two entities overlap in a physics prediction step.
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -110,7 +110,13 @@ where
         .and_then(|x| x)
 }
 
-pub fn run(world: &World, entity_a: Entity, entity_b: Entity, pos: Point2<f32>) {
+pub fn run(
+    world: &World,
+    entity_a: Entity,
+    entity_b: Entity,
+    pos_a: Point2<f32>,
+    pos_b: Point2<f32>,
+) {
     setup(world);
 
     let (id_a, id_b) = {
@@ -133,9 +139,9 @@ pub fn run(world: &World, entity_a: Entity, entity_b: Entity, pos: Point2<f32>) 
         if let Some(handler) = def.handler {
             // Make sure to pass the entities in the order in which the handler expects them
             if id_a == handler_id_a {
-                handler(world, entity_a, entity_b, pos);
+                handler(world, entity_a, entity_b, pos_a, pos_b);
             } else {
-                handler(world, entity_b, entity_a, pos);
+                handler(world, entity_b, entity_a, pos_b, pos_a);
             }
         }
     }

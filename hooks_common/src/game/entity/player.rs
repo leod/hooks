@@ -111,7 +111,7 @@ pub struct HookSegment {
     // TODO: `player_index` and `is_last` could be inferred in theory, but it wouldn't look pretty
     pub player_index: EntityIndex,
     pub is_last: bool,
-    pub fixed: Option<(f32, f32)>,
+    pub fixed: Option<(EntityId, (f32, f32))>,
 }
 
 #[derive(Component, PartialEq, Clone, Debug)]
@@ -132,7 +132,7 @@ const MOVE_SPEED: f32 = 100.0;
 pub const HOOK_NUM_SEGMENTS: usize = 15;
 pub const HOOK_SEGMENT_LENGTH: f32 = 30.0;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const HOOK_SHOOT_SPEED: f32 = 500.0;
+const HOOK_SHOOT_SPEED: f32 = 600.0;
 const HOOK_LUNCH_TIME_SECS: f32 = 0.1;
 const HOOK_LUNCH_RADIUS: f32 = 5.0;
 
@@ -288,14 +288,19 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
 fn hook_segment_wall_interaction(
     world: &World,
     segment_entity: Entity,
-    _wall_entity: Entity,
-    pos: Point2<f32>,
+    wall_entity: Entity,
+    _p_object_segment: Point2<f32>,
+    p_object_wall: Point2<f32>,
 ) {
+    let repl_ids = world.read::<repl::Id>();
     let mut segments = world.write::<HookSegment>();
+
     let segment = segments.get_mut(segment_entity).unwrap();
 
     if segment.is_last && segment.fixed.is_none() {
-        segment.fixed = Some((pos.x, pos.y));
+        let wall_id = repl_ids.get(wall_entity).unwrap().0;
+
+        segment.fixed = Some((wall_id, (p_object_wall.x, p_object_wall.y)));
     }
 }
 
@@ -310,7 +315,6 @@ struct InputData<'a> {
     repl_id: ReadStorage<'a, repl::Id>,
 
     active: WriteStorage<'a, Active>,
-    dynamic: WriteStorage<'a, Dynamic>,
 
     position: WriteStorage<'a, Position>,
     velocity: WriteStorage<'a, Velocity>,
@@ -486,7 +490,6 @@ impl<'a> System<'a> for InputSys {
                     }
 
                     // Join player with first hook segments
-                    // activate spook hier
                     if let (Some(&first_segment), Some(&last_segment)) =
                         (active_segments.first(), active_segments.last())
                     {
@@ -509,6 +512,38 @@ impl<'a> System<'a> for InputSys {
                         let cur_distance = norm(&(segment_attach_p - position.0));
 
                         //debug!("target {} cur {}", target_distance, cur_distance);
+
+                        // Fix last hook segment to the entity it has been attached to
+                        if let Some((fix_entity_id, (fix_x, fix_y))) =
+                            data.segment.get(last_segment).unwrap().fixed
+                        {
+                            if let Some(fix_entity) =
+                                data.entity_map.get_id_to_entity(fix_entity_id)
+                            {
+                                let joint_def = constraint::Def::Joint {
+                                    distance: 0.0,
+                                    p_object_a: Point2::new(HOOK_SEGMENT_LENGTH / 2.0, 0.0),
+                                    p_object_b: Point2::new(fix_x, fix_y),
+                                };
+                                let joint_constraint = Constraint {
+                                    def: joint_def,
+                                    stiffness: 1.0,
+                                    entity_a: last_segment,
+                                    entity_b: fix_entity,
+                                    vars_a: constraint::Vars {
+                                        p: true,
+                                        angle: true,
+                                    },
+                                    vars_b: constraint::Vars {
+                                        p: false,
+                                        angle: false,
+                                    },
+                                };
+                                data.constraints.add(joint_constraint);
+                            } else {
+                                warn!("hook attached to dead entity {:?}", fix_entity_id);
+                            }
+                        }
 
                         // Eat up the first segment if it comes close enough to our mouth.
                         if cur_distance < HOOK_LUNCH_RADIUS {
@@ -612,7 +647,7 @@ impl<'a> System<'a> for InputSys {
                 };
                 let angle_constraint = Constraint {
                     def: angle_def,
-                    stiffness: 0.5,
+                    stiffness: 0.7,
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
@@ -647,19 +682,6 @@ impl<'a> System<'a> for InputSys {
         }
 
         data.activate_segment.clear();
-
-        // Maintain dynamic flag: a fixed hook segment should not move in the physics simulation
-        // TODO: Update with constraints!
-        for (entity, segment, position) in
-            (&*data.entities, &data.segment, &mut data.position).join()
-        {
-            if let Some((x, y)) = segment.fixed {
-                position.0 = Point2::new(x, y);
-                data.dynamic.remove(entity);
-            } else {
-                data.dynamic.insert(entity, Dynamic);
-            }
-        }
 
         // Deactivate hook segments
         for (_, active) in (&data.deactivate_segment, &mut data.active).join() {
