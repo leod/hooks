@@ -437,6 +437,45 @@ impl<'a> System<'a> for InputSys {
                                 }
                             }
                         }
+
+                        // Join player with first hook segments
+                        let segment_p = data.position.get(first_segment).unwrap().0;
+                        let segment_rot = Rotation2::new(
+                            data.orientation.get(first_segment).unwrap().0,
+                        ).matrix()
+                            .clone();
+                        let segment_attach_p = segment_rot *
+                            Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0) +
+                            segment_p.coords;
+
+                        let target_distance = 0.0;
+                        let cur_distance = norm(&(segment_attach_p - position.0));
+
+                        if cur_distance > HOOK_SEGMENT_LENGTH / 2.0 {
+                            let constraint_distance = cur_distance.min(target_distance);
+
+                            let joint_def = constraint::Def::Joint {
+                                distance: constraint_distance,
+                                p_object_a: Point2::origin(),
+                                p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
+                            };
+
+                            let joint_constraint = Constraint {
+                                def: joint_def,
+                                stiffness: 1.0,
+                                entity_a: entity,
+                                entity_b: first_segment,
+                                vars_a: constraint::Vars {
+                                    p: is_last_fixed || true,
+                                    angle: false,
+                                },
+                                vars_b: constraint::Vars {
+                                    p: true,
+                                    angle: true,
+                                },
+                            };
+                            data.constraints.add(joint_constraint);
+                        }
                     }
                 }
                 HookState::Contracting { lunch_timer } => {
