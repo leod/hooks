@@ -58,11 +58,12 @@ pub struct Vars {
 /// A constraint between two entities.
 #[derive(Clone, Debug)]
 pub struct Constraint {
+    pub def: Def,
+    pub stiffness: f32,
     pub entity_a: Entity,
     pub entity_b: Entity,
     pub vars_a: Vars,
     pub vars_b: Vars,
-    pub def: Def,
 }
 
 impl Mass {
@@ -181,6 +182,7 @@ impl Def {
 /// Solve for the velocity update of one constraint.
 pub fn solve_for_position(
     constraint: &Def,
+    stiffness: f32,
     x_a: &Position,
     x_b: &Position,
     m_a: &Mass,
@@ -203,7 +205,7 @@ pub fn solve_for_position(
     let lambda = value / dot(&jacobian.component_mul(&inv_m), &jacobian);
     //debug!("{} {}", value, lambda);
 
-    let delta = -lambda * 1.0 * jacobian.component_mul(&inv_m).transpose();
+    let delta = -lambda * stiffness * jacobian.component_mul(&inv_m).transpose();
 
     (
         Position {

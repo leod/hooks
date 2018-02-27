@@ -492,6 +492,8 @@ impl<'a> System<'a> for InputSys {
                             //let angle_def = constraint::Def::Angle { angle: 0.0 };
 
                             let joint_constraint = Constraint {
+                                def: joint_def,
+                                stiffness: 1.0,
                                 entity_a: entity,
                                 entity_b: first_segment,
                                 vars_a: constraint::Vars {
@@ -502,7 +504,6 @@ impl<'a> System<'a> for InputSys {
                                     p: true,
                                     angle: true,
                                 },
-                                def: joint_def,
                             };
                             data.constraints.add(joint_constraint);
 
@@ -557,6 +558,8 @@ impl<'a> System<'a> for InputSys {
                 data.constraints.add(sum_constraint);*/
 
                 let joint_constraint = Constraint {
+                    def: joint_def,
+                    stiffness: 1.0,
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
@@ -567,9 +570,10 @@ impl<'a> System<'a> for InputSys {
                         p: true,
                         angle: true,
                     },
-                    def: joint_def,
                 };
                 let angle_constraint = Constraint {
+                    def: angle_def,
+                    stiffness: 0.5,
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
@@ -580,7 +584,6 @@ impl<'a> System<'a> for InputSys {
                         p: false,
                         angle: true,
                     },
-                    def: angle_def,
                 };
                 data.constraints.add(joint_constraint);
                 data.constraints.add(angle_constraint);
