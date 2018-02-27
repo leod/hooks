@@ -378,8 +378,8 @@ impl<'a> System<'a> for HandleContactsSys {
                         entity_b,
                         vars_a: constraint::Vars { p: dynamic_a, angle: dynamic_a },
                         vars_b: constraint::Vars { p: dynamic_b, angle: dynamic_b },
-                        def: constraint::Def {
-                            kind: constraint::Kind::Contact { normal: contact.normal.unwrap() },
+                        def: constraint::Def::Contact {
+                            normal: contact.normal.unwrap(),
                             p_object_a,
                             p_object_b,
                         },
