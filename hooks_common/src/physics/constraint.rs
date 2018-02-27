@@ -156,7 +156,7 @@ impl Def {
                     -dot(&(deriv_rot_b * p_object_b.coords), &normal),
                 );
 
-                (value, jacobian)
+                (-value, -jacobian)
             }
             &Def::Sum(ref k1, ref k2) => {
                 let (value_1, jacobian_1) = k1.calculate(x_a, x_b);
@@ -196,7 +196,7 @@ pub fn solve_for_position(
     );
     let (value, jacobian) = constraint.calculate(x_a, x_b);
 
-    if value.abs() <= 0.0001 {
+    if (constraint.is_inequality() && value >= 0.0) || value.abs() <= 0.0001 {
         return (x_a.clone(), x_b.clone());
     }
 
