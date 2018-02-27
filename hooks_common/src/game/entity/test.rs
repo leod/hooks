@@ -1,6 +1,5 @@
 use nalgebra::Point2;
 
-use defs::GameInfo;
 use game::ComponentType;
 use physics::{Dynamic, InvAngularMass, InvMass, Orientation};
 use physics::constraint::{self, Constraint};
@@ -19,7 +18,7 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub mod auth {
-    use specs::{BTreeStorage, Entities, Fetch, FetchMut, Join, ReadStorage, System, WriteStorage};
+    use specs::{BTreeStorage, Entities, FetchMut, Join, ReadStorage, System};
 
     use super::*;
 

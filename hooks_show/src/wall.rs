@@ -40,10 +40,21 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
         graphics::push_transform(ctx, Some(curr_transform * matrix));
         graphics::apply_transformations(ctx)?;
 
+        graphics::set_color(
+            ctx,
+            graphics::Color {
+                r: 0.7,
+                g: 0.7,
+                b: 0.7,
+                a: 1.0,
+            },
+        )?;
         assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
 
         graphics::pop_transform(ctx);
     }
+
+    graphics::set_color(ctx, graphics::WHITE)?;
 
     Ok(())
 }
