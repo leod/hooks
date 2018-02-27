@@ -323,7 +323,7 @@ fn hook_segment_player_interaction(
             active.0 = false;
 
             hook.state = HookState::Contracting { lunch_timer: 0.0 };
-            
+
             debug!("eat");
         }
     }
@@ -487,8 +487,13 @@ impl<'a> System<'a> for InputSys {
                         };
 
                         let segment_p = data.position.get(first_segment).unwrap().0;
-                        let segment_rot = Rotation2::new(data.orientation.get(first_segment).unwrap().0).matrix().clone();
-                        let segment_attach_p = segment_rot * Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0) + segment_p.coords;
+                        let segment_rot = Rotation2::new(
+                            data.orientation.get(first_segment).unwrap().0,
+                        ).matrix()
+                            .clone();
+                        let segment_attach_p = segment_rot *
+                            Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0) +
+                            segment_p.coords;
 
                         let target_distance =
                             (1.0 - new_lunch_timer / HOOK_LUNCH_TIME_SECS) * HOOK_SEGMENT_LENGTH;
@@ -496,7 +501,7 @@ impl<'a> System<'a> for InputSys {
 
                         debug!("target {} cur {}", target_distance, cur_distance);
 
-                        // Eat up the first segment if it comes close enough to our mouth.
+                    // Eat up the first segment if it comes close enough to our mouth.
                         /*if cur_distance < HOOK_LUNCH_RADIUS {
                             // Yummy!
                             let segment_active = data.active.get_mut(first_segment).unwrap();
@@ -528,8 +533,7 @@ impl<'a> System<'a> for InputSys {
                                 },
                             };
                             data.constraints.add(constraint);
-                        }*/
-                    } else {
+                        }*/                    } else {
                         hook.state = HookState::Inactive;
                     }
                 }
