@@ -374,16 +374,17 @@ impl<'a> System<'a> for HandleContactsSys {
                             let dynamic_b = dynamic.get(entity_b).is_some();
 
                             let constraint = Constraint {
-                                entity_a,
-                                entity_b,
-                                vars_a: constraint::Vars { p: dynamic_a, angle: rotate_a },
-                                vars_b: constraint::Vars { p: dynamic_b, angle: rotate_b },
                                 def: constraint::Def::Contact {
                                     normal: contact.normal.unwrap(),
                                     margin: 0.1,
                                     p_object_a,
                                     p_object_b,
                                 },
+                                stiffness: 1.0,
+                                entity_a,
+                                entity_b,
+                                vars_a: constraint::Vars { p: dynamic_a, angle: rotate_a },
+                                vars_b: constraint::Vars { p: dynamic_b, angle: rotate_b },
                             };
                             constraints.add(constraint);
                         }
@@ -447,6 +448,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
 
                     constraint::solve_for_position(
                         &c.def,
+                        c.stiffness,
                         &x_a,
                         &x_b,
                         &m_a.zero_out_constants(&c.vars_a),

@@ -58,6 +58,12 @@ pub mod auth {
                 .collect::<Vec<_>>();
             for (&a, &b) in test_entities.iter().zip(test_entities.iter().skip(1)) {
                 let constraint = Constraint {
+                    def: constraint::Def::Joint {
+                        distance: 300.0,
+                        p_object_a: Point2::origin(),
+                        p_object_b: Point2::origin(),
+                    },
+                    stiffness: 1.0,
                     entity_a: a,
                     entity_b: b,
                     vars_a: constraint::Vars {
@@ -67,11 +73,6 @@ pub mod auth {
                     vars_b: constraint::Vars {
                         p: true,
                         angle: false,
-                    },
-                    def: constraint::Def::Joint {
-                        distance: 300.0,
-                        p_object_a: Point2::origin(),
-                        p_object_b: Point2::origin(),
                     },
                 };
                 constraints.add(constraint);
