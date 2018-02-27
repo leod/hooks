@@ -14,6 +14,7 @@ use std::{env, path, thread};
 
 use nalgebra::{Point2, Vector2};
 
+use ggez::{conf, ContextBuilder};
 use ggez::event::{self, Keycode, MouseButton};
 use ggez::graphics::Font;
 
@@ -214,7 +215,10 @@ fn main() {
     let game = Game::new(reg, client.my_player_id(), client.game_info());
 
     // Initialize ggez
-    let ctx = &mut ggez::Context::load_from_conf("hooks", "leod", ggez::conf::Conf::new()).unwrap();
+    let ctx = &mut ContextBuilder::new("hooks-frenzy", "leod")
+        .window_mode(conf::WindowMode::default().dimensions(1600, 900))
+        .build()
+        .unwrap();
 
     if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
         let mut path = path::PathBuf::from(manifest_dir);
