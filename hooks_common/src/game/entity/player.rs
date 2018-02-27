@@ -130,9 +130,9 @@ const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
 pub const HOOK_NUM_SEGMENTS: usize = 15;
+pub const HOOK_SEGMENT_LENGTH: f32 = 30.0;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 500.0;
-pub const HOOK_SEGMENT_LENGTH: f32 = 20.0;
 const HOOK_LUNCH_TIME_SECS: f32 = 0.1;
 const HOOK_LUNCH_RADIUS: f32 = 5.0;
 
