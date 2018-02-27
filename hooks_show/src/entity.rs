@@ -20,10 +20,10 @@ pub fn register(reg: &mut hooks_common::Registry) {
         })
     });
 
-    entity::add_ctor(reg, "hook_segment", |builder| {
+    /*entity::add_ctor(reg, "hook_segment", |builder| {
         builder.with(rect::Draw {
             width: 10.0,
             height: 3.0,
         })
-    });
+    });*/
 }
