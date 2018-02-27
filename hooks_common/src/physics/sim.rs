@@ -376,7 +376,7 @@ impl<'a> System<'a> for HandleContactsSys {
                             let constraint = Constraint {
                                 def: constraint::Def::Contact {
                                     normal: contact.normal.unwrap(),
-                                    margin: 0.1,
+                                    margin: 0.2,
                                     p_object_a,
                                     p_object_b,
                                 },

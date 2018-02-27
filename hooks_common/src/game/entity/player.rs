@@ -133,7 +133,7 @@ pub const HOOK_NUM_SEGMENTS: usize = 15;
 pub const HOOK_SEGMENT_LENGTH: f32 = 30.0;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 600.0;
-const HOOK_LUNCH_TIME_SECS: f32 = 0.1;
+const HOOK_LUNCH_TIME_SECS: f32 = 0.05;
 const HOOK_LUNCH_RADIUS: f32 = 5.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
@@ -647,7 +647,7 @@ impl<'a> System<'a> for InputSys {
                 };
                 let angle_constraint = Constraint {
                     def: angle_def,
-                    stiffness: 0.7,
+                    stiffness: 0.25,
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
