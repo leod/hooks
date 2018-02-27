@@ -21,20 +21,29 @@ pub struct Mass {
 }
 
 #[derive(Clone, Debug)]
-pub enum Kind {
-    Joint { distance: f32 },
-    Contact { normal: Vector2<f32> },
-}
+pub enum Def {
+    Joint {
+        distance: f32,
 
-#[derive(Clone, Debug)]
-pub struct Def {
-    pub kind: Kind,
+        /// Object-space coordinates.
+        p_object_a: Point2<f32>,
 
-    /// Object-space coordinates.
-    pub p_object_a: Point2<f32>,
+        /// Object-space coordinates.
+        p_object_b: Point2<f32>,
+    },
+    Contact {
+        normal: Vector2<f32>,
 
-    /// Object-space coordinates.
-    pub p_object_b: Point2<f32>,
+        /// Object-space coordinates.
+        p_object_a: Point2<f32>,
+
+        /// Object-space coordinates.
+        p_object_b: Point2<f32>,
+    },
+    Angle {
+        angle: f32,
+    },
+    Sum(Box<Def>, Box<Def>),
 }
 
 /// Which values can change in solving a constraint?
@@ -72,40 +81,40 @@ impl Mass {
 impl Def {
     /// Calculate the constraint value as well as the jacobian at some position.
     pub fn calculate(&self, x_a: &Position, x_b: &Position) -> (f32, RowVector6<f32>) {
-        let rot_a = Rotation2::new(x_a.angle).matrix().clone();
-        let rot_b = Rotation2::new(x_b.angle).matrix().clone();
-        let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
-            .matrix()
-            .clone();
-        let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
-            .matrix()
-            .clone();
+        match self {
+            &Def::Joint {
+                distance,
+                p_object_a,
+                p_object_b,
+            } => {
+                let rot_a = Rotation2::new(x_a.angle).matrix().clone();
+                let rot_b = Rotation2::new(x_b.angle).matrix().clone();
+                let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
+                    .matrix()
+                    .clone();
+                let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
+                    .matrix()
+                    .clone();
 
-        let p_a = rot_a * self.p_object_a.coords + x_a.p.coords;
-        let p_b = rot_b * self.p_object_b.coords + x_b.p.coords;
+                let p_a = rot_a * p_object_a.coords + x_a.p.coords;
+                let p_b = rot_b * p_object_b.coords + x_b.p.coords;
 
-        match self.kind {
-            Kind::Joint { distance } => {
                 let f = p_a - p_b;
                 let value_f = norm(&f);
                 let value = value_f - distance;
                 let jacobian_f = Matrix2x6::new(
                     1.0,
                     0.0,
-                    self.p_object_a.coords.x * deriv_rot_a.m11 +
-                        self.p_object_a.coords.y * deriv_rot_a.m12,
+                    p_object_a.coords.x * deriv_rot_a.m11 + p_object_a.coords.y * deriv_rot_a.m12,
                     -1.0,
                     0.0,
-                    -self.p_object_b.coords.x * deriv_rot_b.m11 -
-                        self.p_object_b.coords.y * deriv_rot_b.m12,
+                    -p_object_b.coords.x * deriv_rot_b.m11 - p_object_b.coords.y * deriv_rot_b.m12,
                     0.0,
                     1.0,
-                    self.p_object_a.coords.x * deriv_rot_a.m21 +
-                        self.p_object_a.coords.y * deriv_rot_a.m22,
+                    p_object_a.coords.x * deriv_rot_a.m21 + p_object_a.coords.y * deriv_rot_a.m22,
                     0.0,
                     -1.0,
-                    -self.p_object_b.coords.x * deriv_rot_b.m21 -
-                        self.p_object_b.coords.y * deriv_rot_b.m22,
+                    -p_object_b.coords.x * deriv_rot_b.m21 - p_object_b.coords.y * deriv_rot_b.m22,
                 );
                 let jacobian = jacobian_f.transpose() * f / value_f;
 
@@ -114,17 +123,34 @@ impl Def {
 
                 (value, jacobian.transpose())
             }
-            Kind::Contact { normal } => {
+            &Def::Angle { angle } => {
+                let value = x_a.angle - x_b.angle;
+                let jacobian = RowVector6::new(0.0, 0.0, 1.0, 0.0, 0.0, -1.0);
+                (value, jacobian)
+            }
+            &Def::Contact {
+                normal,
+                p_object_a,
+                p_object_b,
+            } => {
                 unimplemented!();
+            }
+            &Def::Sum(ref k1, ref k2) => {
+                let (value_1, jacobian_1) = k1.calculate(x_a, x_b);
+                let (value_2, jacobian_2) = k2.calculate(x_a, x_b);
+
+                (value_1 + value_2, jacobian_1 + jacobian_2)
             }
         }
     }
 
     /// Is this an inequality constraint, i.e. `C >= 0`, or an equality constraint, i.e. `C = 0`?
     pub fn is_inequality(&self) -> bool {
-        match self.kind {
-            Kind::Joint { .. } => false,
-            Kind::Contact { .. } => true,
+        match self {
+            &Def::Joint { .. } => false,
+            &Def::Angle { .. } => false,
+            &Def::Contact { .. } => true,
+            &Def::Sum(_, _) => false,
         }
     }
 }

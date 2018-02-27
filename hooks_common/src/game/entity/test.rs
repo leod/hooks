@@ -2,7 +2,7 @@ use nalgebra::{Point2, Vector2};
 
 use defs::GameInfo;
 use game::ComponentType;
-use physics::{AngularVelocity, Dynamic, InvAngularMass, InvMass, Orientation, Position, Velocity};
+use physics::{Dynamic, InvAngularMass, InvMass, Orientation};
 use physics::constraint::{self, Constraint};
 use physics::sim::Constraints;
 use registry::Registry;
@@ -69,8 +69,8 @@ pub mod auth {
                         p: true,
                         angle: false,
                     },
-                    def: constraint::Def {
-                        kind: constraint::Kind::Joint { distance: 300.0 },
+                    def: constraint::Def::Joint {
+                        distance: 300.0,
                         p_object_a: Point2::origin(),
                         p_object_b: Point2::origin(),
                     },

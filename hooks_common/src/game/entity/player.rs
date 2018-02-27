@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::f32;
 
 use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
 use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, FetchMut, Join, MaskedStorage,
@@ -126,7 +127,7 @@ const HOOK_NUM_SEGMENTS: usize = 15;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 500.0;
 const HOOK_SEGMENT_LENGTH: f32 = 20.0;
-const HOOK_LUNCH_TIME_SECS: f32 = 0.3;
+const HOOK_LUNCH_TIME_SECS: f32 = 0.1;
 const HOOK_LUNCH_RADIUS: f32 = 5.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
@@ -289,43 +290,6 @@ fn hook_segment_wall_interaction(
 
     if segment.is_last && segment.fixed.is_none() {
         segment.fixed = Some((pos.x, pos.y));
-    }
-}
-
-fn hook_segment_player_interaction(
-    world: &World,
-    segment_entity: Entity,
-    player_entity: Entity,
-    _pos: Point2<f32>,
-) {
-    let mut hooks = world.write::<Hook>();
-    let hook = hooks.get_mut(player_entity).unwrap();
-
-    if let HookState::Contracting { lunch_timer } = hook.state {
-        /*if lunch_timer < HOOK_LUNCH_TIME_SECS {
-            return;
-        }*/
-
-        let &repl::Id((owner, _)) = world.read::<repl::Id>().get(player_entity).unwrap();
-        let first_segment_id = (owner, hook.first_segment_index);
-
-        let active_segments = active_hook_segment_entities(
-            &world.read_resource::<EntityMap>(),
-            &world.read::<Active>(),
-            &world.read::<HookSegment>(),
-            first_segment_id,
-        ).unwrap();
-
-        if active_segments.first().cloned() == Some(segment_entity) {
-            // Yummy!
-            let mut actives = world.write::<Active>();
-            let active = actives.get_mut(segment_entity).unwrap();
-            active.0 = false;
-
-            hook.state = HookState::Contracting { lunch_timer: 0.0 };
-
-            debug!("eat");
-        }
     }
 }
 
@@ -508,34 +472,49 @@ impl<'a> System<'a> for InputSys {
                             segment_active.0 = false;
 
                             hook.state = HookState::Contracting { lunch_timer: 0.0 };
-
-                            debug!("eat");
                         } else {
                             let constraint_distance = cur_distance.min(target_distance);
 
                             let is_last_fixed =
                                 data.segment.get(last_segment).unwrap().fixed.is_some();
 
-                            let constraint = Constraint {
+                            let joint_def = constraint::Def::Joint {
+                                distance: constraint_distance,
+                                p_object_a: Point2::origin(),
+                                p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
+                            };
+                            let angle_def = constraint::Def::Angle {
+                                angle: f32::consts::PI,
+                            };
+
+                            let joint_constraint = Constraint {
                                 entity_a: entity,
                                 entity_b: first_segment,
                                 vars_a: constraint::Vars {
-                                    p: is_last_fixed,
+                                    p: is_last_fixed || true,
                                     angle: false,
                                 },
                                 vars_b: constraint::Vars {
                                     p: true,
                                     angle: true,
                                 },
-                                def: constraint::Def {
-                                    kind: constraint::Kind::Joint {
-                                        distance: constraint_distance,
-                                    },
-                                    p_object_a: Point2::origin(),
-                                    p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
-                                },
+                                def: joint_def,
                             };
-                            data.constraints.add(constraint);
+                            let angle_constraint = Constraint {
+                                entity_a: entity,
+                                entity_b: first_segment,
+                                vars_a: constraint::Vars {
+                                    p: false,
+                                    angle: false,
+                                },
+                                vars_b: constraint::Vars {
+                                    p: false,
+                                    angle: true,
+                                },
+                                def: angle_def,
+                            };
+                            data.constraints.add(joint_constraint);
+                            //data.constraints.add(angle_constraint);
                         }
                     } else {
                         hook.state = HookState::Inactive;
@@ -546,7 +525,20 @@ impl<'a> System<'a> for InputSys {
             // Join successive hook segments
             let active_segment_pairs = active_segments.iter().zip(active_segments.iter().skip(1));
             for (&entity_a, &entity_b) in active_segment_pairs {
-                let constraint = Constraint {
+                let joint_def = constraint::Def::Joint {
+                    distance: 0.0,
+                    p_object_a: Point2::new(HOOK_SEGMENT_LENGTH / 2.0, 0.0),
+                    p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
+                };
+                let angle_def = constraint::Def::Angle {
+                    angle: f32::consts::PI,
+                };
+
+                /*let sum_def = constraint::Def::Sum(
+                    Box::new(joint_def),
+                    Box::new(angle_def),
+                );
+                let sum_constraint = Constraint {
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
@@ -557,13 +549,38 @@ impl<'a> System<'a> for InputSys {
                         p: true,
                         angle: true,
                     },
-                    def: constraint::Def {
-                        kind: constraint::Kind::Joint { distance: 0.0 },
-                        p_object_a: Point2::new(HOOK_SEGMENT_LENGTH / 2.0, 0.0),
-                        p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
-                    },
+                    def: sum_def,
                 };
-                data.constraints.add(constraint);
+                data.constraints.add(sum_constraint);*/
+
+                let joint_constraint = Constraint {
+                    entity_a,
+                    entity_b,
+                    vars_a: constraint::Vars {
+                        p: true,
+                        angle: true,
+                    },
+                    vars_b: constraint::Vars {
+                        p: true,
+                        angle: true,
+                    },
+                    def: joint_def,
+                };
+                let angle_constraint = Constraint {
+                    entity_a,
+                    entity_b,
+                    vars_a: constraint::Vars {
+                        p: false,
+                        angle: true,
+                    },
+                    vars_b: constraint::Vars {
+                        p: false,
+                        angle: true,
+                    },
+                    def: angle_def,
+                };
+                data.constraints.add(joint_constraint);
+                data.constraints.add(angle_constraint);
             }
         }
 
