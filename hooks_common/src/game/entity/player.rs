@@ -122,10 +122,10 @@ struct DeactivateHookSegment;
 const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
-const HOOK_NUM_SEGMENTS: usize = 10;
+const HOOK_NUM_SEGMENTS: usize = 15;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 500.0;
-const HOOK_SEGMENT_LENGTH: f32 = 30.0;
+const HOOK_SEGMENT_LENGTH: f32 = 20.0;
 const HOOK_LUNCH_TIME_SECS: f32 = 0.3;
 const HOOK_LUNCH_RADIUS: f32 = 5.0;
 
@@ -231,7 +231,7 @@ pub mod auth {
 }
 
 fn build_player(builder: EntityBuilder) -> EntityBuilder {
-    let shape = Cuboid::new(Vector2::new(10.0, 10.0));
+    let shape = Cuboid::new(Vector2::new(20.0, 20.0));
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER]);
@@ -551,7 +551,7 @@ impl<'a> System<'a> for InputSys {
                     entity_b,
                     vars_a: constraint::Vars {
                         p: true,
-                        angle: false,
+                        angle: true,
                     },
                     vars_b: constraint::Vars {
                         p: true,

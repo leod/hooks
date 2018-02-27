@@ -15,14 +15,14 @@ pub fn register(reg: &mut hooks_common::Registry) {
 
     entity::add_ctor(reg, "player", |builder| {
         builder.with(rect::Draw {
-            width: 10.0,
-            height: 10.0,
+            width: 20.0,
+            height: 20.0,
         })
     });
 
     entity::add_ctor(reg, "hook_segment", |builder| {
         builder.with(rect::Draw {
-            width: 15.0,
+            width: 10.0,
             height: 3.0,
         })
     });
