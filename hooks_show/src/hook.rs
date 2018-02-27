@@ -1,4 +1,4 @@
-use nalgebra::{norm, Isometry3, Matrix4, Point2, Rotation2, Vector3, Vector4};
+use nalgebra::{Isometry3, Matrix4, Point2, Rotation2, Vector3, Vector4};
 use specs::{Fetch, Join, ReadStorage, SystemData, World};
 
 use ggez;
@@ -8,7 +8,7 @@ use hooks_common::entity::Active;
 use hooks_common::physics::{Orientation, Position};
 use hooks_common::repl::{self, EntityMap};
 use hooks_common::game::entity::player::{active_hook_segment_entities, Hook, HookSegment,
-                                         HOOK_NUM_SEGMENTS, HOOK_SEGMENT_LENGTH};
+                                         HOOK_SEGMENT_LENGTH};
 
 use {Assets, Registry};
 

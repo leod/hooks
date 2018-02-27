@@ -34,7 +34,7 @@ struct OldPosition(Point2<f32>);
 struct OldOrientation(f32);
 
 /// Resource to store the interactions that were detected in a time step.
-struct Interactions(Vec<(Entity, Entity, Point2<f32>)>);
+struct Interactions(Vec<(Entity, Entity, Point2<f32>, Point2<f32>)>);
 
 /// Resource to store the constraints that are to be applied in the current time step.
 pub struct Constraints(Vec<Constraint>);
@@ -67,8 +67,8 @@ pub fn run(world: &World) {
     CorrectVelocitySys.run_now(&world.res);
 
     let interactions = world.read_resource::<Interactions>().0.clone();
-    for &(entity_a, entity_b, pos) in &interactions {
-        interaction::run(world, entity_a, entity_b, pos);
+    for &(entity_a, entity_b, pos_a, pos_b) in &interactions {
+        interaction::run(world, entity_a, entity_b, pos_a, pos_b);
     }
 
     world.write_resource::<Constraints>().0.clear();
@@ -362,13 +362,13 @@ impl<'a> System<'a> for HandleContactsSys {
                     entity_b
 				);
 
+                // TODO: Easier way to get object-space contact coordinates?
+                let p_object_a = oa.position().inverse() * contact.world1;
+                let p_object_b = ob.position().inverse() * contact.world2;
+
                 if let Some(action) = action {
                     match action {
                         interaction::Action::PreventOverlap { rotate_a, rotate_b } => {
-                            // TODO: Easier way to get object-space contact coordinates?
-                            let p_object_a = oa.position().inverse() * contact.world1;
-                            let p_object_b = ob.position().inverse() * contact.world2;
-
                             // TODO
                             let dynamic_a = dynamic.get(entity_a).is_some();
                             let dynamic_b = dynamic.get(entity_b).is_some();
@@ -391,10 +391,7 @@ impl<'a> System<'a> for HandleContactsSys {
                     }
                 }
 
-                // TODO: Fix this position
-                let pos = contact.world1;
-
-                interactions.0.push((entity_a, entity_b, pos));
+                interactions.0.push((entity_a, entity_b, p_object_a, p_object_b));
             }
         }
     }
