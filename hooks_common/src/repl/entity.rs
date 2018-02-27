@@ -17,6 +17,9 @@ fn register<T: EntitySnapshot>(reg: &mut Registry) {
     reg.event::<RemoveOrder>();
 
     reg.removal_system(RemovalSys, "repl::entity");
+
+    // Index source for entities not owned by a player
+    reg.resource(auth::IndexSource { next: 1 });
 }
 
 /// Event to remove entities, broadcast to clients
@@ -177,9 +180,6 @@ pub mod auth {
     pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
         super::register::<T>(reg);
 
-        // Index source for entities not owned by a player
-        reg.resource(IndexSource { next: 1 });
-
         reg.removal_system(RemovalSys, "repl::auth::entity");
     }
 
@@ -201,8 +201,8 @@ pub mod auth {
         }
     }
 
-    struct IndexSource {
-        next: EntityIndex,
+    pub(super) struct IndexSource {
+        pub(super) next: EntityIndex,
     }
 
     impl IndexSource {
