@@ -271,15 +271,21 @@ impl Game {
             self.state.push_events(self.queued_events.clear());
 
             // For now, just run everyone's queued inputs. This will need to be refined!
-            for (&player_id, player) in self.players.iter_mut() {
-                for (_tick_num, input) in &player.queued_inputs {
-                    game::input::auth::run_player_input(&mut self.state.world, player_id, input);
-                }
-
+            let inputs = self.players
+                .iter()
+                .flat_map(|(&player_id, player)| {
+                    player
+                        .queued_inputs
+                        .iter()
+                        .map(|(_tick_num, input)| (player_id, input.clone()))
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            for player in self.players.values_mut() {
                 player.queued_inputs.clear();
             }
 
-            let tick_events = self.state.run_tick_auth();
+            let tick_events = self.state.run_tick_auth(inputs);
 
             // Can unwrap here, since replication errors should at most happen on the client-side
             let tick_events = tick_events.unwrap();

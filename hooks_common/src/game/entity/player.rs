@@ -499,21 +499,22 @@ impl<'a> System<'a> for InputSys {
                             (1.0 - new_lunch_timer / HOOK_LUNCH_TIME_SECS) * HOOK_SEGMENT_LENGTH;
                         let cur_distance = norm(&(segment_attach_p - position.0));
 
-                        debug!("target {} cur {}", target_distance, cur_distance);
+                        //debug!("target {} cur {}", target_distance, cur_distance);
 
-                    // Eat up the first segment if it comes close enough to our mouth.
-                        /*if cur_distance < HOOK_LUNCH_RADIUS {
+                        // Eat up the first segment if it comes close enough to our mouth.
+                        if cur_distance < HOOK_LUNCH_RADIUS {
                             // Yummy!
                             let segment_active = data.active.get_mut(first_segment).unwrap();
                             segment_active.0 = false;
 
                             hook.state = HookState::Contracting { lunch_timer: 0.0 };
-                        
+
                             debug!("eat");
                         } else {
                             let constraint_distance = cur_distance.min(target_distance);
 
-                            let is_last_fixed = data.segment.get(last_segment).unwrap().fixed.is_some();
+                            let is_last_fixed =
+                                data.segment.get(last_segment).unwrap().fixed.is_some();
 
                             let constraint = Constraint {
                                 entity_a: entity,
@@ -527,13 +528,16 @@ impl<'a> System<'a> for InputSys {
                                     angle: true,
                                 },
                                 def: constraint::Def {
-                                    kind: constraint::Kind::Joint { distance: constraint_distance },
+                                    kind: constraint::Kind::Joint {
+                                        distance: constraint_distance,
+                                    },
                                     p_object_a: Point2::origin(),
                                     p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                                 },
                             };
                             data.constraints.add(constraint);
-                        }*/                    } else {
+                        }
+                    } else {
                         hook.state = HookState::Inactive;
                     }
                 }
