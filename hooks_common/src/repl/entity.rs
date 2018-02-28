@@ -214,15 +214,13 @@ pub mod auth {
         }
     }
 
-    pub fn create<F>(
-        world: &mut World,
-        owner: PlayerId,
-        class: &str,
-        ctor: F,
-    ) -> (EntityIndex, Entity)
+    /// Create a new entity on the server side. Here, it is possible to pass a custom constructor
+    /// that can for example spawn the entity at some given position.
+    pub fn create<F>(world: &mut World, owner: PlayerId, class: &str, ctor: F) -> (EntityId, Entity)
     where
         F: FnOnce(EntityBuilder) -> EntityBuilder,
     {
+        // Every player has his own entity counter
         let index = if owner != INVALID_PLAYER_ID {
             let mut players = world.write_resource::<player::Players>();
             let mut player = players.0.get_mut(&owner).unwrap();
@@ -237,7 +235,7 @@ pub mod auth {
         let entity = super::create(world, id, class_id, ctor);
 
         // On the server, replication errors are definitely a bug, so unwrap
-        (index, entity.unwrap())
+        (id, entity.unwrap())
     }
 }
 

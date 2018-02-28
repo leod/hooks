@@ -40,17 +40,6 @@ pub fn register(reg: &mut Registry) {
         ],
         build_player,
     );
-    repl::entity::register_class(
-        reg,
-        "hook_segment",
-        &[
-            ComponentType::Active,
-            ComponentType::Position,
-            ComponentType::Orientation,
-            ComponentType::HookSegment,
-        ],
-        build_hook_segment,
-    );
 
     interaction::set(
         reg,
@@ -61,17 +50,6 @@ pub fn register(reg: &mut Registry) {
             rotate_b: false,
         }),
         None,
-    );
-    interaction::set(
-        reg,
-        "hook_segment",
-        "wall",
-        Some(interaction::Action::PreventOverlap {
-            rotate_a: false,
-            rotate_b: false,
-        }),
-        //None,
-        Some(hook_segment_wall_interaction),
     );
     /*interaction::set(
         reg,
@@ -91,13 +69,6 @@ pub struct CurrentInput(pub PlayerInput);
 #[component(BTreeStorage)]
 pub struct Player;
 
-#[derive(PartialEq, Clone, Debug, BitStore)]
-pub enum HookState {
-    Inactive,
-    Shooting { time_secs: f32 },
-    Contracting { lunch_timer: f32 },
-}
-
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[component(BTreeStorage)]
 pub struct Hook {
@@ -114,27 +85,8 @@ pub struct HookSegment {
     pub fixed: Option<(EntityId, (f32, f32))>,
 }
 
-#[derive(Component, PartialEq, Clone, Debug)]
-#[component(BTreeStorage)]
-struct ActivateHookSegment {
-    position: Point2<f32>,
-    velocity: Vector2<f32>,
-    orientation: f32,
-}
-
-#[derive(Component, PartialEq, Clone, Debug, Default)]
-#[component(NullStorage)]
-struct DeactivateHookSegment;
-
 const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
-
-pub const HOOK_NUM_SEGMENTS: usize = 20;
-pub const HOOK_SEGMENT_LENGTH: f32 = 30.0;
-const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const HOOK_SHOOT_SPEED: f32 = 600.0;
-const HOOK_LUNCH_TIME_SECS: f32 = 0.05;
-const HOOK_LUNCH_RADIUS: f32 = 5.0;
 
 pub fn run_input(world: &mut World, entity: Entity, input: &PlayerInput) {
     world
@@ -258,31 +210,6 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
         .with(Player)
-}
-
-fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
-    // TODO
-    let shape = Cuboid::new(Vector2::new(HOOK_SEGMENT_LENGTH / 2.0, 3.0));
-
-    let mut groups = CollisionGroups::new();
-    groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
-    groups.set_whitelist(&[collision::GROUP_WALL]);
-
-    let query_type = GeometricQueryType::Contacts(0.0, 0.0);
-
-    // TODO: Velocity (and Dynamic?) component should be added only for owners
-    builder
-        .with(Orientation(0.0))
-        .with(Velocity(zero()))
-        .with(AngularVelocity(0.0))
-        .with(InvMass(1.0 / 5.0))
-        .with(InvAngularMass(
-            12.0 / (5.0 * (HOOK_SEGMENT_LENGTH.powi(2) + 9.0)),
-        ))
-        .with(Dynamic)
-        .with(Friction(5.0))
-        .with(collision::Shape(ShapeHandle::new(shape)))
-        .with(collision::Object { groups, query_type })
 }
 
 fn hook_segment_wall_interaction(

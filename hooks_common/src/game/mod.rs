@@ -40,9 +40,12 @@ snapshot! {
     use physics::Position;
     use physics::Orientation;
 
+    use game::entity::HookDef;
+    use game::entity::HookSegmentDef;
+    use game::entity::HookState;
+    use game::entity::HookNumActive;
+
     use game::entity::player::Player;
-    use game::entity::player::Hook;
-    use game::entity::player::HookSegment;
 
     mod snapshot {
         active: Active,
@@ -50,8 +53,10 @@ snapshot! {
         position: Position,
         orientation: Orientation,
 
+        hook_def: HookDef,
+        hook_segment_def: HookSegmentDef,
+        hook_state: HookState,
+
         player: Player,
-        hook: Hook,
-        hook_segment: HookSegment,
     }
 }
