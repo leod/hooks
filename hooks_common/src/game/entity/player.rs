@@ -129,7 +129,7 @@ struct DeactivateHookSegment;
 const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
-pub const HOOK_NUM_SEGMENTS: usize = 15;
+pub const HOOK_NUM_SEGMENTS: usize = 20;
 pub const HOOK_SEGMENT_LENGTH: f32 = 30.0;
 const HOOK_MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const HOOK_SHOOT_SPEED: f32 = 600.0;
@@ -242,7 +242,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER]);
-    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER_ENTITY]);
+    groups.set_whitelist(&[collision::GROUP_WALL]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
@@ -266,7 +266,7 @@ fn build_hook_segment(builder: EntityBuilder) -> EntityBuilder {
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
-    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER]);
+    groups.set_whitelist(&[collision::GROUP_WALL]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
@@ -563,7 +563,6 @@ impl<'a> System<'a> for InputSys {
                                 p_object_a: Point2::origin(),
                                 p_object_b: Point2::new(-HOOK_SEGMENT_LENGTH / 2.0, 0.0),
                             };
-                            //let angle_def = constraint::Def::Angle { angle: 0.0 };
 
                             let joint_constraint = Constraint {
                                 def: joint_def,
@@ -581,7 +580,10 @@ impl<'a> System<'a> for InputSys {
                             };
                             data.constraints.add(joint_constraint);
 
-                            /*let angle_constraint = Constraint {
+                            let angle_def = constraint::Def::Angle { angle: 0.0 };
+                            let angle_constraint = Constraint {
+                                def: angle_def,
+                                stiffness: 1.0,
                                 entity_a: entity,
                                 entity_b: first_segment,
                                 vars_a: constraint::Vars {
@@ -592,9 +594,8 @@ impl<'a> System<'a> for InputSys {
                                     p: false,
                                     angle: true,
                                 },
-                                def: angle_def,
                             };
-                            data.constraints.add(angle_constraint);*/
+                            data.constraints.add(angle_constraint);
                         }
                     } else {
                         hook.state = HookState::Inactive;
@@ -604,7 +605,7 @@ impl<'a> System<'a> for InputSys {
 
             // Join successive hook segments
             let active_segment_pairs = active_segments.iter().zip(active_segments.iter().skip(1));
-            for (&entity_a, &entity_b) in active_segment_pairs {
+            for (i, (&entity_a, &entity_b)) in active_segment_pairs.enumerate() {
                 let joint_def = constraint::Def::Joint {
                     distance: 0.0,
                     p_object_a: Point2::new(HOOK_SEGMENT_LENGTH / 2.0, 0.0),
@@ -645,9 +646,12 @@ impl<'a> System<'a> for InputSys {
                         angle: true,
                     },
                 };
+                //let j = active_segments.len() - i - 1;
+                //let stiffness = (j as f32 / HOOK_NUM_SEGMENTS as f32).powi(2);
+                let stiffness = 0.7;
                 let angle_constraint = Constraint {
                     def: angle_def,
-                    stiffness: 0.25,
+                    stiffness: stiffness,
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
