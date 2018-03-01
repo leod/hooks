@@ -8,7 +8,7 @@ use physics::AngularVelocity;
 use game::entity::wall;
 
 fn create_state(world: &mut World) {
-    let n_walls = 50;
+    let n_walls = 200;
     let mut rng = IsaacRng::new_unseeded();
 
     for _ in 0..n_walls {

@@ -4,7 +4,6 @@ use specs::{Fetch, Join, ReadStorage, SystemData, World};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use hooks_common::entity::Active;
 use hooks_common::physics::{Orientation, Position};
 use hooks_common::repl::EntityMap;
 use hooks_common::game::entity::hook;
