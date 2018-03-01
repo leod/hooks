@@ -17,8 +17,7 @@ pub struct Config {
 pub struct Server {
     host: Host,
     game: Game,
-    #[cfg(feature = "show")]
-    show: Show,
+    #[cfg(feature = "show")] show: Show,
 }
 
 impl Server {
