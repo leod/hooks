@@ -39,7 +39,7 @@ pub fn register(reg: &mut Registry) {
     );
 }
 
-pub const NUM_HOOKS: usize = 2;
+pub const NUM_HOOKS: usize = 1;
 const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
