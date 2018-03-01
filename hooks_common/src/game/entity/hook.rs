@@ -4,6 +4,7 @@ use specs::{Entity, EntityBuilder, Fetch, FetchMut, Join, ReadStorage, SystemDat
 
 use registry::Registry;
 use defs::{EntityId, GameInfo, INVALID_ENTITY_ID};
+use event::{self, Event};
 use entity::Active;
 use repl;
 use physics::{AngularVelocity, Dynamic, Friction, InvAngularMass, InvMass, Orientation, Position,
@@ -19,6 +20,8 @@ pub fn register(reg: &mut Registry) {
     reg.component::<SegmentDef>();
     reg.component::<State>();
     reg.component::<CurrentInput>();
+
+    reg.event::<FixedEvent>();
 
     repl::entity::register_class(
         reg,
@@ -80,6 +83,20 @@ pub const SEGMENT_LENGTH: f32 = 30.0;
 const SHOOT_SPEED: f32 = 600.0;
 const LUNCH_TIME_SECS: f32 = 0.05;
 const LUNCH_RADIUS: f32 = 5.0;
+
+/// This event is emitted when a hook attaches at some point. This is meant to be used for
+/// visualization purposes.
+#[derive(Debug, Clone, BitStore)]
+pub struct FixedEvent {
+    pub pos: [f32; 2],
+    pub vel: [f32; 2],
+}
+
+impl Event for FixedEvent {
+    fn class(&self) -> event::Class {
+        event::Class::Order
+    }
+}
 
 /// Definition of a hook. This should not change in the entity's lifetime. Thus, we can store
 /// a relatively large amount of data here, since it is only sent once to each client due to delta
@@ -224,6 +241,7 @@ fn first_segment_wall_interaction(
     world: &World,
     segment_info: &interaction::EntityInfo,
     wall_info: &interaction::EntityInfo,
+    pos: Point2<f32>,
 ) {
     let wall_id = {
         let repl_ids = world.read::<repl::Id>();
@@ -253,12 +271,13 @@ fn first_segment_wall_interaction(
         .expect("got segment wall interaction, but hook is inactive");
 
     // Only attach if we are not attached yet
-    match active_state.mode.clone() {
+    let fixed = match active_state.mode.clone() {
         Mode::Shooting { .. } => {
             active_state.mode = Mode::Contracting {
                 lunch_timer: 0.0,
                 fixed: Some((wall_id, wall_info.pos_object.coords.into())),
-            }
+            };
+            true
         }
         Mode::Contracting {
             lunch_timer,
@@ -267,9 +286,20 @@ fn first_segment_wall_interaction(
             active_state.mode = Mode::Contracting {
                 lunch_timer,
                 fixed: Some((wall_id, wall_info.pos_object.coords.into())),
-            }
+            };
+            true
         }
-        _ => {}
+        _ => false,
+    };
+
+    if fixed {
+        // TODO: Validate that received entities have the components specified by their class.
+        let vel = world.read::<Velocity>().get(segment_info.entity).unwrap().0;
+        let event = FixedEvent {
+            pos: pos.coords.into(),
+            vel: vel.into(),
+        };
+        world.write_resource::<event::Sink>().push(event);
     }
 }
 
