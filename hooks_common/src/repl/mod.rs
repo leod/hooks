@@ -51,7 +51,7 @@ pub fn get_id_to_entity(world: &World, id: EntityId) -> Option<Entity> {
 }
 
 pub fn try_id_to_entity(world: &World, id: EntityId) -> Result<Entity, Error> {
-    world.read_resource::<EntityMap>().try_get_id_to_entity(id)
+    world.read_resource::<EntityMap>().try_id_to_entity(id)
 }
 
 /// An `Error` indicates that something went seriously wrong in replication. Either we have a bug,
@@ -65,5 +65,6 @@ pub enum Error {
     InvalidEntityId(EntityId),
     Replication(String),
     InvalidState(String),
+    InvalidEntity(EntityId),
     MissingComponent(EntityId, &'static str),
 }

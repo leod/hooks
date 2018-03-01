@@ -35,7 +35,7 @@ pub fn create(
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
-    let (entity_index, entity) =
+    let (entity_id, entity) =
         repl::entity::auth::create(world, INVALID_PLAYER_ID, "wall", |builder| {
             builder
                 .with(Position(pos))
@@ -45,5 +45,5 @@ pub fn create(
                 .with(collision::Object { groups, query_type })
         });
 
-    ((entity_index, INVALID_PLAYER_ID), entity)
+    (entity_id, entity)
 }

@@ -1,19 +1,14 @@
-use std::ops::Deref;
+use nalgebra::{zero, Point2, Rotation2, Vector2};
+use specs::{BTreeStorage, Entity, EntityBuilder, Fetch, Join, ReadStorage, RunNow, System, World,
+            WriteStorage};
 
-use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
-use specs::{BTreeStorage, Entities, Entity, EntityBuilder, Fetch, FetchMut, Join, MaskedStorage,
-            NullStorage, ReadStorage, RunNow, Storage, System, World, WriteStorage};
-
-use defs::{EntityId, EntityIndex, GameInfo, PlayerId, PlayerInput};
+use defs::{EntityId, GameInfo, PlayerId, PlayerInput, INVALID_ENTITY_ID};
 use registry::Registry;
-use entity::Active;
 use physics::interaction;
-use physics::constraint::{self, Constraint};
 use physics::{AngularVelocity, Dynamic, Friction, InvAngularMass, InvMass, Orientation, Position,
               Velocity};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
-use physics::sim::Constraints;
-use repl::{self, player, EntityMap};
+use repl;
 use game::ComponentType;
 use game::entity::hook;
 
@@ -28,7 +23,6 @@ pub fn register(reg: &mut Registry) {
             ComponentType::Position,
             ComponentType::Orientation,
             ComponentType::Player,
-            ComponentType::Hook,
         ],
         build_player,
     );
@@ -64,7 +58,7 @@ pub fn run_input(
     world: &mut World,
     entity: Entity,
     input: &PlayerInput,
-) -> Result<repl::Error, ()> {
+) -> Result<(), repl::Error> {
     // Update player
     {
         world
@@ -81,15 +75,16 @@ pub fn run_input(
         let player = world
             .read::<Player>()
             .get(entity)
-            .ok_or_else(|| repl::Error::Replication("player entity without Player component"))?;
-
-        let hook_input = world.write::<hook::CurrentInput>();
+            .ok_or_else(|| {
+                repl::Error::Replication("player entity without Player component".to_string())
+            })?
+            .clone();
 
         for i in 0..NUM_HOOKS {
-            let hook_entity = repl::try_id_to_entity(player.hooks[i])?;
+            let hook_entity = repl::try_id_to_entity(world, player.hooks[i])?;
 
             // TODO: Different inputs for different hooks
-            world.insert(
+            world.write::<hook::CurrentInput>().insert(
                 hook_entity,
                 hook::CurrentInput {
                     shoot: input.shoot_one,
@@ -115,7 +110,7 @@ pub mod auth {
 
         let mut hooks = [INVALID_ENTITY_ID; NUM_HOOKS];
         for i in 0..NUM_HOOKS {
-            let (hook_id, _) = hook::auth::create(world, owner);
+            let (hook_id, _) = hook::auth::create(world, id);
             hooks[i] = hook_id;
         }
 
