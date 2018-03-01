@@ -153,7 +153,8 @@ impl Show {
         let positions = world.read::<Position>();
 
         if let Some(my_entity) = self.my_player_entity(world) {
-            self.camera.set_pos(positions.get(my_entity).unwrap().0);
+            self.camera
+                .set_target_pos(positions.get(my_entity).unwrap().0);
         }
 
         self.camera.update(delta);
