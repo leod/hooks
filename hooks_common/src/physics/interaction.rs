@@ -15,7 +15,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(Handlers(BTreeMap::new()));
 }
 
-type Handler = fn(&World, &EntityInfo, &EntityInfo, Point2<f32>);
+type Handler = fn(&World, &EntityInfo, &EntityInfo, Point2<f32>, Vector2<f32>);
 
 /// An action that should be taken when two entities overlap in a physics prediction step.
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -50,6 +50,9 @@ pub struct Event {
 
     /// Collision position in world-space coordinates.
     pub pos: Point2<f32>,
+
+    /// Penetration normal.
+    pub normal: Vector2<f32>,
 }
 
 /// In a module's `register` function, it can happen that another entity class that it wants to
@@ -155,9 +158,9 @@ pub fn run(world: &World, event: &Event) {
         if let Some(handler) = def.handler {
             // Make sure to pass the entities in the order in which the handler expects them
             if id_a == handler_id_a {
-                handler(world, &event.a, &event.b, event.pos);
+                handler(world, &event.a, &event.b, event.pos, event.normal);
             } else {
-                handler(world, &event.b, &event.a, event.pos);
+                handler(world, &event.b, &event.a, event.pos, event.normal);
             }
         }
     }
