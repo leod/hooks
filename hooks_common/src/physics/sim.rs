@@ -18,7 +18,7 @@ pub fn register(reg: &mut Registry) {
     reg.component::<OldOrientation>();
     reg.component::<Force>();
 
-    reg.resource(Interactions(Vec::new()));
+    reg.resource(InteractionEvents(Vec::new()));
     reg.resource(Constraints(Vec::new()));
 }
 
@@ -34,7 +34,7 @@ struct OldPosition(Point2<f32>);
 struct OldOrientation(f32);
 
 /// Resource to store the interactions that were detected in a time step.
-struct Interactions(Vec<(Entity, Entity, Point2<f32>, Point2<f32>)>);
+struct InteractionEvents(Vec<interaction::Event>);
 
 /// Resource to store the constraints that are to be applied in the current time step.
 pub struct Constraints(Vec<Constraint>);
@@ -66,9 +66,9 @@ pub fn run(world: &World) {
     SolveConstraintsSys.run_now(&world.res);
     CorrectVelocitySys.run_now(&world.res);
 
-    let interactions = world.read_resource::<Interactions>().0.clone();
-    for &(entity_a, entity_b, pos_a, pos_b) in &interactions {
-        interaction::run(world, entity_a, entity_b, pos_a, pos_b);
+    let interactions = world.read_resource::<InteractionEvents>().0.clone();
+    for event in &interactions {
+        interaction::run(world, event);
     }
 
     world.write_resource::<Constraints>().0.clear();
@@ -82,7 +82,7 @@ struct PrepareSys;
 
 impl<'a> System<'a> for PrepareSys {
     type SystemData = (
-        FetchMut<'a, Interactions>,
+        FetchMut<'a, InteractionEvents>,
         Entities<'a>,
         ReadStorage<'a, Dynamic>,
         WriteStorage<'a, Force>,
@@ -329,10 +329,11 @@ impl<'a> System<'a> for HandleContactsSys {
     type SystemData = (
         Fetch<'a, CollisionWorld>,
         Fetch<'a, interaction::Handlers>,
-        FetchMut<'a, Interactions>,
+        FetchMut<'a, InteractionEvents>,
         FetchMut<'a, Constraints>,
         ReadStorage<'a, entity::Meta>,
         ReadStorage<'a, Dynamic>,
+        ReadStorage<'a, Velocity>,
     );
 
     #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
@@ -345,6 +346,7 @@ impl<'a> System<'a> for HandleContactsSys {
             mut constraints,
             meta,
             dynamic,
+            velocity,
         ): Self::SystemData
     ) {
         for (oa, ob, gen) in collision_world.contact_pairs() {
@@ -369,10 +371,10 @@ impl<'a> System<'a> for HandleContactsSys {
                 if let Some(action) = action {
                     match action {
                         interaction::Action::PreventOverlap { rotate_a, rotate_b } => {
-                            // TODO
                             let dynamic_a = dynamic.get(entity_a).is_some();
                             let dynamic_b = dynamic.get(entity_b).is_some();
 
+                            // Try to resolve the overlap with a constraint
                             let constraint = Constraint {
                                 def: constraint::Def::Contact {
                                     normal: contact.normal.unwrap(),
@@ -391,7 +393,22 @@ impl<'a> System<'a> for HandleContactsSys {
                     }
                 }
 
-                interactions.0.push((entity_a, entity_b, p_object_a, p_object_b));
+                // Record the collision event
+                let info_a = interaction::EntityInfo {
+                    entity: entity_a,
+                    pos_object: p_object_a,
+                    vel: velocity.get(entity_a).map(|v| v.0),
+                };
+                let info_b = interaction::EntityInfo {
+                    entity: entity_b,
+                    pos_object: p_object_b,
+                    vel: velocity.get(entity_b).map(|v| v.0),
+                };
+                let event = interaction::Event {
+                    a: info_a,
+                    b: info_b,
+                };
+                interactions.0.push(event);
             }
         }
     }

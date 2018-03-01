@@ -125,7 +125,7 @@ pub enum Mode {
 
         /// While contracting, the hook can be attached to another entity. We store the
         /// object-space coordinates in terms of the other entity.
-        fixed: Option<(EntityId, (f32, f32))>,
+        fixed: Option<(EntityId, [f32; 2])>,
     },
 }
 
@@ -222,21 +222,23 @@ pub mod auth {
 
 fn first_segment_wall_interaction(
     world: &World,
-    segment_entity: Entity,
-    wall_entity: Entity,
-    _p_object_segment: Point2<f32>,
-    p_object_wall: Point2<f32>,
+    segment_info: &interaction::EntityInfo,
+    wall_info: &interaction::EntityInfo,
 ) {
     let wall_id = {
         let repl_ids = world.read::<repl::Id>();
 
         // Can unwrap since every wall entity must have a `repl::Id`.
-        repl_ids.get(wall_entity).unwrap().0
+        repl_ids.get(wall_info.entity).unwrap().0
     };
 
     // Get the corresponding hook entity.
     // TODO: Validate that received entities have the components specified by their class.
-    let hook_id = world.read::<SegmentDef>().get(segment_entity).unwrap().hook;
+    let hook_id = world
+        .read::<SegmentDef>()
+        .get(segment_info.entity)
+        .unwrap()
+        .hook;
 
     // TODO: Repl unwrap: server could send faulty hook id in segment definition
     let hook_entity = repl::get_id_to_entity(world, hook_id).unwrap();
@@ -255,7 +257,7 @@ fn first_segment_wall_interaction(
         Mode::Shooting { .. } => {
             active_state.mode = Mode::Contracting {
                 lunch_timer: 0.0,
-                fixed: Some((wall_id, (p_object_wall.x, p_object_wall.y))),
+                fixed: Some((wall_id, wall_info.pos_object.coords.into())),
             }
         }
         Mode::Contracting {
@@ -264,7 +266,7 @@ fn first_segment_wall_interaction(
         } => {
             active_state.mode = Mode::Contracting {
                 lunch_timer,
-                fixed: Some((wall_id, (p_object_wall.x, p_object_wall.y))),
+                fixed: Some((wall_id, wall_info.pos_object.coords.into())),
             }
         }
         _ => {}
@@ -448,12 +450,12 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     let new_lunch_timer = (lunch_timer + dt).min(LUNCH_TIME_SECS);
 
                     // Fix last hook segment to the entity it has been attached to
-                    if let Some((fix_entity_id, (fix_x, fix_y))) = new_fixed {
+                    if let Some((fix_entity_id, fix_pos_object)) = new_fixed {
                         if let Some(fix_entity) = data.entity_map.get_id_to_entity(fix_entity_id) {
                             let joint_def = constraint::Def::Joint {
                                 distance: 0.0,
                                 p_object_a: Point2::new(SEGMENT_LENGTH / 2.0, 0.0),
-                                p_object_b: Point2::new(fix_x, fix_y),
+                                p_object_b: Point2::new(fix_pos_object[0], fix_pos_object[1]),
                             };
                             let joint_constraint = Constraint {
                                 def: joint_def,
