@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::collections::BTreeMap;
 
-use nalgebra::Point2;
+use nalgebra::{Point2, Vector2};
 use specs::{Entity, Fetch, MaskedStorage, Storage, World};
 
 use hooks_util::ordered_pair::OrderedPair;
@@ -15,7 +15,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(Handlers(BTreeMap::new()));
 }
 
-type Handler = fn(&World, Entity, Entity, Point2<f32>, Point2<f32>);
+type Handler = fn(&World, &EntityInfo, &EntityInfo);
 
 /// An action that should be taken when two entities overlap in a physics prediction step.
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -28,6 +28,25 @@ pub enum Action {
 struct Def {
     action: Option<Action>,
     handler: Option<Handler>,
+}
+
+/// The information that is given for one entity when resolving interactions.
+#[derive(Clone, Debug)]
+pub struct EntityInfo {
+    pub entity: Entity,
+
+    /// Collision position in object coordinates.
+    pub pos_object: Point2<f32>,
+
+    /// Velocity of the entity at the time of impact, if the entity has a velocity component.
+    pub vel: Option<Vector2<f32>>,
+}
+
+/// A collision event between two entities.
+#[derive(Clone, Debug)]
+pub struct Event {
+    pub a: EntityInfo,
+    pub b: EntityInfo,
 }
 
 /// In a module's `register` function, it can happen that another entity class that it wants to
@@ -110,13 +129,7 @@ where
         .and_then(|x| x)
 }
 
-pub fn run(
-    world: &World,
-    entity_a: Entity,
-    entity_b: Entity,
-    pos_a: Point2<f32>,
-    pos_b: Point2<f32>,
-) {
+pub fn run(world: &World, event: &Event) {
     setup(world);
 
     let (id_a, id_b) = {
@@ -125,8 +138,8 @@ pub fn run(
         // We assume here that every entity has an `entity::Meta` component, i.e. that it was
         // constructed by `entity::create`.
         (
-            meta.get(entity_a).unwrap().class_id,
-            meta.get(entity_b).unwrap().class_id,
+            meta.get(event.a.entity).unwrap().class_id,
+            meta.get(event.b.entity).unwrap().class_id,
         )
     };
     let id_pair = OrderedPair::new(id_a, id_b);
@@ -139,9 +152,9 @@ pub fn run(
         if let Some(handler) = def.handler {
             // Make sure to pass the entities in the order in which the handler expects them
             if id_a == handler_id_a {
-                handler(world, entity_a, entity_b, pos_a, pos_b);
+                handler(world, &event.a, &event.b);
             } else {
-                handler(world, entity_b, entity_a, pos_b, pos_a);
+                handler(world, &event.b, &event.a);
             }
         }
     }
