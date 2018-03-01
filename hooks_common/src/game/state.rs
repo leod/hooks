@@ -102,7 +102,8 @@ impl State {
 
         // TODO: For now, just run everyone's input here. This might need to get refined!
         for (player_id, input) in inputs {
-            input::auth::run_player_input(&mut self.world, player_id, &input);
+            // Replication error on the server side is a bug, so unwrap
+            input::auth::run_player_input(&mut self.world, player_id, &input).unwrap();
         }
 
         self.run_tick()?;

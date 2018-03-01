@@ -3,17 +3,22 @@ pub mod auth {
 
     use defs::{PlayerId, PlayerInput};
     use physics;
+    use repl;
     use repl::player::Players;
     use game::entity::player;
 
-    pub fn run_player_input(world: &mut World, player_id: PlayerId, input: &PlayerInput) {
+    pub fn run_player_input(
+        world: &mut World,
+        player_id: PlayerId,
+        input: &PlayerInput,
+    ) -> Result<(), repl::Error> {
         let entity = {
             let players = world.read_resource::<Players>();
             players.0.get(&player_id).unwrap().entity
         };
 
         if let Some(entity) = entity {
-            player::run_input(world, entity, input);
+            player::run_input(world, entity, input)?;
         }
 
         // TODO: We need to be careful and limit the number of inputs that may be applied in one
@@ -22,5 +27,7 @@ pub mod auth {
         // TODO: Physics simulation should run *only* for player-owned entities every time that
         //       input is given.
         physics::sim::run(world);
+
+        Ok(())
     }
 }
