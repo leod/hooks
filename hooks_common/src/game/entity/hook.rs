@@ -93,6 +93,9 @@ const LUNCH_RADIUS: f32 = 5.0;
 ///       entity's lifetime.
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
 pub struct Def {
+    /// Different hook colors for drawing.
+    pub index: u32,
+
     /// Every hook belongs to one entity. For shooting the hook, the entity is assumed to have
     /// `Position`, `Orientation` and `Velocity` components.
     pub owner: EntityId,
@@ -174,7 +177,7 @@ fn build_segment(builder: EntityBuilder) -> EntityBuilder {
 pub mod auth {
     use super::*;
 
-    pub fn create(world: &mut World, owner: EntityId) -> (EntityId, Entity) {
+    pub fn create(world: &mut World, owner: EntityId, index: u32) -> (EntityId, Entity) {
         assert!(
             world
                 .read_resource::<repl::EntityMap>()
@@ -204,7 +207,14 @@ pub mod auth {
         }
 
         // Now that we have the IDs of all the segments, attach the definition to the hook
-        world.write::<Def>().insert(entity, Def { owner, segments });
+        world.write::<Def>().insert(
+            entity,
+            Def {
+                index,
+                owner,
+                segments,
+            },
+        );
 
         (id, entity)
     }
@@ -545,7 +555,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         };
                         data.constraints.add(joint_constraint);
 
-                        let angle_def = constraint::Def::Angle { angle: 0.0 };
+                        /*let angle_def = constraint::Def::Angle { angle: 0.0 };
                         let angle_constraint = Constraint {
                             def: angle_def,
                             stiffness: 0.5,
@@ -560,7 +570,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                                 angle: true,
                             },
                         };
-                        data.constraints.add(angle_constraint);
+                        data.constraints.add(angle_constraint);*/
                     }
                 }
             }

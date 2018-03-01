@@ -39,7 +39,7 @@ pub fn register(reg: &mut Registry) {
     );
 }
 
-pub const NUM_HOOKS: usize = 1;
+pub const NUM_HOOKS: usize = 2;
 const MOVE_ACCEL: f32 = 300.0;
 const MOVE_SPEED: f32 = 100.0;
 
@@ -87,7 +87,11 @@ pub fn run_input(
             world.write::<hook::CurrentInput>().insert(
                 hook_entity,
                 hook::CurrentInput {
-                    shoot: input.shoot_one,
+                    shoot: if i == 0 {
+                        input.shoot_one
+                    } else {
+                        input.shoot_two
+                    },
                 },
             );
         }
@@ -110,7 +114,7 @@ pub mod auth {
 
         let mut hooks = [INVALID_ENTITY_ID; NUM_HOOKS];
         for i in 0..NUM_HOOKS {
-            let (hook_id, _) = hook::auth::create(world, id);
+            let (hook_id, _) = hook::auth::create(world, id, i as u32);
             hooks[i] = hook_id;
         }
 
