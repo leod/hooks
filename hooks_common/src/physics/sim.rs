@@ -1,3 +1,5 @@
+use std::f32;
+
 use nalgebra::{norm, zero, Point2, Vector2};
 
 use specs::{Entities, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage, World,
@@ -72,6 +74,11 @@ pub fn run(world: &World) {
     }
 
     world.write_resource::<Constraints>().0.clear();
+}
+
+fn normalize_angle(angle: f32) -> f32 {
+    angle
+    //angle - 2.0 * f32::consts::PI * ((angle + f32::consts::PI) / (2.0 * f32::consts::PI)).floor()
 }
 
 #[derive(Component)]
@@ -409,6 +416,7 @@ impl<'a> System<'a> for HandleContactsSys {
                     b: info_b,
                     // TODO: What is the difference between `world1` and `world2` here?
                     pos: contact.world1,
+                    normal: contact.normal.unwrap(),
                 };
                 interactions.0.push(event);
             }
@@ -447,7 +455,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     let x = |entity| {
                         constraint::Position {
                             p: position.get(entity).unwrap().0,
-                            angle: orientation.get(entity).unwrap().0,
+                            angle: normalize_angle(orientation.get(entity).unwrap().0),
                         }
                     };
                     let m = |entity| {
@@ -480,10 +488,10 @@ impl<'a> System<'a> for SolveConstraintsSys {
                 }
 
                 if c.vars_a.angle {
-                    orientation.insert(c.entity_a, Orientation(p_new_a.angle));
+                    orientation.insert(c.entity_a, Orientation(normalize_angle(p_new_a.angle)));
                 }
                 if c.vars_b.angle {
-                    orientation.insert(c.entity_b, Orientation(p_new_b.angle));
+                    orientation.insert(c.entity_b, Orientation(normalize_angle(p_new_b.angle)));
                 }
             }
         }

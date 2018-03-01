@@ -31,16 +31,16 @@ fn handle_event(
             hook::FixedEvent => {
                 let cone = particle_frenzy::spawn::Cone {
                     spawn_time: context.time,
-                    life_time: 2.0,
+                    life_time: 0.3,
                     pos: event.pos,
                     orientation: event.vel[1].atan2(event.vel[0]),
-                    spread: f32::consts::PI / 8.0,
-                    min_speed: 100.0,
-                    max_speed: 300.0,
+                    spread: f32::consts::PI * 2.0, //f32::consts::PI / 12.0,
+                    min_speed: 50.0,
+                    max_speed: 400.0,
                     angle: 0.0,
-                    friction: 100.0,
+                    friction: 1000.0,
                     size: [3.0, 3.0],
-                    color: |_, _| [1.0, 0.0, 0.0],
+                    color: |_, speed| [(speed - 50.0) / 350.0, 0.5, 0.0],
                 };
                 cone.spawn(&mut context.particles, 1000);
             },

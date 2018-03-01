@@ -242,6 +242,7 @@ fn first_segment_wall_interaction(
     segment_info: &interaction::EntityInfo,
     wall_info: &interaction::EntityInfo,
     pos: Point2<f32>,
+    normal: Vector2<f32>,
 ) {
     let wall_id = {
         let repl_ids = world.read::<repl::Id>();
@@ -293,11 +294,9 @@ fn first_segment_wall_interaction(
     };
 
     if fixed {
-        // TODO: Validate that received entities have the components specified by their class.
-        let vel = world.read::<Velocity>().get(segment_info.entity).unwrap().0;
         let event = FixedEvent {
             pos: pos.coords.into(),
-            vel: vel.into(),
+            vel: normal.into(),
         };
         world.write_resource::<event::Sink>().push(event);
     }
