@@ -50,6 +50,10 @@ pub fn get_id_to_entity(world: &World, id: EntityId) -> Option<Entity> {
     world.read_resource::<EntityMap>().get_id_to_entity(id)
 }
 
+pub fn try_id_to_entity(world: &World, id: EntityId) -> Result<Entity, Error> {
+    world.read_resource::<EntityMap>().try_get_id_to_entity(id)
+}
+
 /// An `Error` indicates that something went seriously wrong in replication. Either we have a bug,
 /// or the server sent us an invalid snapshot. It is not possible to recover from this, so we
 /// should disconnect if such an error occurs.
@@ -61,4 +65,5 @@ pub enum Error {
     InvalidEntityId(EntityId),
     Replication(String),
     InvalidState(String),
+    MissingComponent(EntityId, &'static str),
 }

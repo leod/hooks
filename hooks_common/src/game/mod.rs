@@ -43,7 +43,6 @@ snapshot! {
     use game::entity::HookDef;
     use game::entity::HookSegmentDef;
     use game::entity::HookState;
-    use game::entity::HookNumActive;
 
     use game::entity::player::Player;
 
