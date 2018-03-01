@@ -126,6 +126,18 @@ impl MainState {
             } => {
                 self.next_player_input.shoot_one = false;
             }
+            event::Event::MouseButtonDown {
+                mouse_btn: MouseButton::Right,
+                ..
+            } => {
+                self.next_player_input.shoot_two = true;
+            }
+            event::Event::MouseButtonUp {
+                mouse_btn: MouseButton::Right,
+                ..
+            } => {
+                self.next_player_input.shoot_two = false;
+            }
             event::Event::KeyDown {
                 keycode: Some(keycode),
                 ..

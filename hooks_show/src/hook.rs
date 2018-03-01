@@ -63,11 +63,20 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
                 let curr_transform = graphics::get_transform(ctx);
                 graphics::push_transform(ctx, Some(curr_transform * matrix));
                 graphics::apply_transformations(ctx)?;
-                let color = graphics::Color {
-                    r: 0.0,
-                    g: 1.0,
-                    b: 0.0,
-                    a: 1.0,
+                let color = if hook_def.index == 0 {
+                    graphics::Color {
+                        r: 0.0,
+                        g: 1.0,
+                        b: 0.0,
+                        a: 1.0,
+                    }
+                } else {
+                    graphics::Color {
+                        r: 1.0,
+                        g: 0.5,
+                        b: 0.0,
+                        a: 1.0,
+                    }
                 };
                 graphics::set_color(ctx, color)?;
                 assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
