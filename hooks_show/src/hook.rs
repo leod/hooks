@@ -1,18 +1,53 @@
+use std::f32;
+
 use nalgebra::{Isometry3, Matrix4, Point2, Rotation2, Vector3, Vector4};
 use specs::{Fetch, Join, ReadStorage, SystemData, World};
 
 use ggez;
 use ggez::graphics::{self, Drawable};
 
+use particle_frenzy;
+
+use hooks_common::event::Event;
 use hooks_common::physics::{Orientation, Position};
 use hooks_common::repl::EntityMap;
 use hooks_common::game::entity::hook;
 
-use {Assets, Registry};
+use {Assets, Context, Registry};
 
 /// Draw joints for debugging.
 pub fn register_show(reg: &mut Registry) {
+    reg.event_handler(handle_event);
     reg.draw_fn(draw);
+}
+
+fn handle_event(
+    context: &mut Context,
+    _world: &mut World,
+    events: &[Box<Event>],
+) -> ggez::error::GameResult<()> {
+    for event in events {
+        match_event!(event:
+            hook::FixedEvent => {
+                let cone = particle_frenzy::spawn::Cone {
+                    spawn_time: context.time,
+                    life_time: 2.0,
+                    pos: event.pos,
+                    orientation: event.vel[1].atan2(event.vel[0]),
+                    spread: f32::consts::PI / 8.0,
+                    min_speed: 100.0,
+                    max_speed: 300.0,
+                    angle: 0.0,
+                    friction: 100.0,
+                    size: [3.0, 3.0],
+                    color: |_, _| [1.0, 0.0, 0.0],
+                };
+                cone.spawn(&mut context.particles, 1000);
+            },
+        );
+    }
+
+    Ok(())
 }
 
 type DrawData<'a> = (

@@ -69,7 +69,7 @@ impl MainState {
                 ctx.quit()?;
             }
             Some(hooks_game::game::Event::TickStarted(ref events)) => {
-                self.show.handle_events(self.game.world_mut(), events)?;
+                self.show.handle_events(ctx, self.game.world_mut(), events)?;
             }
             None => {}
         }
@@ -241,12 +241,8 @@ fn main() {
     }
 
     let assets = Assets::new(ctx).unwrap();
-    let show = Show::load(
-        ggez::graphics::get_size(ctx),
-        client.my_player_id(),
-        client.game_info(),
-        assets,
-    ).unwrap();
+    let size = ggez::graphics::get_size(ctx);
+    let show = Show::load(ctx, size, client.my_player_id(), client.game_info(), assets).unwrap();
     let font = Font::default_font().unwrap();
 
     // Inform the server that we are good to go

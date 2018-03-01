@@ -63,6 +63,7 @@ impl<T: Clone + Event> EventClone for T {
 
 mopafy!(Event);
 
+#[macro_export]
 macro_rules! match_event {
     {
         $event:ident:

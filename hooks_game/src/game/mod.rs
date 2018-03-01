@@ -146,7 +146,7 @@ impl Game {
 
         // Start ticks
         //while self.tick_timer.trigger() {
-        while self.last_tick < self.tick_history.max_num() {
+        if self.last_tick < self.tick_history.max_num() {
             let tick = if let Some(last_tick) = self.last_tick {
                 let next_tick = last_tick + 1;
                 self.tick_history.get(next_tick).map(|_| next_tick)
@@ -170,13 +170,15 @@ impl Game {
                     debug!("Entities {:?}", tick_data.snapshot.as_ref().unwrap().0.keys());
                 }*/
 
-                self.state.run_tick_view(tick_data)?;
+                let events = self.state.run_tick_view(tick_data)?;
+                Ok(Some(Event::TickStarted(events)))
             } else {
                 //warn!("Waiting for tick...");
+                Ok(None)
             }
+        } else {
+            Ok(None)
         }
-
-        Ok(None)
     }
 }
 

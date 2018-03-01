@@ -1,22 +1,25 @@
+//! This crate is a bit of a placeholder to have some simple graphics.
+
+extern crate gfx_device_gl;
 extern crate ggez;
+#[macro_use]
 extern crate hooks_common;
 #[macro_use]
 extern crate hooks_util;
 #[macro_use]
 extern crate log;
 extern crate nalgebra;
+extern crate particle_frenzy;
 extern crate specs;
 #[macro_use]
 extern crate specs_derive;
 
 mod camera;
-pub mod debug;
-
 mod rect;
 mod wall;
 mod hook;
-
 mod entity;
+pub mod debug;
 
 use nalgebra::Point2;
 
@@ -45,6 +48,12 @@ pub fn register_show(reg: &mut Registry) {
 pub struct Assets {
     pub rect_fill: Mesh,
     pub rect_line: Mesh,
+}
+
+pub struct Context {
+    pub assets: Assets,
+    pub particles: particle_frenzy::System<gfx_device_gl::Resources>,
+    pub time: f32,
 }
 
 impl Assets {
@@ -78,7 +87,7 @@ impl Assets {
     }
 }
 
-pub type EventHandler = fn(&Assets, &mut World, &Vec<Box<Event>>) -> ggez::error::GameResult<()>;
+pub type EventHandler = fn(&mut Context, &mut World, &[Box<Event>]) -> ggez::error::GameResult<()>;
 pub type DrawFn = fn(&mut ggez::Context, &Assets, &World) -> ggez::error::GameResult<()>;
 
 #[derive(Default)]
@@ -102,16 +111,16 @@ impl Registry {
 pub struct Show {
     my_player_id: PlayerId,
     game_info: GameInfo,
-
-    assets: Assets,
     reg: Registry,
 
+    context: Context,
     camera: Camera,
 }
 
 impl Show {
     /// Load all assets for a game info and create a `Show`.
     pub fn load(
+        ctx: &mut ggez::Context,
         view_size: (u32, u32),
         my_player_id: PlayerId,
         game_info: &GameInfo,
@@ -120,25 +129,38 @@ impl Show {
         let mut reg = Registry::default();
         register_show(&mut reg);
 
+        let particles = {
+            let target = graphics::get_screen_render_target(ctx);
+            let factory = graphics::get_factory(ctx);
+            particle_frenzy::System::new(factory, target, 10_000, 50)
+        };
+        let context = Context {
+            assets,
+            particles,
+            time: 0.0,
+        };
+
         Ok(Show {
             my_player_id,
             game_info: game_info.clone(),
-
-            assets,
             reg,
 
+            context,
             camera: Camera::new(view_size),
         })
     }
 
     /// Show game events.
     pub fn handle_events(
-        &self,
+        &mut self,
+        ctx: &mut ggez::Context,
         world: &mut World,
         events: &Vec<Box<Event>>,
     ) -> ggez::error::GameResult<()> {
+        self.update_time(ctx);
+
         for handler in &self.reg.event_handlers {
-            handler(&self.assets, world, events)?;
+            handler(&mut self.context, world, events)?;
         }
 
         Ok(())
@@ -148,6 +170,7 @@ impl Show {
     pub fn draw(&mut self, ctx: &mut ggez::Context, world: &World) -> ggez::error::GameResult<()> {
         profile!("show game");
 
+        self.update_time(ctx);
         let delta = ggez::timer::get_delta(ctx);
 
         let positions = world.read::<Position>();
@@ -159,22 +182,34 @@ impl Show {
 
         self.camera.update(delta);
 
-        graphics::push_transform(ctx, Some(self.camera.transform()));
+        let camera_transform = self.camera.transform();
+
+        graphics::push_transform(ctx, Some(camera_transform));
         graphics::apply_transformations(ctx)?;
 
         for draw_fn in &self.reg.draw_fns {
-            draw_fn(ctx, &self.assets, world)?;
+            draw_fn(ctx, &self.context.assets, world)?;
         }
 
         graphics::pop_transform(ctx);
         graphics::apply_transformations(ctx)?;
+
+        // Draw particles
+        {
+            let transform = graphics::get_projection(ctx) * camera_transform;
+            let (factory, device, encoder, _depthview, _colorview) = graphics::get_gfx_objects(ctx);
+            self.context
+                .particles
+                .render(factory, encoder, self.context.time, &transform.into());
+            encoder.flush(device);
+        }
 
         Ok(())
     }
 
     /// Once the game is finished, move the `Assets` so that we don't reload things unnecessarily.
     pub fn into_assets(self) -> Assets {
-        self.assets
+        self.context.assets
     }
 
     fn my_player_entity(&self, world: &World) -> Option<specs::Entity> {
@@ -187,5 +222,12 @@ impl Show {
             // ... or the server isn't doing its job.
             None
         }
+    }
+
+    fn update_time(&mut self, ctx: &mut ggez::Context) {
+        // TODO: Should this involve the game time somehow?
+
+        self.context.time =
+            ggez::timer::duration_to_f64(ggez::timer::get_time_since_start(ctx)) as f32;
     }
 }

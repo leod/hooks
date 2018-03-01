@@ -7,9 +7,11 @@ authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 hooks_util = { path = "../hooks_util" }
 hooks_common = { path = "../hooks_common" }
 ggez = { git = "https://github.com/leod/ggez.git", branch = "nalgebra-0.14" }
+particle-frenzy = { git = "https://github.com/leod/particle-frenzy.git" }
 specs = "0.10.0"
 specs-derive = "0.1.0"
 log = "0.4"
 bit_manager = "*"
 env_logger = "0.5.0-rc.2"
 nalgebra = "0.14"
+gfx_device_gl = "0.15"
