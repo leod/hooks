@@ -1,7 +1,7 @@
 use nalgebra::{norm, zero, Point2, Vector2};
 
-use specs::{Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage,
-            World, WriteStorage};
+use specs::{Entities, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage, World,
+            WriteStorage};
 
 use hooks_util::profile;
 use defs::GameInfo;
@@ -407,6 +407,8 @@ impl<'a> System<'a> for HandleContactsSys {
                 let event = interaction::Event {
                     a: info_a,
                     b: info_b,
+                    // TODO: What is the difference between `world1` and `world2` here?
+                    pos: contact.world1,
                 };
                 interactions.0.push(event);
             }
