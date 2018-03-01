@@ -190,10 +190,16 @@ pub mod auth {
         // Create hook segments
         let mut segments = [INVALID_ENTITY_ID; NUM_SEGMENTS];
         for i in 0..NUM_SEGMENTS {
-            let (segment_id, _) =
-                repl::entity::auth::create(world, owner.0, "hook_segment", |builder| {
-                    builder.with(SegmentDef { hook: id })
-                });
+            // The first hook segment is special because it can attach to entities
+            let class = if i == 0 {
+                "first_hook_segment"
+            } else {
+                "hook_segment"
+            };
+
+            let (segment_id, _) = repl::entity::auth::create(world, owner.0, class, |builder| {
+                builder.with(SegmentDef { hook: id })
+            });
             segments[i] = segment_id;
         }
 
@@ -280,6 +286,8 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
     // Update all hooks that currently have some input attached to them
     for (input, hook_def, hook_state) in (&data.input, &data.hook_def, &mut data.hook_state).join()
     {
+        //debug!("{:?}", hook_state);
+
         // Stalk our owner
         let owner_entity = data.entity_map.try_id_to_entity(hook_def.owner)?;
         let owner_pos = data.position
@@ -300,6 +308,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
         for i in 0..NUM_SEGMENTS {
             segment_entities[i] = data.entity_map.try_id_to_entity(hook_def.segments[i])?;
         }
+        // TODO: num_active_segments could be out of bounds
 
         // Update hook state
         match hook_state.0.clone() {
@@ -336,17 +345,22 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                     let join_index = if activate_next {
                         if num_active_segments + 1 < NUM_SEGMENTS {
-                            let segment_id = hook_def.segments[num_active_segments + 1];
-                            let next_segment = data.entity_map.try_id_to_entity(segment_id)?;
+                            let segment_index = num_active_segments;
+                            let next_segment = segment_entities[segment_index];
 
                             let vel =
-                                Vector2::new(owner_angle.cos(), owner_angle.cos()) * SHOOT_SPEED;
+                                Vector2::new(owner_angle.cos(), owner_angle.sin()) * SHOOT_SPEED;
 
                             data.position.insert(next_segment, Position(owner_pos));
                             data.orientation
                                 .insert(next_segment, Orientation(owner_angle));
                             data.velocity
                                 .insert(next_segment, Velocity(owner_vel + vel));
+
+                            hook_state.0 = Some(ActiveState {
+                                num_active_segments: num_active_segments as u8 + 1,
+                                mode: Mode::Shooting,
+                            });
 
                             // Join with this new last segment
                             num_active_segments
@@ -534,7 +548,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         let angle_def = constraint::Def::Angle { angle: 0.0 };
                         let angle_constraint = Constraint {
                             def: angle_def,
-                            stiffness: 1.0,
+                            stiffness: 0.5,
                             entity_a: owner_entity,
                             entity_b: last_entity,
                             vars_a: constraint::Vars {
@@ -561,62 +575,68 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
             }
         }
 
-        // Join successive hook segments
-        match &hook_state.0 {
+        // Maintain the `Active` flag of our segments
+        let num_active_segments = match &hook_state.0 {
             &Some(ActiveState {
                 num_active_segments,
                 ..
-            }) if num_active_segments > 1 =>
-            {
-                assert!(num_active_segments > 0);
+            }) => num_active_segments as usize,
+            &None => 0,
+        };
+        for i in 0..num_active_segments {
+            data.active.insert(segment_entities[i], Active(true));
+        }
+        for i in num_active_segments..NUM_SEGMENTS {
+            data.active.insert(segment_entities[i], Active(false));
+        }
 
-                for i in 0..num_active_segments as usize - 1 {
-                    let entity_a = segment_entities[i];
-                    let entity_b = segment_entities[i + 1];
+        // Join successive hook segments
+        if num_active_segments > 1 {
+            for i in 0..num_active_segments - 1 {
+                let entity_a = segment_entities[i];
+                let entity_b = segment_entities[i + 1];
 
-                    let joint_def = constraint::Def::Joint {
-                        distance: 0.0,
-                        p_object_a: Point2::new(SEGMENT_LENGTH / 2.0, 0.0),
-                        p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0, 0.0),
-                    };
-                    let angle_def = constraint::Def::Angle { angle: 0.0 };
+                let joint_def = constraint::Def::Joint {
+                    distance: 0.0,
+                    p_object_a: Point2::new(-SEGMENT_LENGTH / 2.0, 0.0),
+                    p_object_b: Point2::new(SEGMENT_LENGTH / 2.0, 0.0),
+                };
+                let angle_def = constraint::Def::Angle { angle: 0.0 };
 
-                    let joint_constraint = Constraint {
-                        def: joint_def,
-                        stiffness: 1.0,
-                        entity_a,
-                        entity_b,
-                        vars_a: constraint::Vars {
-                            p: true,
-                            angle: true,
-                        },
-                        vars_b: constraint::Vars {
-                            p: true,
-                            angle: true,
-                        },
-                    };
-                    //let j = active_segments.len() - i - 1;
-                    //let stiffness = (j as f32 / NUM_SEGMENTS as f32).powi(2);
-                    let stiffness = 0.7;
-                    let angle_constraint = Constraint {
-                        def: angle_def,
-                        stiffness: stiffness,
-                        entity_a,
-                        entity_b,
-                        vars_a: constraint::Vars {
-                            p: false,
-                            angle: true,
-                        },
-                        vars_b: constraint::Vars {
-                            p: false,
-                            angle: true,
-                        },
-                    };
-                    data.constraints.add(joint_constraint);
-                    data.constraints.add(angle_constraint);
-                }
+                let joint_constraint = Constraint {
+                    def: joint_def,
+                    stiffness: 1.0,
+                    entity_a,
+                    entity_b,
+                    vars_a: constraint::Vars {
+                        p: true,
+                        angle: true,
+                    },
+                    vars_b: constraint::Vars {
+                        p: true,
+                        angle: true,
+                    },
+                };
+                //let j = active_segments.len() - i - 1;
+                //let stiffness = (j as f32 / NUM_SEGMENTS as f32).powi(2);
+                let stiffness = 0.7;
+                let angle_constraint = Constraint {
+                    def: angle_def,
+                    stiffness: stiffness,
+                    entity_a,
+                    entity_b,
+                    vars_a: constraint::Vars {
+                        p: false,
+                        angle: true,
+                    },
+                    vars_b: constraint::Vars {
+                        p: false,
+                        angle: true,
+                    },
+                };
+                data.constraints.add(joint_constraint);
+                data.constraints.add(angle_constraint);
             }
-            _ => {}
         }
     }
 
