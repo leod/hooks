@@ -7,6 +7,7 @@ use specs::{self, Component, FlaggedStorage, VecStorage};
 use registry::Registry;
 
 pub fn register(reg: &mut Registry) {
+    reg.component::<Update>();
     reg.component::<Dynamic>();
     reg.component::<InvMass>();
     reg.component::<InvAngularMass>();
@@ -17,6 +18,11 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Friction>();
     reg.component::<Joints>();
 }
+
+/// Should this entity be updated in the next simulation run?
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(NullStorage)]
+pub struct Update;
 
 /// Non-static entities.
 #[derive(Component, PartialEq, Clone, Debug)]

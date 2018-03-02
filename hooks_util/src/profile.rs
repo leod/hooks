@@ -132,13 +132,11 @@ impl debug::Inspect for Node {
             timer::duration_to_secs(root.duration_sum)
         });
         //let name = if self.pred.is_some() { "".to_string() } else { self.name.to_string() };
-        let name = "".to_string();
-
         let mut vars = vec![
             (
-                name,
+                ":".to_string(),
                 debug::Vars::Leaf(format!(
-                    "{:.2}% {:>4.2}ms/call {:.2}Hz",
+                    "{:3.2}% {:>4.2}ms/call {:.2}Hz",
                     percent,
                     duration_sum_secs * 1000.0 / (self.num_calls as f64),
                     self.num_calls as f64 / root_duration_sum_secs
@@ -153,7 +151,7 @@ impl debug::Inspect for Node {
                 succs.push((succ.name.to_string(), succ.inspect()));
             }
 
-            vars.push(("".to_string(), debug::Vars::Node(succs)));
+            vars.push(("↳".to_string(), debug::Vars::Node(succs)));
         }
 
         debug::Vars::Node(vars)
