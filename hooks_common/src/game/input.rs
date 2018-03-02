@@ -1,8 +1,8 @@
 pub mod auth {
-    use specs::World;
+    use specs::{Join, World};
 
     use defs::{PlayerId, PlayerInput};
-    use physics;
+    use physics::{self, Update};
     use repl;
     use repl::player::Players;
     use game::entity::player;
@@ -12,20 +12,33 @@ pub mod auth {
         player_id: PlayerId,
         input: &PlayerInput,
     ) -> Result<(), repl::Error> {
-        let entity = {
+        // TODO: We need to be careful and limit the number of inputs that may be applied in one
+        //       tick. Currently, it is possible to explode the simulation by lagging the client
+        //       and assumably applying too many inputs at once.
+
+        let player_entity = {
             let players = world.read_resource::<Players>();
             players.0.get(&player_id).unwrap().entity
         };
 
-        if let Some(entity) = entity {
-            player::run_input(world, entity, input)?;
+        if let Some(player_entity) = player_entity {
+            player::run_input(world, player_entity, input)?;
         }
 
-        // TODO: We need to be careful and limit the number of inputs that may be applied in one
-        //       tick. Currently, it is possible to explode the simulation by lagging the client
-        //       and assumably applying too many inputs at once.
-        // TODO: Physics simulation should run *only* for player-owned entities every time that
-        //       input is given.
+        // Simulate only this player's entities
+        {
+            let repl_id = world.read::<repl::Id>();
+            let mut update = world.write();
+
+            update.clear();
+
+            for (entity, repl_id) in (&*world.entities(), &repl_id).join() {
+                if (repl_id.0).0 == player_id {
+                    update.insert(entity, Update);
+                }
+            }
+        }
+
         physics::sim::run(world);
 
         Ok(())

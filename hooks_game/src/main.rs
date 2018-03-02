@@ -10,7 +10,7 @@ extern crate log;
 extern crate nalgebra;
 extern crate specs;
 
-use std::{env, path, thread};
+use std::{env, io, path, thread};
 
 use nalgebra::{Point2, Vector2};
 
@@ -60,18 +60,19 @@ impl MainState {
         self.fps = ggez::timer::get_fps(ctx);
         let delta = ggez::timer::get_delta(ctx);
 
-        match self.game
+        while let Some(event) = self.game
             .update(&mut self.client, &self.next_player_input, delta)
             .unwrap()
         {
-            Some(hooks_game::game::Event::Disconnected) => {
-                info!("Got disconnected! Bye.");
-                ctx.quit()?;
+            match event {
+                hooks_game::game::Event::Disconnected => {
+                    info!("Got disconnected! Bye.");
+                    ctx.quit()?;
+                }
+                hooks_game::game::Event::TickStarted(ref events) => {
+                    self.show.handle_events(ctx, self.game.world_mut(), events)?;
+                }
             }
-            Some(hooks_game::game::Event::TickStarted(ref events)) => {
-                self.show.handle_events(ctx, self.game.world_mut(), events)?;
-            }
-            None => {}
         }
 
         Ok(())
@@ -146,6 +147,9 @@ impl MainState {
                 Keycode::S => self.next_player_input.move_backward = true,
                 Keycode::F1 => self.show_debug = !self.show_debug,
                 Keycode::F2 => self.show_profiler = !self.show_profiler,
+                Keycode::P => {
+                    PROFILER.with(|p| p.borrow().inspect().print(&mut io::stdout()));
+                }
                 _ => {}
             },
             event::Event::KeyUp {

@@ -90,6 +90,32 @@ impl Game {
         &mut self.state.world
     }
 
+    fn on_received_tick(&mut self, client: &mut Client, data: Vec<u8>) -> Result<(), Error> {
+        let mut reader = BitReader::new(Cursor::new(data));
+
+        let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
+        let tick_nums = self.tick_history
+            .delta_read_tick(&entity_classes, &mut reader)?;
+
+        if let Some((old_tick_num, new_tick_num)) = tick_nums {
+            //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
+
+            if rand::thread_rng().gen() {
+                // TMP: For testing delta encoding/decoding!
+                let reply = ClientGameMsg::ReceivedTick(new_tick_num);
+                client.send_game(reply)?;
+            }
+
+            if let Some(old_tick_num) = old_tick_num {
+                // The fact that we have received a new delta encoded tick means that
+                // the server knows that we have the tick w.r.t. which it was encoded.
+                self.server_recv_ack_tick = Some(old_tick_num);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn update(
         &mut self,
         client: &mut Client,
@@ -102,32 +128,16 @@ impl Game {
         self.tick_timer += delta;
 
         // Handle network events
-        while let Some(event) = client.service()? {
-            match event {
-                client::Event::Disconnected => {
-                    return Ok(Some(Event::Disconnected));
-                }
-                client::Event::ServerGameMsg(data) => {
-                    let mut reader = BitReader::new(Cursor::new(data));
+        {
+            profile!("service");
 
-                    let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
-                    let tick_nums = self.tick_history
-                        .delta_read_tick(&entity_classes, &mut reader)?;
-
-                    if let Some((old_tick_num, new_tick_num)) = tick_nums {
-                        //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
-
-                        if rand::thread_rng().gen() {
-                            // TMP: For testing delta encoding/decoding!
-                            let reply = ClientGameMsg::ReceivedTick(new_tick_num);
-                            client.send_game(reply)?;
-                        }
-
-                        if let Some(old_tick_num) = old_tick_num {
-                            // The fact that we have received a new delta encoded tick means that
-                            // the server knows that we have the tick w.r.t. which it was encoded.
-                            self.server_recv_ack_tick = Some(old_tick_num);
-                        }
+            while let Some(event) = client.service()? {
+                match event {
+                    client::Event::Disconnected => {
+                        return Ok(Some(Event::Disconnected));
+                    }
+                    client::Event::ServerGameMsg(data) => {
+                        self.on_received_tick(client, data)?;
                     }
                 }
             }
