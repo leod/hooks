@@ -166,7 +166,7 @@ impl Game {
             };
 
             if let Some(tick) = tick {
-                profile!("start tick");
+                profile!("tick");
 
                 self.last_tick = Some(tick);
 

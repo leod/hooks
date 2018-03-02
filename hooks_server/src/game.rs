@@ -8,6 +8,7 @@ use bit_manager::BitWriter;
 use shred::{Fetch, RunNow};
 
 use hooks_util::timer::{Stopwatch, Timer};
+use hooks_util::profile;
 use hooks_common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
                    TickDeltaNum, TickNum};
 use hooks_common::net::protocol::ClientGameMsg;
@@ -263,6 +264,8 @@ impl Game {
 
         // 4. Run a tick periodically
         if self.tick_timer.trigger() {
+            profile!("tick");
+
             // 4.1. Run tick
             //debug!("Starting tick {}", self.next_tick);
 
@@ -285,12 +288,17 @@ impl Game {
                 player.queued_inputs.clear();
             }
 
-            let tick_events = self.state.run_tick_auth(inputs);
+            let tick_events = {
+                profile!("run");
+                self.state.run_tick_auth(inputs)
+            };
 
             // Can unwrap here, since replication errors should at most happen on the client-side
             let tick_events = tick_events.unwrap();
 
             // 4.2. Record tick in history and send snapshots for every player
+            profile!("send");
+
             let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
             let send_snapshot = self.next_tick % self.game_info().ticks_per_snapshot == 0;
 
