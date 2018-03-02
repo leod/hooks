@@ -7,17 +7,21 @@ use specs::{self, Component, FlaggedStorage, VecStorage};
 use registry::Registry;
 
 pub fn register(reg: &mut Registry) {
+    reg.component::<Dynamic>();
+    reg.component::<InvMass>();
+    reg.component::<InvAngularMass>();
     reg.component::<Position>();
     reg.component::<Velocity>();
     reg.component::<Orientation>();
     reg.component::<AngularVelocity>();
-
-    reg.component::<InvMass>();
-    reg.component::<InvAngularMass>();
-    reg.component::<Dynamic>();
     reg.component::<Friction>();
     reg.component::<Joints>();
 }
+
+/// Non-static entities.
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(NullStorage)]
+pub struct Dynamic;
 
 /// Physical mass.
 #[derive(Component, PartialEq, Clone, Debug)]
@@ -29,14 +33,14 @@ pub struct InvMass(pub f32);
 #[component(VecStorage)]
 pub struct InvAngularMass(pub f32);
 
+/// Two-dimensional position.
+#[derive(PartialEq, Clone, Debug)]
+pub struct Position(pub Point2<f32>);
+
 /// Two-dimensional velocity.
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(VecStorage)]
 pub struct Velocity(pub Vector2<f32>);
-
-/// Two-dimensional position.
-#[derive(PartialEq, Clone, Debug)]
-pub struct Position(pub Point2<f32>);
 
 impl Component for Position {
     type Storage = FlaggedStorage<Self, VecStorage<Self>>;
@@ -54,11 +58,6 @@ impl Component for Orientation {
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[component(VecStorage)]
 pub struct AngularVelocity(pub f32);
-
-/// Non-static entities.
-#[derive(Component, PartialEq, Clone, Debug)]
-#[component(NullStorage)]
-pub struct Dynamic;
 
 /// Whether to apply friction to this entity.
 #[derive(Component, PartialEq, Clone, Debug)]

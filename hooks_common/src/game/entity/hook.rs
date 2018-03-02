@@ -625,10 +625,10 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
             &None => 0,
         };
         for i in 0..num_active_segments {
-            data.active.insert(segment_entities[i], Active(true));
+            data.active.insert(segment_entities[i], Active);
         }
         for i in num_active_segments..NUM_SEGMENTS {
-            data.active.insert(segment_entities[i], Active(false));
+            data.active.remove(segment_entities[i]);
         }
 
         // Join successive hook segments

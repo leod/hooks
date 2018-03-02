@@ -35,8 +35,6 @@ pub mod view {
 }
 
 snapshot! {
-    use entity::Active;
-
     use physics::Position;
     use physics::Orientation;
 
@@ -47,8 +45,6 @@ snapshot! {
     use game::entity::player::Player;
 
     mod snapshot {
-        active: Active,
-
         position: Position,
         orientation: Orientation,
 

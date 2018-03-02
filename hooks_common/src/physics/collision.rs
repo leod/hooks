@@ -131,22 +131,18 @@ impl<'a> System<'a> for MaintainSys {
             &object,
             !&object_handle,
         ).join()
-            .filter_map(
-                |(entity, active, position, orientation, shape, object, _)| {
-                    if active.0 {
-                        let isometry = Isometry2::new(position.0.coords, orientation.0);
-                        let handle = collision_world.add(
-                            isometry,
-                            shape.0.clone(),
-                            object.groups,
-                            object.query_type,
-                            entity,
-                        );
+            .map(
+                |(entity, _active, position, orientation, shape, object, _)| {
+                    let isometry = Isometry2::new(position.0.coords, orientation.0);
+                    let handle = collision_world.add(
+                        isometry,
+                        shape.0.clone(),
+                        object.groups,
+                        object.query_type,
+                        entity,
+                    );
 
-                        Some((entity, handle))
-                    } else {
-                        None
-                    }
+                    (entity, handle)
                 },
             )
             .collect::<Vec<_>>();
@@ -155,25 +151,19 @@ impl<'a> System<'a> for MaintainSys {
             object_handle.insert(entity, ObjectHandle(handle));
         }
 
-        for (entity, active, _, _) in (&*entities, &active, &object, !&object_handle).join() {
-            if active.0 {
-                panic!(
-                    "Entity {:?} has collision::Object but not Position, Orientation or Shape",
-                    entity
-                );
-            }
+        for (entity, _active, _, _) in (&*entities, &active, &object, !&object_handle).join() {
+            panic!(
+                "Entity {:?} has collision::Object but not Position, Orientation or Shape",
+                entity
+            );
         }
 
         // Remove newly inactive entities from collision world
-        let removed_handles = (&*entities, &active, &object_handle)
+        let removed_handles = (&*entities, !&active, &object_handle)
             .join()
-            .filter_map(|(entity, active, object_handle)| {
-                if !active.0 {
-                    collision_world.remove(&[object_handle.0]);
-                    Some(entity)
-                } else {
-                    None
-                }
+            .map(|(entity, _, object_handle)| {
+                collision_world.remove(&[object_handle.0]);
+                entity
             })
             .collect::<Vec<_>>();
 
