@@ -116,13 +116,9 @@ impl<'a> System<'a> for FrictionForceSys {
     );
 
     fn run(&mut self, (active, dynamic, friction, mut velocity, mut force): Self::SystemData) {
-        for (active, _, friction, velocity, force) in
+        for (_, _, friction, velocity, force) in
             (&active, &dynamic, &friction, &mut velocity, &mut force).join()
         {
-            if !active.0 {
-                continue;
-            }
-
             let speed = norm(&velocity.0);
 
             if speed < MIN_SPEED {
@@ -147,15 +143,11 @@ impl<'a> System<'a> for JointForceSys {
     );
 
     fn run(&mut self, (active, dynamic, joints, positions, mut force): Self::SystemData) {
-        for (is_active, _, joints, position_a, force) in
+        for (_, _, joints, position_a, force) in
             (&active, &dynamic, &joints, &positions, &mut force).join()
         {
-            if !is_active.0 {
-                continue;
-            }
-
             for &(entity_b, ref joint) in &joints.0 {
-                if !active.get(entity_b).unwrap().0 {
+                if active.get(entity_b).is_none() {
                     // Both endpoints of the joint need to be active
                     continue;
                 }
@@ -228,6 +220,7 @@ struct CorrectVelocitySys;
 impl<'a> System<'a> for CorrectVelocitySys {
     type SystemData = (
         Fetch<'a, GameInfo>,
+        ReadStorage<'a, Active>,
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, OldPosition>,
@@ -242,6 +235,7 @@ impl<'a> System<'a> for CorrectVelocitySys {
         &mut self,
         (
             game_info,
+            active,
             dynamic,
             position,
             old_position,
@@ -253,13 +247,13 @@ impl<'a> System<'a> for CorrectVelocitySys {
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (_, position, old_position, velocity) in
-            (&dynamic, &position, &old_position, &mut velocity).join()
+        for (_, _, position, old_position, velocity) in
+            (&active, &dynamic, &position, &old_position, &mut velocity).join()
         {
             velocity.0 = (position.0 - old_position.0) / dt;
         }
-        for (_, orientation, old_orientation, angular_velocity) in
-            (&dynamic, &orientation, &old_orientation, &mut angular_velocity).join()
+        for (_, _, orientation, old_orientation, angular_velocity) in
+            (&active, &dynamic, &orientation, &old_orientation, &mut angular_velocity).join()
         {
             let x = orientation.0;
             let y = old_orientation.0;
@@ -279,8 +273,8 @@ impl<'a> System<'a> for IntegrateForceSys {
     type SystemData = (
         Fetch<'a, GameInfo>,
         ReadStorage<'a, Active>,
-        ReadStorage<'a, InvMass>,
         ReadStorage<'a, Dynamic>,
+        ReadStorage<'a, InvMass>,
         ReadStorage<'a, Force>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, AngularVelocity>,
@@ -292,8 +286,8 @@ impl<'a> System<'a> for IntegrateForceSys {
         (
             game_info,
             active,
-            inv_mass,
             dynamic,
+            inv_mass,
             force,
             mut velocity,
             mut ang_velocity,
@@ -301,7 +295,7 @@ impl<'a> System<'a> for IntegrateForceSys {
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (active, _, inv_mass, force, velocity, ang_velocity) in (
+        for (_, _, inv_mass, force, velocity, ang_velocity) in (
             &active,
             &dynamic,
             &inv_mass,
@@ -310,10 +304,6 @@ impl<'a> System<'a> for IntegrateForceSys {
             &mut ang_velocity,
         ).join()
         {
-            if !active.0 {
-                continue;
-            }
-
             velocity.0 += force.0 * inv_mass.0 * dt;
 
             // TODO: Angular friction
@@ -339,6 +329,7 @@ impl<'a> System<'a> for HandleContactsSys {
         FetchMut<'a, InteractionEvents>,
         FetchMut<'a, Constraints>,
         ReadStorage<'a, entity::Meta>,
+        ReadStorage<'a, Active>,
         ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Velocity>,
     );
@@ -352,6 +343,7 @@ impl<'a> System<'a> for HandleContactsSys {
             mut interactions,
             mut constraints,
             meta,
+            active,
             dynamic,
             velocity,
         ): Self::SystemData
@@ -363,6 +355,11 @@ impl<'a> System<'a> for HandleContactsSys {
             for contact in &contacts {
                 let entity_a = *oa.data();
                 let entity_b = *ob.data();
+
+                // Only consider contacts where at least one object is active
+                if active.get(entity_a).is_none() && active.get(entity_b).is_none() {
+                    continue;
+                }
 
                 let action = interaction::get_action(
                     &interaction_handlers,
@@ -526,31 +523,23 @@ impl<'a> System<'a> for IntegrateVelocitySys {
     ) {
         let dt = game_info.tick_duration_secs() as f32;
 
-        for (active, _, velocity, position) in (
+        for (_, _, velocity, position) in (
             &active,
             &dynamic,
             &velocity,
             &mut position,
         ).join()
         {
-            if !active.0 {
-                continue;
-            }
-
             position.0 += velocity.0 * dt;
         }
 
-        for (active, _, angular_velocity, orientation) in (
+        for (_, _, angular_velocity, orientation) in (
             &active,
             &dynamic,
             &angular_velocity,
             &mut orientation,
         ).join()
         {
-            if !active.0 {
-                continue;
-            }
-
             orientation.0 += angular_velocity.0 * dt;
         }
     }
