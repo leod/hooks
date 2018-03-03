@@ -28,10 +28,10 @@ run-server: build
 	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server
 
 run-game-release: build
-	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game
+	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game
 
 run-server-release: build
-	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server
+	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server
 
 random-bot:
 	cargo run -j8 --release --example random_bot
