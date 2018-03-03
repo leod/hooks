@@ -83,7 +83,6 @@ pub fn run_input(
         for i in 0..NUM_HOOKS {
             let hook_entity = repl::try_id_to_entity(world, player.hooks[i])?;
 
-            // TODO: Different inputs for different hooks
             world.write::<hook::CurrentInput>().insert(
                 hook_entity,
                 hook::CurrentInput {

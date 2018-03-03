@@ -45,6 +45,10 @@ pub trait EntitySnapshot: Clone + PartialEq + 'static {
     ) -> Result<Self, Error>;
 }
 
+pub trait HasComponent<T> {
+    fn get(&self) -> Option<T>;
+}
+
 /// Trait implemented by the component type enum associated with an EntitySnapshot.
 pub trait ComponentType: Debug + Clone + Sync + Send + Sized {
     type EntitySnapshot: EntitySnapshot<ComponentType = Self>;
@@ -324,6 +328,14 @@ macro_rules! snapshot {
                     pub $field_name: Option<$field_type>,
                 )+
             }
+
+            $(
+                impl snapshot::HasComponent<$field_type> for EntitySnapshot {
+                    fn get(&self) -> Option<$field_type> {
+                        self.$field_name.clone()
+                    }
+                }
+            )+
 
             impl snapshot::EntitySnapshot for EntitySnapshot {
                 type ComponentType = ComponentType;

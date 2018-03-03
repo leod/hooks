@@ -25,7 +25,7 @@ fn main() {
     let map_info = MapInfo;
     let game_info = GameInfo {
         ticks_per_second: 60,
-        ticks_per_snapshot: 1,
+        ticks_per_snapshot: 6,
         map_info,
         player_entity_class: "player".to_string(),
     };

@@ -50,7 +50,6 @@ pub enum Def {
 /// Which values can change in solving a constraint?
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Vars {
-    // TODO: These two are kind of misnomers, they should refer to velocity
     pub p: bool,
     pub angle: bool,
 }

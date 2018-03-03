@@ -14,7 +14,6 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Remove>();
 }
 
-// TODO: Probably want to use Box<FnSomething>
 pub type Ctor = fn(EntityBuilder) -> EntityBuilder;
 
 /// Constructors, e.g. for adding client-side-specific components to replicated entities.
