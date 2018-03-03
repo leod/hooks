@@ -59,6 +59,14 @@ impl Timer {
     pub fn progress(&self) -> f64 {
         duration_to_secs(self.accum) / duration_to_secs(self.period)
     }
+
+    pub fn accum(&self) -> Duration {
+        self.accum
+    }
+
+    pub fn accum_secs(&self) -> f64 {
+        duration_to_secs(self.accum)
+    }
 }
 
 impl AddAssign<Duration> for Timer {
