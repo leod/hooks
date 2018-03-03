@@ -41,18 +41,28 @@ impl From<repl::Error> for Error {
 }
 
 pub struct Game {
+    game_info: GameInfo,
+
+    /// How many ticks we want to lag behind the server, so that we can interpolate.
+    target_lag_ticks: TickNum,
+
     my_player_id: PlayerId,
+
+    /// The complete state of the game.
     state: game::State,
+
+    /// Recent ticks we have received
     tick_history: tick::History<game::EntitySnapshot>,
 
     /// Timer to start the next tick.
     tick_timer: Timer,
-
     /// Number of last started tick.
     last_tick: Option<TickNum>,
-
     /// Newest tick of which we know that the server knows that we have received it.
     server_recv_ack_tick: Option<TickNum>,
+
+    /// Estimated ping
+    ping: f32,
 }
 
 pub fn register(reg: &mut Registry, game_info: &GameInfo) {
@@ -73,12 +83,15 @@ impl Game {
         let tick_history = tick::History::new(state.event_reg.clone());
 
         Game {
+            game_info: game_info.clone(),
+            target_lag_ticks: 2 * game_info.ticks_per_snapshot,
             my_player_id,
             state,
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
             last_tick: None,
             server_recv_ack_tick: None,
+            ping: 5.0,
         }
     }
 
@@ -124,9 +137,6 @@ impl Game {
     ) -> Result<Option<Event>, Error> {
         profile!("update game");
 
-        // Advance timers
-        self.tick_timer += delta;
-
         // Handle network events
         {
             profile!("service");
@@ -153,6 +163,33 @@ impl Game {
             }
             _ => {}
         }
+
+        // Advance timers
+        /*let lag_tick = match (self.last_tick, self.tick_history.max_num(), self.tick_history.min_num()) {
+            (Some(last), Some(b), Some(max)) => {
+                assert!(max >= last);
+                Some(max - last)
+            }
+            (None, Some(b), Some(c)) => {
+                assert!(b >= c);
+                Some(b) - Some(c) + 1
+            }
+            _ => None
+        };
+
+        let time_warp = if let Some(lag_ticks) = lag_ticks {
+            let tick_dur = self.game_info.tick_duration_secs() as f32;
+            let lag_time = lag_ticks as f32 * tick_dur + self.tick_timer.accum_secs();
+            let target_lag_time = self.target_lag_ticks as f32 * tick_dur;
+
+            if lag_ticks < target_lag_ticks {
+            }
+            1.0
+        } else {
+            1.0
+        };*/
+
+        self.tick_timer += delta; //* time_warp;
 
         // Start ticks
         //while self.tick_timer.trigger() {
@@ -211,6 +248,16 @@ impl debug::Inspect for Game {
             (
                 "server recv ack tick".to_string(),
                 self.server_recv_ack_tick.inspect(),
+            ),
+            (
+                "lag ticks".to_string(),
+                match (self.last_tick, self.tick_history.max_num()) {
+                    (Some(a), Some(b)) => {
+                        assert!(a <= b);
+                        Some(b - a)
+                    }
+                    _ => None,
+                }.inspect(),
             ),
         ])
     }

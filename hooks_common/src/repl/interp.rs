@@ -8,7 +8,7 @@ use repl::snapshot::{EntitySnapshot, HasComponent, WorldSnapshot};
 
 use hooks_util::join;
 
-pub trait Interp: Sized {
+pub trait Interp {
     fn interp(&self, other: &Self, t: f32) -> Self;
 }
 
