@@ -10,11 +10,6 @@ use hooks_common::physics::{Orientation, Position};
 
 use {Assets, Registry};
 
-// TODO: Lots of code duplication with show::rect! Ideally, we would automatically attach
-// `show::rect::Draw` for entities with `wall::Size` components, I think. This isn't easily
-// possible right now because we have the ctor stuff only for replicated entities, which walls do
-// not need to be.
-
 pub fn register_show(reg: &mut Registry) {
     reg.draw_fn(draw);
 }

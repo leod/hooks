@@ -1,6 +1,7 @@
 #[macro_use]
 pub mod snapshot;
 pub mod tick;
+pub mod interp;
 pub mod entity;
 pub mod player;
 
