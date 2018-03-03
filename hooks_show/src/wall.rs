@@ -4,6 +4,7 @@ use specs::{Join, ReadStorage, SystemData, World};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
+use hooks_util::profile;
 use hooks_common::game::entity::wall;
 use hooks_common::physics::{Orientation, Position};
 
@@ -25,6 +26,8 @@ type DrawData<'a> = (
 );
 
 fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
+    profile!("wall");
+
     let (position, orientation, size) = DrawData::fetch(&world.res, 0);
 
     for (position, orientation, size) in (&position, &orientation, &size).join() {

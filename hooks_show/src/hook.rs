@@ -8,6 +8,7 @@ use ggez::graphics::{self, Drawable};
 
 use particle_frenzy;
 
+use hooks_util::profile;
 use hooks_common::event::Event;
 use hooks_common::physics::{Orientation, Position};
 use hooks_common::repl::EntityMap;
@@ -59,6 +60,8 @@ type DrawData<'a> = (
 );
 
 fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
+    profile!("hook");
+
     let (entity_map, position, orientation, hook_def, hook_state) = DrawData::fetch(&world.res, 0);
 
     for (hook_def, hook_state) in (&hook_def, &hook_state).join() {

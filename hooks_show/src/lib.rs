@@ -157,6 +157,8 @@ impl Show {
         world: &mut World,
         events: &Vec<Box<Event>>,
     ) -> ggez::error::GameResult<()> {
+        profile!("show events");
+
         self.update_time(ctx);
 
         for handler in &self.reg.event_handlers {
@@ -168,7 +170,7 @@ impl Show {
 
     /// Draw the game.
     pub fn draw(&mut self, ctx: &mut ggez::Context, world: &World) -> ggez::error::GameResult<()> {
-        profile!("show game");
+        profile!("show");
 
         self.update_time(ctx);
         let delta = ggez::timer::get_delta(ctx);
@@ -187,8 +189,12 @@ impl Show {
         graphics::push_transform(ctx, Some(camera_transform));
         graphics::apply_transformations(ctx)?;
 
-        for draw_fn in &self.reg.draw_fns {
-            draw_fn(ctx, &self.context.assets, world)?;
+        {
+            profile!("fns");
+
+            for draw_fn in &self.reg.draw_fns {
+                draw_fn(ctx, &self.context.assets, world)?;
+            }
         }
 
         graphics::pop_transform(ctx);
@@ -196,6 +202,8 @@ impl Show {
 
         // Draw particles
         {
+            profile!("particles");
+
             let transform = graphics::get_projection(ctx) * camera_transform;
             let (factory, device, encoder, _depthview, _colorview) = graphics::get_gfx_objects(ctx);
             self.context

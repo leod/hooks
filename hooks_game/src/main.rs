@@ -89,7 +89,7 @@ impl MainState {
         self.show.draw(ctx, self.game.world())?;
 
         if self.show_debug {
-            profile!("draw text");
+            profile!("text");
             hooks_show::debug::show(ctx, &self.font, &self.inspect(), Point2::new(10.0, 10.0))?;
         }
 
