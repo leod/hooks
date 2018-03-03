@@ -160,7 +160,7 @@ impl<'a> System<'a> for InputSys {
     type SystemData = InputData<'a>;
 
     fn run(&mut self, mut data: InputData<'a>) {
-        let dt = data.game_info.tick_duration_secs() as f32;
+        let dt = data.game_info.tick_duration_secs();
 
         // Movement
         for (input, orientation, velocity) in

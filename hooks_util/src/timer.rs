@@ -1,13 +1,13 @@
 use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
-pub fn duration_to_secs(d: Duration) -> f64 {
-    let seconds = d.as_secs() as f64;
-    let nanos = f64::from(d.subsec_nanos());
+pub fn duration_to_secs(d: Duration) -> f32 {
+    let seconds = d.as_secs() as f32;
+    let nanos = d.subsec_nanos() as f32;
     seconds + (nanos * 1e-9)
 }
 
-pub fn secs_to_duration(t: f64) -> Duration {
+pub fn secs_to_duration(t: f32) -> Duration {
     debug_assert!(t >= 0.0, "secs_to_duration passed a negative number");
 
     let seconds = t.trunc();
@@ -63,7 +63,7 @@ impl Timer {
     }
 
     /// Percentual progress until the next period.
-    pub fn progress(&self) -> f64 {
+    pub fn progress(&self) -> f32 {
         duration_to_secs(self.accum) / duration_to_secs(self.period)
     }
 
@@ -71,7 +71,7 @@ impl Timer {
         self.accum
     }
 
-    pub fn accum_secs(&self) -> f64 {
+    pub fn accum_secs(&self) -> f32 {
         duration_to_secs(self.accum)
     }
 }

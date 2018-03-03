@@ -273,7 +273,7 @@ impl<'a> System<'a> for CorrectVelocitySys {
             mut angular_velocity,
         ): Self::SystemData
     ) {
-        let dt = game_info.tick_duration_secs() as f32;
+        let dt = game_info.tick_duration_secs();
 
         for (_, position, old_position, velocity) in
             (filter.join(), &position, &old_position, &mut velocity).join()
@@ -319,7 +319,7 @@ impl<'a> System<'a> for IntegrateForceSys {
             mut ang_velocity,
         ): Self::SystemData,
     ) {
-        let dt = game_info.tick_duration_secs() as f32;
+        let dt = game_info.tick_duration_secs();
 
         for (_, inv_mass, force, velocity, ang_velocity) in (
             filter.join(),
@@ -545,7 +545,7 @@ impl<'a> System<'a> for IntegrateVelocitySys {
             mut orientation
         ): Self::SystemData
     ) {
-        let dt = game_info.tick_duration_secs() as f32;
+        let dt = game_info.tick_duration_secs();
 
         for (_, velocity, position) in (
             filter.join(),

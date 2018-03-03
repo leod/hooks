@@ -59,8 +59,8 @@ impl GameInfo {
         timer::secs_to_duration(self.tick_duration_secs())
     }
 
-    pub fn tick_duration_secs(&self) -> f64 {
-        1.0 / (self.ticks_per_second as f64)
+    pub fn tick_duration_secs(&self) -> f32 {
+        1.0 / (self.ticks_per_second as f32)
     }
 }
 

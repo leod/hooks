@@ -322,7 +322,7 @@ struct InputData<'a> {
 pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
     let mut data = InputData::fetch(&world.res, 0);
 
-    let dt = data.game_info.tick_duration_secs() as f32;
+    let dt = data.game_info.tick_duration_secs();
 
     // Update all hooks that currently have some input attached to them
     for (input, hook_def, hook_state) in (&data.input, &data.hook_def, &mut data.hook_state).join()
