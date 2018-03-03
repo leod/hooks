@@ -56,8 +56,13 @@ pub struct Game {
 
     /// Timer to start the next tick.
     tick_timer: Timer,
+
+    ///
+    recv_tick_timer: Timer,
+
     /// Number of last started tick.
     last_tick: Option<TickNum>,
+
     /// Newest tick of which we know that the server knows that we have received it.
     server_recv_ack_tick: Option<TickNum>,
 
@@ -89,6 +94,12 @@ impl Game {
             state,
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
+            recv_tick_timer: Timer::new(
+                game_info
+                    .tick_duration()
+                    .checked_mul(game_info.ticks_per_snapshot)
+                    .unwrap(),
+            ),
             last_tick: None,
             server_recv_ack_tick: None,
             ping: 5.0,
@@ -112,6 +123,9 @@ impl Game {
 
         if let Some((old_tick_num, new_tick_num)) = tick_nums {
             //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
+            assert!(self.tick_history.max_num() == Some(new_tick_num));
+
+            self.recv_tick_timer.reset();
 
             if rand::thread_rng().gen() {
                 // TMP: For testing delta encoding/decoding!
@@ -129,6 +143,29 @@ impl Game {
         Ok(())
     }
 
+    fn start_tick(
+        &mut self,
+        client: &mut Client,
+        player_input: &PlayerInput,
+        tick: TickNum,
+    ) -> Result<Vec<Box<event::Event>>, Error> {
+        profile!("tick");
+
+        if let Some(last_tick) = self.last_tick {
+            assert!(tick > last_tick);
+        }
+
+        self.last_tick = Some(tick);
+
+        // Inform the server
+        client.send_game(ClientGameMsg::StartedTick(tick, player_input.clone()))?;
+
+        let tick_data = self.tick_history.get(tick).unwrap();
+
+        let events = self.state.run_tick_view(tick_data)?;
+        Ok(events)
+    }
+
     pub fn update(
         &mut self,
         client: &mut Client,
@@ -136,6 +173,8 @@ impl Game {
         delta: Duration,
     ) -> Result<Option<Event>, Error> {
         profile!("update game");
+
+        self.recv_tick_timer += delta;
 
         // Handle network events
         {
@@ -164,64 +203,28 @@ impl Game {
             _ => {}
         }
 
-        // Advance timers
-        /*let lag_tick = match (self.last_tick, self.tick_history.max_num(), self.tick_history.min_num()) {
-            (Some(last), Some(b), Some(max)) => {
-                assert!(max >= last);
-                Some(max - last)
-            }
-            (None, Some(b), Some(c)) => {
-                assert!(b >= c);
-                Some(b) - Some(c) + 1
-            }
-            _ => None
-        };
+        if let (Some(min_tick), Some(max_tick)) =
+            (self.tick_history.min_num(), self.tick_history.max_num())
+        {
+            if let Some(last_tick) = self.last_tick {
+                self.tick_timer += delta; //* time_warp;
 
-        let time_warp = if let Some(lag_ticks) = lag_ticks {
-            let tick_dur = self.game_info.tick_duration_secs() as f32;
-            let lag_time = lag_ticks as f32 * tick_dur + self.tick_timer.accum_secs();
-            let target_lag_time = self.target_lag_ticks as f32 * tick_dur;
+                // Start ticks
+                if last_tick < max_tick {
+                    // NOTE: `tick::History` always makes sure that there are no gaps in the stored
+                    //       tick nums. Even if we have not received a snapshot for some tick, it
+                    //       will be created (including its events) when we receive a newer tick.
+                    let next_tick = last_tick + 1;
 
-            if lag_ticks < target_lag_ticks {
-            }
-            1.0
-        } else {
-            1.0
-        };*/
-
-        self.tick_timer += delta; //* time_warp;
-
-        // Start ticks
-        //while self.tick_timer.trigger() {
-        if self.last_tick < self.tick_history.max_num() {
-            let tick = if let Some(last_tick) = self.last_tick {
-                let next_tick = last_tick + 1;
-                self.tick_history.get(next_tick).map(|_| next_tick)
+                    let events = self.start_tick(client, player_input, next_tick)?;
+                    Ok(Some(Event::TickStarted(events)))
+                } else {
+                    Ok(None)
+                }
             } else {
                 // Start our first tick
-                self.tick_history.min_num()
-            };
-
-            if let Some(tick) = tick {
-                profile!("tick");
-
-                self.last_tick = Some(tick);
-
-                // Inform the server
-                client.send_game(ClientGameMsg::StartedTick(tick, player_input.clone()))?;
-
-                let tick_data = self.tick_history.get(tick).unwrap();
-
-                /*debug!("Starting tick {}", tick);
-                if tick_data.snapshot.is_some() {
-                    debug!("Entities {:?}", tick_data.snapshot.as_ref().unwrap().0.keys());
-                }*/
-
-                let events = self.state.run_tick_view(tick_data)?;
+                let events = self.start_tick(client, player_input, min_tick)?;
                 Ok(Some(Event::TickStarted(events)))
-            } else {
-                //warn!("Waiting for tick...");
-                Ok(None)
             }
         } else {
             Ok(None)

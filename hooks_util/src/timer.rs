@@ -55,6 +55,13 @@ impl Timer {
         }
     }
 
+    /// Reset the accumulated time. Returns true if enough time has passed for one period.
+    pub fn reset(&mut self) -> bool {
+        let trigger = self.accum >= self.period;
+        self.accum = Duration::default();
+        trigger
+    }
+
     /// Percentual progress until the next period.
     pub fn progress(&self) -> f64 {
         duration_to_secs(self.accum) / duration_to_secs(self.period)
