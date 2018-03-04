@@ -7,6 +7,7 @@ use specs::World;
 
 use hooks_util::debug;
 use hooks_util::profile;
+use hooks_util::stats;
 use hooks_util::timer::{self, Timer};
 use hooks_common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
 use hooks_common::net::protocol::ClientGameMsg;
@@ -125,6 +126,11 @@ impl Game {
             //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
             assert!(self.tick_history.max_num() == Some(new_tick_num));
 
+            let timer_error = timer::duration_to_secs(self.recv_tick_timer.accum()) -
+                self.game_info.ticks_per_snapshot as f32 *
+                    timer::duration_to_secs(self.game_info.tick_duration());
+            stats::record("recv timer error", timer_error);
+
             self.recv_tick_timer.reset();
 
             if rand::thread_rng().gen() {
@@ -223,16 +229,26 @@ impl Game {
                 } else {
                     1.0
                 };
-                debug!(
-                    "cur {:.2} recv {:.2} target lag {:.2} target {:.2} delta {:.2} warp {:.2}",
-                    cur_time, recv_tick_time, target_lag_time, target_time, delta_time, warp_factor,
+
+                // For debugging, record some values
+                stats::record("time current", cur_time);
+                stats::record("time target", target_time);
+                stats::record("time delta", delta_time);
+                stats::record("time receive tick", recv_tick_time);
+                stats::record("time target lag", target_lag_time);
+                stats::record("time warp factor", warp_factor);
+                stats::record("lag ticks target", self.target_lag_ticks as f32);
+                stats::record("lag ticks current", (max_tick - last_tick) as f32);
+                stats::record(
+                    "lag ticks error",
+                    (max_tick - last_tick) as f32 - self.target_lag_ticks as f32,
                 );
 
                 self.tick_timer +=
                     timer::secs_to_duration(timer::duration_to_secs(delta) * warp_factor);
 
                 // Start ticks
-                if last_tick < max_tick && self.tick_timer.trigger_reset() {
+                if last_tick < max_tick && self.tick_timer.trigger() {
                     // NOTE: `tick::History` always makes sure that there are no gaps in the stored
                     //       tick nums. Even if we have not received a snapshot for some tick, it
                     //       will be created (including its events) when we receive a newer tick.
@@ -268,24 +284,10 @@ impl debug::Inspect for Game {
                 "max tick".to_string(),
                 self.tick_history.max_num().inspect(),
             ),
-            (
-                "tick timer".to_string(),
-                (self.tick_timer.progress() * 100.0).inspect(),
-            ),
             ("last tick".to_string(), self.last_tick.inspect()),
             (
                 "server recv ack tick".to_string(),
                 self.server_recv_ack_tick.inspect(),
-            ),
-            (
-                "lag ticks".to_string(),
-                match (self.last_tick, self.tick_history.max_num()) {
-                    (Some(a), Some(b)) => {
-                        assert!(a <= b);
-                        Some(b - a)
-                    }
-                    _ => None,
-                }.inspect(),
             ),
         ])
     }

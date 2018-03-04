@@ -20,6 +20,8 @@ use ggez::graphics::Font;
 
 use hooks_util::debug::{self, Inspect};
 use hooks_util::profile::{self, PROFILER};
+use hooks_util::stats;
+use hooks_util::timer;
 use hooks_common::defs::{GameInfo, PlayerInput};
 use hooks_common::registry::Registry;
 use hooks_game::client::Client;
@@ -49,8 +51,10 @@ struct MainState {
     show: Show,
     font: Font,
     fps: f64,
+
     show_debug: bool,
     show_profiler: bool,
+    show_stats: bool,
 }
 
 impl MainState {
@@ -58,12 +62,18 @@ impl MainState {
         profile!("update");
 
         self.fps = ggez::timer::get_fps(ctx);
-        let delta = ggez::timer::get_delta(ctx);
+        let mut delta = ggez::timer::get_delta(ctx);
+
+        stats::update(timer::duration_to_secs(delta));
+        stats::record("dt", timer::duration_to_secs(delta));
 
         while let Some(event) = self.game
             .update(&mut self.client, &self.next_player_input, delta)
             .unwrap()
         {
+            // TODO: Hmmm...
+            delta = Default::default();
+
             match event {
                 hooks_game::game::Event::Disconnected => {
                     info!("Got disconnected! Bye.");
@@ -147,6 +157,7 @@ impl MainState {
                 Keycode::S => self.next_player_input.move_backward = true,
                 Keycode::F1 => self.show_debug = !self.show_debug,
                 Keycode::F2 => self.show_profiler = !self.show_profiler,
+                Keycode::F3 => self.show_stats = !self.show_stats,
                 Keycode::P => {
                     PROFILER.with(|p| p.borrow().inspect().print(&mut io::stdout()));
                 }
@@ -189,7 +200,7 @@ impl MainState {
 impl debug::Inspect for MainState {
     fn inspect(&self) -> debug::Vars {
         let mut vars = vec![
-            ("fps".to_string(), self.fps.inspect()),
+            ("fps".to_string(), (self.fps as usize).inspect()),
             ("game".to_string(), self.game.inspect()),
         ];
 
@@ -198,6 +209,10 @@ impl debug::Inspect for MainState {
                 "profiler".to_string(),
                 PROFILER.with(|p| p.borrow().inspect()),
             ));
+        }
+
+        if self.show_stats {
+            vars.push(("stats".to_string(), stats::inspect()));
         }
 
         debug::Vars::Node(vars)
@@ -261,6 +276,7 @@ fn main() {
         fps: 0.0,
         show_debug: false,
         show_profiler: false,
+        show_stats: false,
     };
 
     while state.run_frame(ctx).unwrap() {}
