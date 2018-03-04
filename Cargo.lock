@@ -536,6 +536,9 @@ dependencies = [
 [[package]]
 name = "hooks_util"
 version = "0.1.0"
+dependencies = [
+ "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "hound"
