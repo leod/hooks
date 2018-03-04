@@ -7,7 +7,7 @@ use specs::World;
 
 use hooks_util::debug;
 use hooks_util::profile;
-use hooks_util::timer::Timer;
+use hooks_util::timer::{self, Timer};
 use hooks_common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
 use hooks_common::net::protocol::ClientGameMsg;
 use hooks_common::registry::Registry;
@@ -89,7 +89,7 @@ impl Game {
 
         Game {
             game_info: game_info.clone(),
-            target_lag_ticks: 2 * game_info.ticks_per_snapshot,
+            target_lag_ticks: 6 * game_info.ticks_per_snapshot,
             my_player_id,
             state,
             tick_history,
@@ -207,10 +207,32 @@ impl Game {
             (self.tick_history.min_num(), self.tick_history.max_num())
         {
             if let Some(last_tick) = self.last_tick {
-                self.tick_timer += delta; //* time_warp;
+                let tick_duration = self.game_info.tick_duration_secs();
+                let cur_time = last_tick as f32 * tick_duration + self.tick_timer.accum_secs();
+                let recv_tick_time =
+                    max_tick as f32 * tick_duration + self.recv_tick_timer.accum_secs();
+                let target_lag_time = self.target_lag_ticks as f32 * tick_duration;
+                let target_time = recv_tick_time - target_lag_time;
+                let delta_time = target_time - cur_time;
+
+                let warp_thresh = 0.01; // 10ms
+                let warp_factor = if delta_time > warp_thresh {
+                    1.5
+                } else if delta_time < -warp_thresh {
+                    1.0 / 1.5
+                } else {
+                    1.0
+                };
+                debug!(
+                    "cur {:.2} recv {:.2} target lag {:.2} target {:.2} delta {:.2} warp {:.2}",
+                    cur_time, recv_tick_time, target_lag_time, target_time, delta_time, warp_factor,
+                );
+
+                self.tick_timer +=
+                    timer::secs_to_duration(timer::duration_to_secs(delta) * warp_factor);
 
                 // Start ticks
-                if last_tick < max_tick {
+                if last_tick < max_tick && self.tick_timer.trigger_reset() {
                     // NOTE: `tick::History` always makes sure that there are no gaps in the stored
                     //       tick nums. Even if we have not received a snapshot for some tick, it
                     //       will be created (including its events) when we receive a newer tick.
@@ -227,6 +249,9 @@ impl Game {
                 Ok(Some(Event::TickStarted(events)))
             }
         } else {
+            // We have not received our first tick yet
+            assert!(self.last_tick.is_none());
+
             Ok(None)
         }
     }
