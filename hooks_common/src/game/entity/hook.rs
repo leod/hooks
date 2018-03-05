@@ -150,6 +150,7 @@ pub enum Mode {
 #[derive(PartialEq, Clone, Debug, BitStore)]
 pub struct ActiveState {
     pub num_active_segments: u8,
+    pub want_fix: bool,
     pub mode: Mode,
 }
 
@@ -271,6 +272,10 @@ fn first_segment_wall_interaction(
         .as_mut()
         .expect("got segment wall interaction, but hook is inactive");
 
+    if !active_state.want_fix {
+        return;
+    }
+
     // Only attach if we are not attached yet
     let fixed = match active_state.mode.clone() {
         Mode::Shooting { .. } => {
@@ -356,11 +361,13 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
             Some(ActiveState {
                 num_active_segments,
                 mode: Mode::Shooting,
+                ..
             }) => {
                 if !input.shoot {
                     // Start contracting the hook
                     hook_state.0 = Some(ActiveState {
                         num_active_segments,
+                        want_fix: false,
                         mode: Mode::Contracting {
                             lunch_timer: 0.0,
                             fixed: None,
@@ -368,6 +375,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     });
                 } else {
                     let num_active_segments = num_active_segments as usize;
+                    let new_want_fix = input.shoot;
 
                     // Keep on shooting
                     let activate_next = num_active_segments == 0 || {
@@ -400,6 +408,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                             hook_state.0 = Some(ActiveState {
                                 num_active_segments: num_active_segments as u8 + 1,
+                                want_fix: new_want_fix,
                                 mode: Mode::Shooting,
                             });
 
@@ -409,6 +418,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             // No segments left, switch to contracting
                             hook_state.0 = Some(ActiveState {
                                 num_active_segments: num_active_segments as u8,
+                                want_fix: new_want_fix,
                                 mode: Mode::Contracting {
                                     lunch_timer: 0.0,
                                     fixed: None,
@@ -419,6 +429,12 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             num_active_segments - 1
                         }
                     } else {
+                        hook_state.0 = Some(ActiveState {
+                            num_active_segments: num_active_segments as u8,
+                            want_fix: new_want_fix,
+                            mode: Mode::Shooting,
+                        });
+
                         num_active_segments - 1
                     };
 
@@ -470,7 +486,10 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
             Some(ActiveState {
                 num_active_segments,
                 mode: Mode::Contracting { lunch_timer, fixed },
+                ..
             }) => {
+                let new_want_fix = input.shoot;
+
                 // Are we done contracting?
                 if num_active_segments == 0 {
                     hook_state.0 = None;
@@ -538,6 +557,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     } else {
                         hook_state.0 = Some(ActiveState {
                             num_active_segments: new_num_active_segments as u8,
+                            want_fix: new_want_fix,
                             mode: Mode::Contracting {
                                 lunch_timer: new_lunch_timer,
                                 fixed: new_fixed,
@@ -610,6 +630,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     // Start shooting the hook
                     hook_state.0 = Some(ActiveState {
                         num_active_segments: 0,
+                        want_fix: true,
                         mode: Mode::Shooting,
                     });
                 }

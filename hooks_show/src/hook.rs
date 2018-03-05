@@ -68,6 +68,7 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
         if let &Some(hook::ActiveState {
             num_active_segments,
             ref mode,
+            ..
         }) = &hook_state.0
         {
             // Look up our segments

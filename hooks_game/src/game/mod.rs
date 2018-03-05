@@ -90,7 +90,7 @@ impl Game {
 
         Game {
             game_info: game_info.clone(),
-            target_lag_ticks: 6 * game_info.ticks_per_snapshot,
+            target_lag_ticks: 2 * game_info.ticks_per_snapshot,
             my_player_id,
             state,
             tick_history,
