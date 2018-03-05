@@ -181,7 +181,6 @@ impl Game {
         profile!("update game");
 
         // Handle network events
-        let mut received_tick = false;
         {
             profile!("service");
 
@@ -191,7 +190,6 @@ impl Game {
                         return Ok(Some(Event::Disconnected));
                     }
                     client::Event::ServerGameMsg(data) => {
-                        received_tick = true;
                         self.on_received_tick(client, data)?;
                     }
                 }
@@ -235,9 +233,7 @@ impl Game {
 
                 let warp_factor = 0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (lag_time_error / 0.05).exp());
 
-                if !received_tick {
-                    self.recv_tick_timer += delta;
-                }
+                self.recv_tick_timer += delta;
                 self.tick_timer +=
                     timer::secs_to_duration(timer::duration_to_secs(delta) * warp_factor);
 
