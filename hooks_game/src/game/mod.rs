@@ -58,8 +58,8 @@ pub struct Game {
     /// Timer to start the next tick.
     tick_timer: Timer,
 
-    ///
-    recv_tick_timer: Timer,
+    /// When do we expect to receive the next snapshot?
+    recv_snapshot_timer: Timer,
 
     /// Number of last started tick.
     last_tick: Option<TickNum>,
@@ -95,7 +95,7 @@ impl Game {
             state,
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
-            recv_tick_timer: Timer::new(
+            recv_snapshot_timer: Timer::new(
                 game_info
                     .tick_duration()
                     .checked_mul(game_info.ticks_per_snapshot)
@@ -126,12 +126,11 @@ impl Game {
             //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
             assert!(self.tick_history.max_num() == Some(new_tick_num));
 
-            let timer_error = timer::duration_to_secs(self.recv_tick_timer.accum()) -
-                self.game_info.ticks_per_snapshot as f32 *
-                    timer::duration_to_secs(self.game_info.tick_duration());
+            let timer_error = timer::duration_to_secs(self.recv_snapshot_timer.accum()) -
+                timer::duration_to_secs(self.recv_snapshot_timer.period());
             stats::record("recv timer error", timer_error);
 
-            self.recv_tick_timer.reset();
+            self.recv_snapshot_timer.reset();
 
             if rand::thread_rng().gen() {
                 // TMP: For testing delta encoding/decoding!
@@ -213,10 +212,10 @@ impl Game {
             if let Some(last_tick) = self.last_tick {
                 let tick_duration = self.game_info.tick_duration_secs();
                 let cur_time = last_tick as f32 * tick_duration + self.tick_timer.accum_secs();
-                let recv_tick_time =
-                    max_tick as f32 * tick_duration + self.recv_tick_timer.accum_secs();
+                let recv_snapshot_time =
+                    max_tick as f32 * tick_duration + self.recv_snapshot_timer.accum_secs();
                 let target_lag_time = self.target_lag_ticks as f32 * tick_duration;
-                let cur_lag_time = recv_tick_time - cur_time;
+                let cur_lag_time = recv_snapshot_time - cur_time;
                 let lag_time_error = target_lag_time - cur_lag_time;
 
                 let warp_thresh = 0.01; // 10ms
@@ -233,7 +232,7 @@ impl Game {
 
                 let warp_factor = 0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (lag_time_error / 0.05).exp());
 
-                self.recv_tick_timer += delta;
+                self.recv_snapshot_timer += delta;
                 self.tick_timer +=
                     timer::secs_to_duration(timer::duration_to_secs(delta) * warp_factor);
 
