@@ -180,9 +180,8 @@ impl Game {
     ) -> Result<Option<Event>, Error> {
         profile!("update game");
 
-        self.recv_tick_timer += delta;
-
         // Handle network events
+        let mut received_tick = false;
         {
             profile!("service");
 
@@ -192,6 +191,7 @@ impl Game {
                         return Ok(Some(Event::Disconnected));
                     }
                     client::Event::ServerGameMsg(data) => {
+                        received_tick = true;
                         self.on_received_tick(client, data)?;
                     }
                 }
@@ -222,13 +222,24 @@ impl Game {
                 let lag_time_error = target_lag_time - cur_lag_time;
 
                 let warp_thresh = 0.01; // 10ms
-                let warp_factor = if lag_time_error < warp_thresh {
+                let max_warp = 2.0;
+                let min_warp = 0.5;
+
+                /*let warp_factor = if lag_time_error < warp_thresh {
                     1.5
                 } else if lag_time_error > -warp_thresh {
                     1.0 / 1.5
                 } else {
                     1.0
-                };
+                };*/
+
+                let warp_factor = 0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (lag_time_error / 0.05).exp());
+
+                if !received_tick {
+                    self.recv_tick_timer += delta;
+                }
+                self.tick_timer +=
+                    timer::secs_to_duration(timer::duration_to_secs(delta) * warp_factor);
 
                 // For debugging, record some values
                 stats::record("time lag target", target_lag_time);
@@ -241,9 +252,6 @@ impl Game {
                     "lag ticks error",
                     (max_tick - last_tick) as f32 - self.target_lag_ticks as f32,
                 );
-
-                self.tick_timer +=
-                    timer::secs_to_duration(timer::duration_to_secs(delta) * warp_factor);
 
                 // Start ticks
                 if last_tick < max_tick && self.tick_timer.trigger() {
