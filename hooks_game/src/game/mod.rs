@@ -218,24 +218,22 @@ impl Game {
                 let recv_tick_time =
                     max_tick as f32 * tick_duration + self.recv_tick_timer.accum_secs();
                 let target_lag_time = self.target_lag_ticks as f32 * tick_duration;
-                let target_time = recv_tick_time - target_lag_time;
-                let delta_time = target_time - cur_time;
+                let cur_lag_time = recv_tick_time - cur_time;
+                let lag_time_error = target_lag_time - cur_lag_time;
 
                 let warp_thresh = 0.01; // 10ms
-                let warp_factor = if delta_time > warp_thresh {
+                let warp_factor = if lag_time_error < warp_thresh {
                     1.5
-                } else if delta_time < -warp_thresh {
+                } else if lag_time_error > -warp_thresh {
                     1.0 / 1.5
                 } else {
                     1.0
                 };
 
                 // For debugging, record some values
-                stats::record("time current", cur_time);
-                stats::record("time target", target_time);
-                stats::record("time delta", delta_time);
-                stats::record("time receive tick", recv_tick_time);
-                stats::record("time target lag", target_lag_time);
+                stats::record("time lag target", target_lag_time);
+                stats::record("time lag current", cur_lag_time);
+                stats::record("time lag error", lag_time_error);
                 stats::record("time warp factor", warp_factor);
                 stats::record("lag ticks target", self.target_lag_ticks as f32);
                 stats::record("lag ticks current", (max_tick - last_tick) as f32);
