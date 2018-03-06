@@ -66,7 +66,10 @@ pub struct Orientation(pub f32);
 
 impl Interp for Orientation {
     fn interp(&self, other: &Orientation, t: f32) -> Orientation {
-        Orientation(self.0 * (1.0 - t) + other.0 * t)
+        // TODO: Solution for orientation interpolation without sin/cos/atan2?
+        let x = (1.0 - t) * self.0.cos() + t * other.0.cos();
+        let y = (1.0 - t) * self.0.sin() + t * other.0.sin();
+        Orientation(y.atan2(x))
     }
 }
 
