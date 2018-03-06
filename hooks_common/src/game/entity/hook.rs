@@ -607,22 +607,24 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         };
                         data.constraints.add(joint_constraint);
 
-                        let angle_def = constraint::Def::Angle { angle: 0.0 };
-                        let angle_constraint = Constraint {
-                            def: angle_def,
-                            stiffness: 0.5,
-                            entity_a: owner_entity,
-                            entity_b: last_entity,
-                            vars_a: constraint::Vars {
-                                p: false,
-                                angle: false,
-                            },
-                            vars_b: constraint::Vars {
-                                p: false,
-                                angle: true,
-                            },
-                        };
-                        data.constraints.add(angle_constraint);
+                        if new_fixed.is_none() {
+                            let angle_def = constraint::Def::Angle { angle: 0.0 };
+                            let angle_constraint = Constraint {
+                                def: angle_def,
+                                stiffness: 0.5,
+                                entity_a: owner_entity,
+                                entity_b: last_entity,
+                                vars_a: constraint::Vars {
+                                    p: false,
+                                    angle: false,
+                                },
+                                vars_b: constraint::Vars {
+                                    p: false,
+                                    angle: true,
+                                },
+                            };
+                            data.constraints.add(angle_constraint);
+                        }
                     }
                 }
             }
