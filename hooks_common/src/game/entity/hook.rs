@@ -400,6 +400,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             let vel =
                                 Vector2::new(owner_angle.cos(), owner_angle.sin()) * SHOOT_SPEED;
 
+                            //debug!("shoot at {}", owner_angle);
                             data.position.insert(next_segment, Position(owner_pos));
                             data.orientation
                                 .insert(next_segment, Orientation(owner_angle));
@@ -606,7 +607,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         };
                         data.constraints.add(joint_constraint);
 
-                        /*let angle_def = constraint::Def::Angle { angle: 0.0 };
+                        let angle_def = constraint::Def::Angle { angle: 0.0 };
                         let angle_constraint = Constraint {
                             def: angle_def,
                             stiffness: 0.5,
@@ -621,7 +622,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                                 angle: true,
                             },
                         };
-                        data.constraints.add(angle_constraint);*/
+                        data.constraints.add(angle_constraint);
                     }
                 }
             }
