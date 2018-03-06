@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use bit_manager::BitReader;
 use rand::{self, Rng};
-use specs::World;
+use specs::{RunNow, World};
 
 use hooks_util::debug;
 use hooks_util::profile;
@@ -12,7 +12,8 @@ use hooks_util::timer::{self, Timer};
 use hooks_common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
 use hooks_common::net::protocol::ClientGameMsg;
 use hooks_common::registry::Registry;
-use hooks_common::repl::{self, tick};
+use hooks_common::physics::{Orientation, Position};
+use hooks_common::repl::{self, interp, tick};
 
 use client::{self, Client};
 
@@ -64,6 +65,13 @@ pub struct Game {
     /// Number of last started tick.
     last_tick: Option<TickNum>,
 
+    /// Number of last started tick that also contained a snapshot. This is used for interpolation.
+    last_snapshot_tick: Option<TickNum>,
+
+    /// Number of the tick we are currently interpolating into. If given, must be larger than
+    /// `last_tick`.
+    interp_tick: Option<TickNum>,
+
     /// Newest tick of which we know that the server knows that we have received it.
     server_recv_ack_tick: Option<TickNum>,
 
@@ -73,6 +81,9 @@ pub struct Game {
 
 pub fn register(reg: &mut Registry, game_info: &GameInfo) {
     hooks_common::view::register(reg, game_info);
+
+    reg.component::<interp::State<Position>>();
+    reg.component::<interp::State<Orientation>>();
 }
 
 #[derive(Debug)]
@@ -102,6 +113,8 @@ impl Game {
                     .unwrap(),
             ),
             last_tick: None,
+            last_snapshot_tick: None,
+            interp_tick: None,
             server_recv_ack_tick: None,
             ping: 5.0,
         }
@@ -159,6 +172,9 @@ impl Game {
         if let Some(last_tick) = self.last_tick {
             assert!(tick > last_tick);
         }
+        if let Some(last_snapshot_tick) = self.last_snapshot_tick {
+            assert!(tick > last_snapshot_tick);
+        }
 
         self.last_tick = Some(tick);
 
@@ -167,8 +183,32 @@ impl Game {
 
         let tick_data = self.tick_history.get(tick).unwrap();
 
+        if tick_data.snapshot.is_some() {
+            // This tick contains a snapshot, so remember that we want to use it as the
+            // basis for interpolation from now on
+            self.last_snapshot_tick = Some(tick);
+        }
+
         let events = self.state.run_tick_view(tick_data)?;
         Ok(events)
+    }
+
+    fn next_interp_tick(&self) -> Option<TickNum> {
+        self.last_snapshot_tick
+            .map(|last_snapshot_tick| {
+                // If we have a started tick, the history will contain at least one element,
+                // so we can unwrap here.
+                let max_tick = self.tick_history.max_num().unwrap();
+
+                // Find the next tick for which we received a snapshot we can interpolate into
+                (last_snapshot_tick + 1..max_tick).find(|&tick| {
+                    self.tick_history
+                        .get(tick)
+                        .map(|data| data.snapshot.is_some())
+                        .unwrap_or(false)
+                })
+            })
+            .and_then(|x| x)
     }
 
     pub fn update(
@@ -198,14 +238,82 @@ impl Game {
         // Remove ticks from our history that:
         // 1. We know for sure will not be used by the server as a reference for delta encoding.
         // 2. We have already started.
-        match (self.last_tick, self.server_recv_ack_tick) {
-            (Some(last_tick), Some(server_recv_ack_tick)) => {
+        match (self.last_snapshot_tick, self.server_recv_ack_tick) {
+            (Some(last_snapshot_tick), Some(server_recv_ack_tick)) => {
                 self.tick_history
-                    .prune_older_ticks(server_recv_ack_tick.min(last_tick));
+                    .prune_older_ticks(server_recv_ack_tick.min(last_snapshot_tick));
             }
             _ => {}
         }
 
+        // Interpolate into the next tick where we have a snapshot
+        let next_interp_tick = self.next_interp_tick();
+
+        if let Some(next_interp_tick) = next_interp_tick {
+            // Can unwrap, since otherwise next_interp_tick would be none
+            let last_tick = self.last_tick.unwrap();
+            let last_snapshot_tick = self.last_snapshot_tick.unwrap();
+
+            // Have we already loaded our interpolation state?
+            let loaded = if let Some(cur_interp_tick) = self.interp_tick {
+                assert!(next_interp_tick >= cur_interp_tick);
+                next_interp_tick == cur_interp_tick
+            } else {
+                // First time interpolating in this game
+                false
+            };
+
+            if !loaded {
+                // State of next_interp_tick has not been loaded yet
+                let last_snapshot = self.tick_history
+                    .get(last_snapshot_tick)
+                    .unwrap()
+                    .snapshot
+                    .as_ref()
+                    .unwrap();
+                let next_snapshot = self.tick_history
+                    .get(next_interp_tick)
+                    .unwrap()
+                    .snapshot
+                    .as_ref()
+                    .unwrap();
+
+                let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Position>::new(
+                    &last_snapshot,
+                    &next_snapshot,
+                );
+                sys.run_now(&self.state.world.res);
+
+                let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Orientation>::new(
+                    &last_snapshot,
+                    &next_snapshot,
+                );
+                sys.run_now(&self.state.world.res);
+
+                self.interp_tick = Some(next_interp_tick);
+            }
+
+            // Interpolate based on the progress between `last_snapshot_tick` and
+            // `next_interp_tick`.
+            assert!(last_snapshot_tick < next_interp_tick);
+            assert!(last_snapshot_tick <= last_tick);
+            assert!(last_tick < next_interp_tick);
+
+            let delta_ticks = next_interp_tick - last_snapshot_tick;
+            let done_ticks = last_tick - last_snapshot_tick;
+
+            let interp_t = (done_ticks as f32 + self.tick_timer.progress()) / delta_ticks as f32;
+            //stats::record("interp time", interp_t);
+            //debug!("{}", interp_t);
+
+            let mut sys = interp::InterpSys::<Position>::new(interp_t);
+            sys.run_now(&self.state.world.res);
+
+            let mut sys = interp::InterpSys::<Orientation>::new(interp_t);
+            sys.run_now(&self.state.world.res);
+        }
+
+        // Update tick timing and start next tick if necessary
         if let (Some(min_tick), Some(max_tick)) =
             (self.tick_history.min_num(), self.tick_history.max_num())
         {
@@ -285,6 +393,7 @@ impl debug::Inspect for Game {
                 "max tick".to_string(),
                 self.tick_history.max_num().inspect(),
             ),
+            ("interp_tick".to_string(), self.interp_tick.inspect()),
             ("last tick".to_string(), self.last_tick.inspect()),
             (
                 "server recv ack tick".to_string(),

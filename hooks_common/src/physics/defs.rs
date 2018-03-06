@@ -5,6 +5,7 @@ use nalgebra::{Point2, Vector2};
 use specs::{self, Component, FlaggedStorage, VecStorage};
 
 use registry::Registry;
+use repl::interp::Interp;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Update>();
@@ -52,9 +53,22 @@ impl Component for Position {
     type Storage = FlaggedStorage<Self, VecStorage<Self>>;
 }
 
+impl Interp for Position {
+    fn interp(&self, other: &Position, t: f32) -> Position {
+        //debug!("{} into {} at {}", self.0, other.0, t);
+        Position(self.0 * (1.0 - t) + other.0.coords * t)
+    }
+}
+
 /// Rotation angle.
 #[derive(PartialEq, Clone, Debug, BitStore)]
 pub struct Orientation(pub f32);
+
+impl Interp for Orientation {
+    fn interp(&self, other: &Orientation, t: f32) -> Orientation {
+        Orientation(self.0 * (1.0 - t) + other.0 * t)
+    }
+}
 
 impl Component for Orientation {
     type Storage = FlaggedStorage<Self, VecStorage<Self>>;
