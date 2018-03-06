@@ -85,6 +85,8 @@ impl MainState {
             }
         }
 
+        self.game.interpolate();
+
         Ok(())
     }
 

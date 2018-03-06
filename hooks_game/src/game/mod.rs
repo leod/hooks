@@ -246,73 +246,6 @@ impl Game {
             _ => {}
         }
 
-        // Interpolate into the next tick where we have a snapshot
-        let next_interp_tick = self.next_interp_tick();
-
-        if let Some(next_interp_tick) = next_interp_tick {
-            // Can unwrap, since otherwise next_interp_tick would be none
-            let last_tick = self.last_tick.unwrap();
-            let last_snapshot_tick = self.last_snapshot_tick.unwrap();
-
-            // Have we already loaded our interpolation state?
-            let loaded = if let Some(cur_interp_tick) = self.interp_tick {
-                assert!(next_interp_tick >= cur_interp_tick);
-                next_interp_tick == cur_interp_tick
-            } else {
-                // First time interpolating in this game
-                false
-            };
-
-            if !loaded {
-                // State of next_interp_tick has not been loaded yet
-                let last_snapshot = self.tick_history
-                    .get(last_snapshot_tick)
-                    .unwrap()
-                    .snapshot
-                    .as_ref()
-                    .unwrap();
-                let next_snapshot = self.tick_history
-                    .get(next_interp_tick)
-                    .unwrap()
-                    .snapshot
-                    .as_ref()
-                    .unwrap();
-
-                let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Position>::new(
-                    &last_snapshot,
-                    &next_snapshot,
-                );
-                sys.run_now(&self.state.world.res);
-
-                let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Orientation>::new(
-                    &last_snapshot,
-                    &next_snapshot,
-                );
-                sys.run_now(&self.state.world.res);
-
-                self.interp_tick = Some(next_interp_tick);
-            }
-
-            // Interpolate based on the progress between `last_snapshot_tick` and
-            // `next_interp_tick`.
-            assert!(last_snapshot_tick < next_interp_tick);
-            assert!(last_snapshot_tick <= last_tick);
-            assert!(last_tick < next_interp_tick);
-
-            let delta_ticks = next_interp_tick - last_snapshot_tick;
-            let done_ticks = last_tick - last_snapshot_tick;
-
-            let interp_t = (done_ticks as f32 + self.tick_timer.progress()) / delta_ticks as f32;
-            //stats::record("interp time", interp_t);
-            //debug!("{}", interp_t);
-
-            let mut sys = interp::InterpSys::<Position>::new(interp_t);
-            sys.run_now(&self.state.world.res);
-
-            let mut sys = interp::InterpSys::<Orientation>::new(interp_t);
-            sys.run_now(&self.state.world.res);
-        }
-
         // Update tick timing and start next tick if necessary
         if let (Some(min_tick), Some(max_tick)) =
             (self.tick_history.min_num(), self.tick_history.max_num())
@@ -378,6 +311,75 @@ impl Game {
             assert!(self.last_tick.is_none());
 
             Ok(None)
+        }
+    }
+
+    pub fn interpolate(&mut self) {
+        // Interpolate into the next tick where we have a snapshot
+        let next_interp_tick = self.next_interp_tick();
+
+        if let Some(next_interp_tick) = next_interp_tick {
+            // Can unwrap, since otherwise next_interp_tick would be none
+            let last_tick = self.last_tick.unwrap();
+            let last_snapshot_tick = self.last_snapshot_tick.unwrap();
+
+            // Have we already loaded our interpolation state?
+            let loaded = if let Some(cur_interp_tick) = self.interp_tick {
+                assert!(next_interp_tick >= cur_interp_tick);
+                next_interp_tick == cur_interp_tick
+            } else {
+                // First time interpolating in this game
+                false
+            };
+
+            if !loaded {
+                // State of next_interp_tick has not been loaded yet
+                let last_snapshot = self.tick_history
+                    .get(last_snapshot_tick)
+                    .unwrap()
+                    .snapshot
+                    .as_ref()
+                    .unwrap();
+                let next_snapshot = self.tick_history
+                    .get(next_interp_tick)
+                    .unwrap()
+                    .snapshot
+                    .as_ref()
+                    .unwrap();
+
+                let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Position>::new(
+                    &last_snapshot,
+                    &next_snapshot,
+                );
+                sys.run_now(&self.state.world.res);
+
+                let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Orientation>::new(
+                    &last_snapshot,
+                    &next_snapshot,
+                );
+                sys.run_now(&self.state.world.res);
+
+                self.interp_tick = Some(next_interp_tick);
+            }
+
+            // Interpolate based on the progress between `last_snapshot_tick` and
+            // `next_interp_tick`.
+            assert!(last_snapshot_tick < next_interp_tick);
+            assert!(last_snapshot_tick <= last_tick);
+            assert!(last_tick < next_interp_tick);
+
+            let delta_ticks = next_interp_tick - last_snapshot_tick;
+            let done_ticks = last_tick - last_snapshot_tick;
+
+            let interp_t = (done_ticks as f32 + self.tick_timer.progress()) / delta_ticks as f32;
+            //stats::record("interp time", interp_t);
+            //debug!("{}", interp_t);
+
+            let mut sys = interp::InterpSys::<Position>::new(interp_t);
+            sys.run_now(&self.state.world.res);
+
+            let mut sys = interp::InterpSys::<Orientation>::new(interp_t);
+            sys.run_now(&self.state.world.res);
         }
     }
 }
