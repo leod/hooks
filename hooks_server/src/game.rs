@@ -45,7 +45,9 @@ impl Player {
 }
 
 pub struct Game {
-    state: game::State,
+    game_state: game::State,
+    game_runner: game::run::AuthRunner,
+
     players: BTreeMap<PlayerId, Player>,
 
     /// Timer to start the next tick.
@@ -67,7 +69,7 @@ fn register(reg: &mut Registry, game_info: &GameInfo) {
 
 impl Game {
     pub fn new(game_info: GameInfo) -> Game {
-        let mut state = {
+        let mut game_state = {
             let mut reg = Registry::new();
 
             register(&mut reg, &game_info);
@@ -75,10 +77,11 @@ impl Game {
             game::State::from_registry(reg)
         };
 
-        game::init::auth::create_state(&mut state.world);
+        game::init::auth::create_state(&mut game_state.world);
 
         Game {
-            state,
+            game_state,
+            game_runner: game::run::AuthRunner::new(),
             players: BTreeMap::new(),
             tick_timer: Timer::new(game_info.tick_duration()),
             next_tick: 0,
@@ -88,7 +91,7 @@ impl Game {
     }
 
     pub fn game_info(&self) -> Fetch<GameInfo> {
-        self.state.world.read_resource::<GameInfo>()
+        self.game_state.world.read_resource::<GameInfo>()
     }
 
     pub fn update(&mut self, host: &mut Host) -> Result<(), host::Error> {
@@ -140,7 +143,7 @@ impl Game {
                         info: player_info,
                     });
 
-                    let mut player = Player::new(self.next_tick, self.state.event_reg.clone());
+                    let mut player = Player::new(self.next_tick, self.game_state.event_reg.clone());
 
                     // Send additional `JoinedEvent`s only for the new player, in the first tick
                     // that it receives
@@ -270,8 +273,13 @@ impl Game {
             //debug!("Starting tick {}", self.next_tick);
 
             // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
-            assert!(self.state.world.read_resource::<event::Sink>().is_empty());
-            self.state.push_events(self.queued_events.clear());
+            assert!(
+                self.game_state
+                    .world
+                    .read_resource::<event::Sink>()
+                    .is_empty()
+            );
+            self.game_state.push_events(self.queued_events.clear());
 
             // For now, just run everyone's queued inputs. This will need to be refined!
             let inputs = self.players
@@ -290,7 +298,7 @@ impl Game {
 
             let tick_events = {
                 profile!("run");
-                self.state.run_tick_auth(inputs)
+                self.game_runner.run_tick(&mut self.game_state, inputs)
             };
 
             // Can unwrap here, since replication errors should at most happen on the client-side
@@ -299,7 +307,7 @@ impl Game {
             // 4.2. Record tick in history and send snapshots for every player
             profile!("send");
 
-            let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
+            let entity_classes = self.game_state.world.read_resource::<game::EntityClasses>();
             let send_snapshot = self.next_tick % self.game_info().ticks_per_snapshot == 0;
 
             for (&player_id, player) in self.players.iter_mut() {
@@ -317,7 +325,7 @@ impl Game {
                         snapshot: game::WorldSnapshot::new(),
                         only_player: None,
                     };
-                    sys.run_now(&self.state.world.res);
+                    sys.run_now(&self.game_state.world.res);
                     Some(sys.snapshot)
                 } else {
                     None
@@ -362,7 +370,7 @@ impl Game {
         // Only consider those players that are already registered in the game logic. The new player
         // will get information about other new players (that have joined but whose PlayerJoined
         // events have not been processed in a tick yet) with the regular shared events.
-        let other_players = self.state.world.read_resource::<player::Players>();
+        let other_players = self.game_state.world.read_resource::<player::Players>();
 
         for (&other_id, other_player) in other_players.iter() {
             new_player.queued_events.push(player::JoinedEvent {

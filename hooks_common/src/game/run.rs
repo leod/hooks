@@ -24,7 +24,11 @@ impl CommonRunner {
 
     fn run_pre_tick(&mut self, state: &mut State) -> Result<(), repl::Error> {
         // First run pre-tick event handlers, e.g. handle player join/leave events
-        let events = state.world.read_resource::<event::Sink>().clone().into_vec();
+        let events = state
+            .world
+            .read_resource::<event::Sink>()
+            .clone()
+            .into_vec();
         for event in &events {
             for handler in &state.pre_tick_event_handlers {
                 handler(&mut state.world, &**event)?;

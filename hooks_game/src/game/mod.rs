@@ -51,7 +51,10 @@ pub struct Game {
     my_player_id: PlayerId,
 
     /// The complete state of the game.
-    state: game::State,
+    game_state: game::State,
+
+    /// Runner for advancing the game state.
+    game_runner: game::run::ViewRunner,
 
     /// Recent ticks we have received
     tick_history: tick::History<game::EntitySnapshot>,
@@ -94,16 +97,17 @@ pub enum Event {
 
 impl Game {
     pub fn new(reg: Registry, my_player_id: PlayerId, game_info: &GameInfo) -> Game {
-        let mut state = game::State::from_registry(reg);
-        game::init::view::create_state(&mut state.world);
+        let mut game_state = game::State::from_registry(reg);
+        game::init::view::create_state(&mut game_state.world);
 
-        let tick_history = tick::History::new(state.event_reg.clone());
+        let tick_history = tick::History::new(game_state.event_reg.clone());
 
         Game {
             game_info: game_info.clone(),
             target_lag_ticks: 2 * game_info.ticks_per_snapshot,
             my_player_id,
-            state,
+            game_state,
+            game_runner: game::run::ViewRunner::new(),
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
             recv_snapshot_timer: Timer::new(
@@ -121,17 +125,17 @@ impl Game {
     }
 
     pub fn world(&self) -> &World {
-        &self.state.world
+        &self.game_state.world
     }
 
     pub fn world_mut(&mut self) -> &mut World {
-        &mut self.state.world
+        &mut self.game_state.world
     }
 
     fn on_received_tick(&mut self, client: &mut Client, data: Vec<u8>) -> Result<(), Error> {
         let mut reader = BitReader::new(Cursor::new(data));
 
-        let entity_classes = self.state.world.read_resource::<game::EntityClasses>();
+        let entity_classes = self.game_state.world.read_resource::<game::EntityClasses>();
         let tick_nums = self.tick_history
             .delta_read_tick(&entity_classes, &mut reader)?;
 
@@ -189,7 +193,7 @@ impl Game {
             self.last_snapshot_tick = Some(tick);
         }
 
-        let events = self.state.run_tick_view(tick_data)?;
+        let events = self.game_runner.run_tick(&mut self.game_state, tick_data)?;
         Ok(events)
     }
 
@@ -351,13 +355,13 @@ impl Game {
                     &last_snapshot,
                     &next_snapshot,
                 );
-                sys.run_now(&self.state.world.res);
+                sys.run_now(&self.game_state.world.res);
 
                 let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Orientation>::new(
                     &last_snapshot,
                     &next_snapshot,
                 );
-                sys.run_now(&self.state.world.res);
+                sys.run_now(&self.game_state.world.res);
 
                 self.interp_tick = Some(next_interp_tick);
             }
@@ -376,10 +380,10 @@ impl Game {
             //debug!("{}", interp_t);
 
             let mut sys = interp::InterpSys::<Position>::new(interp_t);
-            sys.run_now(&self.state.world.res);
+            sys.run_now(&self.game_state.world.res);
 
             let mut sys = interp::InterpSys::<Orientation>::new(interp_t);
-            sys.run_now(&self.state.world.res);
+            sys.run_now(&self.game_state.world.res);
         }
     }
 }
