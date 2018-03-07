@@ -11,7 +11,7 @@ use entity::{self, Active};
 use registry::Registry;
 
 use physics::{collision, constraint, interaction, AngularVelocity, Dynamic, Friction,
-              InvAngularMass, InvMass, Joints, Orientation, Position, Update, Velocity};
+              InvAngularMass, InvMass, Orientation, Position, Update, Velocity};
 use physics::collision::CollisionWorld;
 use physics::constraint::Constraint;
 
@@ -56,7 +56,7 @@ impl<'a> Filter<'a> {
     }
 }
 
-const JOINT_MIN_DISTANCE: f32 = 0.001;
+//const JOINT_MIN_DISTANCE: f32 = 0.001;
 const MIN_SPEED: f32 = 0.01;
 
 #[derive(Component, PartialEq, Clone, Debug)]
@@ -162,7 +162,7 @@ impl<'a> System<'a> for FrictionForceSys {
     }
 }
 
-struct JointForceSys;
+/*struct JointForceSys;
 
 impl<'a> System<'a> for JointForceSys {
     type SystemData = (
@@ -210,7 +210,7 @@ impl<'a> System<'a> for JointForceSys {
             }
         }
     }
-}
+}*/
 
 struct SavePositionSys;
 
