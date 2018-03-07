@@ -355,7 +355,6 @@ impl<'a> System<'a> for HandleContactsSys {
         FetchMut<'a, Constraints>,
         Filter<'a>,
         ReadStorage<'a, entity::Meta>,
-        ReadStorage<'a, Dynamic>,
         ReadStorage<'a, Velocity>,
     );
 
@@ -369,7 +368,6 @@ impl<'a> System<'a> for HandleContactsSys {
             mut constraints,
             filter,
             meta,
-            dynamic,
             velocity,
         ): Self::SystemData
     ) {
@@ -401,8 +399,8 @@ impl<'a> System<'a> for HandleContactsSys {
                 if let Some(action) = action {
                     match action {
                         interaction::Action::PreventOverlap { rotate_a, rotate_b } => {
-                            let dynamic_a = dynamic.get(entity_a).is_some();
-                            let dynamic_b = dynamic.get(entity_b).is_some();
+                            let filter_a = filter.filter(entity_a);
+                            let filter_b = filter.filter(entity_b);
 
                             // Try to resolve the overlap with a constraint
                             let constraint = Constraint {
@@ -415,8 +413,8 @@ impl<'a> System<'a> for HandleContactsSys {
                                 stiffness: 1.0,
                                 entity_a,
                                 entity_b,
-                                vars_a: constraint::Vars { p: dynamic_a, angle: rotate_a },
-                                vars_b: constraint::Vars { p: dynamic_b, angle: rotate_b },
+                                vars_a: constraint::Vars { p: filter_a, angle: rotate_a && filter_a },
+                                vars_b: constraint::Vars { p: filter_b, angle: rotate_b && filter_b },
                             };
                             constraints.add(constraint);
                         }
