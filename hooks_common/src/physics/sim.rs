@@ -413,8 +413,14 @@ impl<'a> System<'a> for HandleContactsSys {
                                 stiffness: 1.0,
                                 entity_a,
                                 entity_b,
-                                vars_a: constraint::Vars { p: filter_a, angle: rotate_a && filter_a },
-                                vars_b: constraint::Vars { p: filter_b, angle: rotate_b && filter_b },
+                                vars_a: constraint::Vars {
+                                    p: filter_a,
+                                    angle: rotate_a && filter_a
+                                },
+                                vars_b: constraint::Vars {
+                                    p: filter_b,
+                                    angle: rotate_b && filter_b
+                                },
                             };
                             constraints.add(constraint);
                         }
