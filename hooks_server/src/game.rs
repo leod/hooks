@@ -313,9 +313,12 @@ impl Game {
                 let snapshot = if send_snapshot {
                     // We don't do this yet, but here the snapshot will be filtered differently for
                     // every player.
-                    let mut sys = game::StoreSnapshotSys(game::WorldSnapshot::new());
+                    let mut sys = game::StoreSnapshotSys {
+                        snapshot: game::WorldSnapshot::new(),
+                        only_player: None,
+                    };
                     sys.run_now(&self.state.world.res);
-                    Some(sys.0)
+                    Some(sys.snapshot)
                 } else {
                     None
                 };

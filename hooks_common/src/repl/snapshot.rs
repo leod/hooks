@@ -289,6 +289,7 @@ macro_rules! snapshot {
 
             use specs::{Entities, System, ReadStorage, WriteStorage, Fetch, Join};
 
+            use defs::PlayerId;
             use entity::Meta;
             use repl::{self, snapshot};
 
@@ -439,7 +440,10 @@ macro_rules! snapshot {
             );
 
             /// Store World state of entities with ReplId component in a Snapshot.
-            pub struct StoreSnapshotSys(pub WorldSnapshot);
+            pub struct StoreSnapshotSys {
+                pub snapshot: WorldSnapshot,
+                pub only_player: Option<PlayerId>,
+            }
 
             impl<'a> System<'a> for StoreSnapshotSys {
                 type SystemData = (
@@ -454,10 +458,16 @@ macro_rules! snapshot {
                     &mut self,
                     (classes, entities, repl_id, meta, ($($field_name,)+)): Self::SystemData,
                 ) {
-                    (self.0).0.clear();
+                    self.snapshot.0.clear();
 
                     let join = (&*entities, &repl_id, &meta).join();
                     for (entity, repl_id, meta) in join {
+                        if let Some(only_player) = self.only_player {
+                            if (repl_id.0).0 != only_player {
+                                continue;
+                            }
+                        }
+
                         let components = &classes.0.get(&meta.class_id).unwrap().components;
 
                         let mut entity_snapshot: EntitySnapshot = snapshot::EntitySnapshot::none();
@@ -470,14 +480,17 @@ macro_rules! snapshot {
                             }
                         }
 
-                        (self.0).0.insert(repl_id.0, (meta.clone(), entity_snapshot));
+                        self.snapshot.0.insert(repl_id.0, (meta.clone(), entity_snapshot));
                     }
                 }
             }
 
             /// Overwrite World state of entities with `ReplId` component with the state in a
             /// Snapshot. Note that this system does not create new entities.
-            pub struct LoadSnapshotSys<'a>(pub &'a WorldSnapshot);
+            pub struct LoadSnapshotSys<'a> {
+                pub snapshot: &'a WorldSnapshot,
+                pub exclude_player: Option<PlayerId>
+            }
 
             impl<'a> System<'a> for LoadSnapshotSys<'a> {
                 type SystemData = (
@@ -486,7 +499,13 @@ macro_rules! snapshot {
                 );
 
                 fn run(&mut self, (entity_map, ($(mut $field_name,)+)): Self::SystemData) {
-                    for (&entity_id, entity_snapshot) in &(self.0).0 {
+                    for (&entity_id, entity_snapshot) in &self.snapshot.0 {
+                        if let Some(exclude_player) = self.exclude_player {
+                            if entity_id.0 == exclude_player {
+                                continue;
+                            }
+                        }
+
                         let entity = entity_map.id_to_entity(entity_id);
 
                         $(

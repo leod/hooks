@@ -126,7 +126,10 @@ impl State {
             repl::entity::view::create_new_entities(&mut self.world, snapshot)?;
 
             // Snap entities to their state in the new tick
-            let mut sys = game::LoadSnapshotSys(snapshot);
+            let mut sys = game::LoadSnapshotSys {
+                snapshot,
+                exclude_player: None,
+            };
             sys.run_now(&self.world.res);
         }
 
