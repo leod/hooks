@@ -2,7 +2,7 @@ use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
 
 use nalgebra::{Point2, Vector2};
-use specs::{self, Component, FlaggedStorage, VecStorage};
+use specs::{Component, FlaggedStorage, VecStorage};
 
 use registry::Registry;
 use repl::interp::Interp;
@@ -17,7 +17,7 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Orientation>();
     reg.component::<AngularVelocity>();
     reg.component::<Friction>();
-    reg.component::<Joints>();
+    //reg.component::<Joints>();
 }
 
 /// Should this entity be updated in the next simulation run?
@@ -87,7 +87,7 @@ pub struct AngularVelocity(pub f32);
 #[component(NullStorage)]
 pub struct Friction(pub f32);
 
-/// Some kind of joint thingy.
+/*/// Some kind of joint thingy.
 #[derive(PartialEq, Clone, Debug, BitStore)]
 pub struct Joint {
     pub stiffness: f32,
@@ -97,7 +97,7 @@ pub struct Joint {
 /// Entities that this entity is joined to.
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(BTreeStorage)]
-pub struct Joints(pub Vec<(specs::Entity, Joint)>);
+pub struct Joints(pub Vec<(specs::Entity, Joint)>);*/
 
 impl BitStore for Velocity {
     fn read_from<R: BitRead>(reader: &mut R) -> Result<Self> {

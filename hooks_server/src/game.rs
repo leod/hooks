@@ -18,9 +18,17 @@ use hooks_common::repl::{player, tick};
 use host::{self, Host};
 
 struct Player {
+    /// Tick in which this player joined the game.
     join_tick: TickNum,
+
+    /// Last tick that we know the player has received.
     last_ack_tick: Option<TickNum>,
+
+    /// Last tick that has been started by the player.
     last_started_tick: Option<TickNum>,
+
+    /// We keep a history of ticks for each player, to be used as a basis for delta encoding.
+    /// We delta encode w.r.t. to `last_ack_tick`.
     tick_history: tick::History<game::EntitySnapshot>,
 
     /// Events queued only for this player for the next tick. We currently use this to inform newly
@@ -29,6 +37,9 @@ struct Player {
 
     /// Inputs received from the client.
     queued_inputs: BTreeMap<TickNum, PlayerInput>,
+
+    /// Last input that has been executed from this client, if any.
+    last_input_num: Option<TickNum>,
 }
 
 impl Player {
@@ -40,6 +51,7 @@ impl Player {
             tick_history: tick::History::new(event_reg),
             queued_events: event::Sink::new(),
             queued_inputs: BTreeMap::new(),
+            last_input_num: None,
         }
     }
 }
@@ -56,7 +68,7 @@ pub struct Game {
     /// Number of tick we will start next.
     next_tick: TickNum,
 
-    /// Stopwatch for advancing timers
+    /// Stopwatch for advancing timers.
     update_stopwatch: Stopwatch,
 
     /// Events queued for the next tick.
@@ -293,6 +305,10 @@ impl Game {
                 })
                 .collect();
             for player in self.players.values_mut() {
+                // Remember the last input we run (i.e. the maximal number contained in the map)
+                player.last_input_num =
+                    player.queued_inputs.iter().next_back().map(|(&num, _)| num);
+
                 player.queued_inputs.clear();
             }
 
@@ -334,6 +350,7 @@ impl Game {
                 let tick_data = tick::Data {
                     events: player_events.into_vec(),
                     snapshot: snapshot,
+                    last_input_num: player.last_input_num,
                 };
 
                 player.tick_history.push_tick(self.next_tick, tick_data);

@@ -2,7 +2,6 @@ use specs::{Dispatcher, World};
 
 use registry::{EventHandler, Registry, TickFn};
 use event::{self, Event};
-use game;
 
 pub struct State {
     pub world: World,

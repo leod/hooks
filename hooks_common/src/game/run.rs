@@ -100,12 +100,14 @@ impl AuthRunner {
 
 pub struct ViewRunner {
     common: CommonRunner,
+    my_player_id: PlayerId,
 }
 
 impl ViewRunner {
-    pub fn new() -> ViewRunner {
+    pub fn new(my_player_id: PlayerId) -> ViewRunner {
         ViewRunner {
             common: CommonRunner,
+            my_player_id,
         }
     }
 
@@ -115,6 +117,7 @@ impl ViewRunner {
         &mut self,
         state: &mut State,
         tick_data: &tick::Data<game::EntitySnapshot>,
+        input: &PlayerInput,
     ) -> Result<Vec<Box<Event>>, repl::Error> {
         let events = event::Sink::clone_from_vec(&tick_data.events);
         state.push_events(events.into_vec());

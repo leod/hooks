@@ -56,7 +56,9 @@ pub struct Game {
     /// Runner for advancing the game state.
     game_runner: game::run::ViewRunner,
 
-    /// Recent ticks we have received
+    /// Recent ticks we have received. This has two uses:
+    /// 1. Older ticks serve as the basis for delta decoding ticks received from the server.
+    /// 2. Interpolation between successive ticks that have snapshots, for a smoother display.
     tick_history: tick::History<game::EntitySnapshot>,
 
     /// Timer to start the next tick.
@@ -107,7 +109,7 @@ impl Game {
             target_lag_ticks: 2 * game_info.ticks_per_snapshot,
             my_player_id,
             game_state,
-            game_runner: game::run::ViewRunner::new(),
+            game_runner: game::run::ViewRunner::new(my_player_id),
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
             recv_snapshot_timer: Timer::new(
@@ -193,7 +195,8 @@ impl Game {
             self.last_snapshot_tick = Some(tick);
         }
 
-        let events = self.game_runner.run_tick(&mut self.game_state, tick_data)?;
+        let events = self.game_runner
+            .run_tick(&mut self.game_state, tick_data, player_input)?;
         Ok(events)
     }
 

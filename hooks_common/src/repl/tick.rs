@@ -9,6 +9,20 @@ use event::{self, Event};
 use repl::{entity, player};
 use repl::snapshot::{self, EntityClasses, EntitySnapshot, WorldSnapshot};
 
+pub struct Data<T: EntitySnapshot> {
+    /// Game events that happened in this tick.
+    pub events: Vec<Box<Event>>,
+
+    /// State of replicated entities at the end of the tick. Note that not every tick needs to have
+    /// a snapshot, meaning that the server can run ticks at a higher frequency than it sends
+    /// snapshots to the clients. However, the client still receives events that happened in those
+    /// intermediate ticks, together with the data of the next tick that includes a snapshot.
+    pub snapshot: Option<WorldSnapshot<T>>,
+
+    /// The last of our player input that has been run to in this tick, if any.
+    pub last_input_num: Option<TickNum>,
+}
+
 #[derive(Debug)]
 pub enum Error {
     ReceivedInvalidTick(TickNum, String),
@@ -33,11 +47,6 @@ impl From<bit_manager::Error> for Error {
     fn from(error: bit_manager::Error) -> Error {
         Error::BitManager(error)
     }
-}
-
-pub struct Data<T: EntitySnapshot> {
-    pub events: Vec<Box<Event>>,
-    pub snapshot: Option<WorldSnapshot<T>>,
 }
 
 pub struct History<T: EntitySnapshot> {
@@ -120,6 +129,8 @@ impl<T: EntitySnapshot> History<T> {
         writer.write(&delta_num)?;
 
         let cur_data = &self.ticks[&cur_num];
+
+        writer.write(&cur_data.last_input_num)?;
 
         // Send events of all ticks between previous and current tick
         {
@@ -226,6 +237,8 @@ impl<T: EntitySnapshot> History<T> {
             None
         };
 
+        let last_input_num = reader.read::<Option<TickNum>>()?;
+
         // Loop for reading events backwards
         let mut event_tick_num = cur_num + 1;
 
@@ -250,6 +263,7 @@ impl<T: EntitySnapshot> History<T> {
                 let prev_data = Data {
                     events: events,
                     snapshot: None,
+                    last_input_num: None,
                 };
 
                 entry.insert(prev_data);
@@ -326,7 +340,11 @@ impl<T: EntitySnapshot> History<T> {
         }
 
         // Finally, add the new snapshot in the history
-        self.ticks.get_mut(&cur_num).unwrap().snapshot = Some(cur_snapshot);
+        // NOTE: Here, the tick data entry has already been created by the loop for reading events
+        //       of intermediate ticks. The intermediate ticks do not have a snapshot.
+        let cur_data = self.ticks.get_mut(&cur_num).unwrap();
+        cur_data.snapshot = Some(cur_snapshot);
+        cur_data.last_input_num = last_input_num;
 
         Ok(Some((prev_num, cur_num)))
     }
