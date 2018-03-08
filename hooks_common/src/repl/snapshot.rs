@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use bit_manager::{self, BitRead, BitWrite};
 
-use hooks_util::join;
+use hooks_util::{join, stats};
 
 use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
 use entity::Meta;
@@ -162,6 +162,9 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         let mut delta_id: Option<EntityId> = None;
         let mut delta_finished = false;
 
+        // Counter for debugging / statistics
+        let mut num_entities_read = 0;
+
         loop {
             if delta_id.is_none() && !delta_finished {
                 // Read next entity id from the delta bitstream
@@ -200,6 +203,8 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                             cur_snapshot.0.insert(id, (*left).clone());
                         }
                         join::Item::Right(id, _) => {
+                            num_entities_read += 1;
+
                             // New entity
                             assert!(id != INVALID_ENTITY_ID);
                             new_entities.push(id);
@@ -223,6 +228,8 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                             cur_snapshot.0.insert(id, (meta, entity_snapshot));
                         }
                         join::Item::Both(id, &(ref left_meta, ref left_snapshot), _) => {
+                            num_entities_read += 1;
+
                             // This entity exists in both snapshots
                             assert!(id != INVALID_ENTITY_ID);
 
@@ -253,6 +260,8 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
                 delta_id = None;
             }
         }
+
+        stats::record("tick num entities", num_entities_read as f32);
 
         Ok((new_entities, cur_snapshot))
     }

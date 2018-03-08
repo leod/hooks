@@ -1,6 +1,6 @@
 use std::f32;
 
-use nalgebra::{norm, zero, Point2, Vector2};
+use nalgebra::{dot, norm, zero, Point2, Vector2};
 
 use specs::{Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage,
             World, WriteStorage};
@@ -10,7 +10,7 @@ use defs::GameInfo;
 use entity::{self, Active};
 use registry::Registry;
 
-use physics::{collision, constraint, interaction, AngularVelocity, Dynamic, Friction,
+use physics::{collision, constraint, interaction, AngularVelocity, Drag, Dynamic, Friction,
               InvAngularMass, InvMass, Orientation, Position, Update, Velocity};
 use physics::collision::CollisionWorld;
 use physics::constraint::Constraint;
@@ -23,6 +23,9 @@ pub fn register(reg: &mut Registry) {
     reg.resource(InteractionEvents(Vec::new()));
     reg.resource(Constraints(Vec::new()));
 }
+
+pub const NUM_ITERATIONS: usize = 10;
+pub const CONTACT_MARGIN: f32 = 1.0;
 
 /// Tag components that all need to be given for entities that want to be simulated.
 #[derive(SystemData)]
@@ -92,6 +95,7 @@ pub fn run(world: &World) {
 
     PrepareSys.run_now(&world.res);
     FrictionForceSys.run_now(&world.res);
+    DragForceSys.run_now(&world.res);
     //JointForceSys.run_now(&world.res);
     IntegrateForceSys.run_now(&world.res);
     SavePositionSys.run_now(&world.res);
@@ -140,23 +144,62 @@ struct FrictionForceSys;
 
 impl<'a> System<'a> for FrictionForceSys {
     type SystemData = (
+        Fetch<'a, GameInfo>,
         Filter<'a>,
+        ReadStorage<'a, InvMass>,
         ReadStorage<'a, Friction>,
         WriteStorage<'a, Velocity>,
-        WriteStorage<'a, Force>,
     );
 
-    fn run(&mut self, (filter, friction, mut velocity, mut force): Self::SystemData) {
-        for (_, friction, velocity, force) in
-            (filter.join(), &friction, &mut velocity, &mut force).join()
+    fn run(&mut self, (game_info, filter, inv_mass, friction, mut velocity): Self::SystemData) {
+        let dt = game_info.tick_duration_secs();
+
+        for (_, inv_mass, friction, velocity) in
+            (filter.join(), &inv_mass, &friction, &mut velocity).join()
         {
             let speed = norm(&velocity.0);
 
             if speed < MIN_SPEED {
                 velocity.0 = zero();
             } else {
-                force.0 -= velocity.0 / speed * friction.0;
-                //force.0 -= velocity.0 * friction.0;
+                let force = -velocity.0 / speed * inv_mass.0 * friction.0;
+                velocity.0 += force * dt;
+
+                if dot(&velocity.0, &force) >= 0.0 {
+                    velocity.0 = zero();
+                }
+            }
+        }
+    }
+}
+
+struct DragForceSys;
+
+impl<'a> System<'a> for DragForceSys {
+    type SystemData = (
+        Fetch<'a, GameInfo>,
+        Filter<'a>,
+        ReadStorage<'a, InvMass>,
+        ReadStorage<'a, Drag>,
+        WriteStorage<'a, Velocity>,
+    );
+
+    fn run(&mut self, (game_info, filter, inv_mass, drag, mut velocity): Self::SystemData) {
+        let dt = game_info.tick_duration_secs();
+
+        for (_, inv_mass, drag, velocity) in (filter.join(), &inv_mass, &drag, &mut velocity).join()
+        {
+            let speed = norm(&velocity.0);
+
+            if speed < MIN_SPEED {
+                velocity.0 = zero();
+            } else {
+                let force = -velocity.0 * inv_mass.0 * drag.0;
+                velocity.0 += force * dt;
+
+                if dot(&velocity.0, &force) >= 0.0 {
+                    velocity.0 = zero();
+                }
             }
         }
     }
@@ -406,7 +449,7 @@ impl<'a> System<'a> for HandleContactsSys {
                             let constraint = Constraint {
                                 def: constraint::Def::Contact {
                                     normal: contact.normal.unwrap(),
-                                    margin: 0.2,
+                                    margin: CONTACT_MARGIN,
                                     p_object_a,
                                     p_object_b,
                                 },
@@ -473,9 +516,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
             mut orientation,
         ): Self::SystemData
     ) {
-        let num_iterations = 20;
-
-        for _ in 0..num_iterations {
+        for _ in 0..NUM_ITERATIONS {
             for c in &constraints.0 {
                 let (p_new_a, p_new_b) = {
                     // Set up input for constraint solving
@@ -557,6 +598,7 @@ impl<'a> System<'a> for IntegrateVelocitySys {
             &mut position,
         ).join()
         {
+            //debug!("moving {}*{}={}", velocity.0, dt, velocity.0 * dt);
             position.0 += velocity.0 * dt;
         }
 
@@ -566,6 +608,7 @@ impl<'a> System<'a> for IntegrateVelocitySys {
             &mut orientation,
         ).join()
         {
+            //debug!("rotating {}*{}={}", angular_velocity.0, dt, angular_velocity.0 * dt);
             orientation.0 += angular_velocity.0 * dt;
         }
     }

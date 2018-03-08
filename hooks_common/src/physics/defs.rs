@@ -17,6 +17,7 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Orientation>();
     reg.component::<AngularVelocity>();
     reg.component::<Friction>();
+    reg.component::<Drag>();
     //reg.component::<Joints>();
 }
 
@@ -86,6 +87,11 @@ pub struct AngularVelocity(pub f32);
 #[derive(Component, PartialEq, Clone, Debug)]
 #[component(NullStorage)]
 pub struct Friction(pub f32);
+
+/// Whether to apply drag to this entity.
+#[derive(Component, PartialEq, Clone, Debug)]
+#[component(NullStorage)]
+pub struct Drag(pub f32);
 
 /*/// Some kind of joint thingy.
 #[derive(PartialEq, Clone, Debug, BitStore)]

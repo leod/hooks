@@ -10,6 +10,8 @@ struct LogEntry {
     input: PlayerInput,
 
     /// Snapshot of our entities after executing the input.
+    /// We will use this to calculate an error for the prediction when the correct snapshot arrives
+    /// from the server (not implemented yet).
     snapshot: game::WorldSnapshot,
 }
 

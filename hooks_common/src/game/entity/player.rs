@@ -1,11 +1,11 @@
-use nalgebra::{zero, Point2, Rotation2, Vector2};
+use nalgebra::{normalize, zero, Point2, Rotation2, Vector2};
 use specs::{BTreeStorage, Entity, EntityBuilder, Fetch, Join, ReadStorage, RunNow, System, World,
             WriteStorage};
 
 use defs::{EntityId, GameInfo, PlayerId, PlayerInput, INVALID_ENTITY_ID};
 use registry::Registry;
 use physics::interaction;
-use physics::{AngularVelocity, Dynamic, Friction, InvAngularMass, InvMass, Orientation, Position,
+use physics::{AngularVelocity, Drag, Dynamic, InvAngularMass, InvMass, Orientation, Position,
               Velocity};
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use repl;
@@ -43,8 +43,7 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub const NUM_HOOKS: usize = 2;
-const MOVE_ACCEL: f32 = 300.0;
-const MOVE_SPEED: f32 = 100.0;
+const MOVE_ACCEL: f32 = 2000.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
@@ -144,7 +143,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         .with(InvMass(1.0 / 200.0))
         .with(InvAngularMass(1.0 / 10.0))
         .with(Dynamic)
-        .with(Friction(200.0 * 100.0))
+        .with(Drag(200.0 * 7.5))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
 }
@@ -175,14 +174,27 @@ impl<'a> System<'a> for InputSys {
             }
 
             let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
+            let right = Vector2::new(-forward.y, forward.x);
 
-            if input.0.move_forward {
-                velocity.0 += forward * MOVE_ACCEL * dt;
-            //velocity.0 = forward * MOVE_SPEED;
-            } else if input.0.move_backward {
-                velocity.0 -= forward * MOVE_SPEED * dt;
-            } else {
-                //velocity.0 = Vector2::new(0.0, 0.0);
+            let mut direction = Vector2::new(0.0, 0.0);
+            let move_any = input.0.move_forward || input.0.move_backward || input.0.move_right ||
+                input.0.move_left;
+
+            if move_any {
+                if input.0.move_forward {
+                    direction += forward;
+                }
+                if input.0.move_backward {
+                    direction -= forward;
+                }
+                if input.0.move_right {
+                    direction += right;
+                }
+                if input.0.move_left {
+                    direction -= right;
+                }
+
+                velocity.0 += normalize(&direction) * MOVE_ACCEL * dt;
             }
         }
     }

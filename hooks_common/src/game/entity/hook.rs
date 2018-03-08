@@ -83,12 +83,14 @@ pub fn register(reg: &mut Registry) {
     );
 }
 
-pub const NUM_SEGMENTS: usize = 20;
-pub const SEGMENT_LENGTH: f32 = 30.0;
+pub const NUM_SEGMENTS: usize = 15;
+pub const SEGMENT_LENGTH: f32 = 20.0;
 //const MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const SHOOT_SPEED: f32 = 600.0;
-const LUNCH_TIME_SECS: f32 = 0.05;
+const SHOOT_SPEED: f32 = 1000.0;
+const LUNCH_TIME_SECS: f32 = 0.025;
 const LUNCH_RADIUS: f32 = 5.0;
+const ANGLE_STIFFNESS: f32 = 1.0;
+const OWNER_ANGLE_STIFFNESS: f32 = 0.5;
 
 /// This event is emitted when a hook attaches at some point. This is meant to be used for
 /// visualization purposes.
@@ -189,7 +191,7 @@ fn build_segment(builder: EntityBuilder) -> EntityBuilder {
         .with(AngularVelocity(0.0))
         .with(InvMass(1.0 / 5.0))
         .with(InvAngularMass(
-            12.0 / (5.0 * (SEGMENT_LENGTH.powi(2) + 9.0)),
+            12.0 / (5.0 * (SEGMENT_LENGTH.powi(2) + 18.0)),
         ))
         .with(Dynamic)
         .with(Friction(5.0))
@@ -478,7 +480,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             entity_a: owner_entity,
                             entity_b: join_entity,
                             vars_a: constraint::Vars {
-                                p: true,
+                                p: false,
                                 angle: false,
                             },
                             vars_b: constraint::Vars {
@@ -603,7 +605,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             entity_a: owner_entity,
                             entity_b: last_entity,
                             vars_a: constraint::Vars {
-                                p: true,
+                                p: new_fixed.is_some(),
                                 angle: false,
                             },
                             vars_b: constraint::Vars {
@@ -617,7 +619,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             let angle_def = constraint::Def::Angle { angle: 0.0 };
                             let angle_constraint = Constraint {
                                 def: angle_def,
-                                stiffness: 0.5,
+                                stiffness: OWNER_ANGLE_STIFFNESS,
                                 entity_a: owner_entity,
                                 entity_b: last_entity,
                                 vars_a: constraint::Vars {
@@ -690,7 +692,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                 };
                 //let j = active_segments.len() - i - 1;
                 //let stiffness = (j as f32 / NUM_SEGMENTS as f32).powi(2);
-                let stiffness = 0.7;
+                let stiffness = ANGLE_STIFFNESS;
                 let angle_constraint = Constraint {
                     def: angle_def,
                     stiffness: stiffness,

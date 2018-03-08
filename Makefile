@@ -36,12 +36,20 @@ run-server-release: build-release
 random-bot:
 	cargo run -j8 --release --example random_bot
 
-stress: build-release
+stress-release: build-release
 	cargo build -j8 --release --examples
 	tmux \
-		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server; cat"' \; \
-		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game; cat"' \; \
-		split-window -h 'bash -c "for i in {1..'${N_STRESS}'}; do echo $i; target/release/examples/random_bot & done ; cat"' \; \
+		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_server; cat"' \; \
+		split-window -h 'bash -c "sleep 1; RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_game; cat"' \; \
+		split-window -h 'bash -c "sleep 1; for i in {1..'${N_STRESS}'}; do echo $i; target/release/examples/random_bot & done ; cat"' \; \
+		select-layout even-horizontal
+
+stress: build
+	cargo build -j8 --examples
+	tmux \
+		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server; cat"' \; \
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game &> game.log; cat"' \; \
+		split-window -h 'bash -c "for i in {1..'${N_STRESS}'}; do echo $i; target/debug/examples/random_bot & done ; cat"' \; \
 		select-layout even-horizontal
 
 fmt:

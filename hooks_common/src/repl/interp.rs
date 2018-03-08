@@ -90,20 +90,21 @@ where
             }
 
             if let Some(left_state) = HasComponent::<C>::get(left_state) {
-                // This is where we assume that the entity has already been created
-                let entity = entity_map.get_id_to_entity(id).unwrap();
+                // Due to events from intermediate ticks following the last snapshot tick, the
+                // entity might already have been removed.
+                if let Some(entity) = entity_map.get_id_to_entity(id) {
+                    if active.get(entity).is_none() {
+                        // Entity is currently disabled, so ignore in interpolation
+                        continue;
+                    }
 
-                if active.get(entity).is_none() {
-                    // Entity is currently disabled, so ignore in interpolation
-                    continue;
+                    // The repl components of an entity do not change in its lifetime. Hence, it
+                    // would be a bug in delta deserialization if the right entity does not have
+                    // this component anymore.
+                    let right_state = right_state.get().unwrap();
+
+                    states.insert(entity, State(left_state, right_state));
                 }
-
-                // The repl components of an entity do not change in its lifetime. Hence, it would
-                // be a bug in delta deserialization if the right does not have this component
-                // anymore.
-                let right_state = right_state.get().unwrap();
-
-                states.insert(entity, State(left_state, right_state));
             }
         }
     }
