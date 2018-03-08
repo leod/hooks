@@ -2,6 +2,7 @@ pub mod entity;
 pub mod state;
 pub mod init;
 pub mod input;
+pub mod predict;
 pub mod run;
 pub mod catch;
 
@@ -38,6 +39,8 @@ pub mod view {
 snapshot! {
     use physics::Position;
     use physics::Orientation;
+    use physics::Velocity;
+    use physics::AngularVelocity;
 
     use game::entity::HookDef;
     use game::entity::HookSegmentDef;
@@ -48,6 +51,9 @@ snapshot! {
     mod snapshot {
         position: Position,
         orientation: Orientation,
+
+        velocity: Velocity,
+        angular_velocity: AngularVelocity,
 
         hook_def: HookDef,
         hook_segment_def: HookSegmentDef,

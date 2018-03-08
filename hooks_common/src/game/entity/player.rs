@@ -23,6 +23,9 @@ pub fn register(reg: &mut Registry) {
             ComponentType::Position,
             ComponentType::Orientation,
             ComponentType::Player,
+            // TODO: Only send to owner
+            ComponentType::Velocity,
+            ComponentType::AngularVelocity,
         ],
         build_player,
     );

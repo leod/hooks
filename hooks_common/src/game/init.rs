@@ -4,7 +4,6 @@ use nalgebra::{Point2, Vector2};
 use rand::{IsaacRng, Rng};
 use specs::World;
 
-use physics::AngularVelocity;
 use game::entity::wall;
 
 fn create_state(world: &mut World) {
@@ -27,8 +26,8 @@ fn create_state(world: &mut World) {
 }
 
 pub mod auth {
-    use physics::{Position, Velocity};
-    use repl;
+    //use physics::{Position, Velocity, AngularVelocity};
+    //use repl;
 
     use super::*;
 
@@ -40,7 +39,7 @@ pub mod auth {
         /*repl::entity::auth::create(world, 0, "test", |builder| {
             builder.with(Position(Point2::new(0.0, -50.0)))
         });*/
-        repl::entity::auth::create(world, 0, "test", |builder| {
+        /*repl::entity::auth::create(world, 0, "test", |builder| {
             builder
                 .with(Position(Point2::origin()))
                 .with(Velocity(Vector2::new(1.0, 0.0)))
@@ -51,7 +50,7 @@ pub mod auth {
                 .with(Position(Point2::new(0.0, 0.0)))
                 .with(Velocity(Vector2::new(1.0, 0.0)))
                 .with(AngularVelocity(0.1))
-        });
+        });*/
         /*repl::entity::auth::create(world, 0, "test", |builder| {
             builder.with(Position(Point2::new(0.0, 50.0)))
         });*/

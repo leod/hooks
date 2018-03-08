@@ -1,10 +1,10 @@
 use specs::RunNow;
 
-use defs::{PlayerId, PlayerInput};
+use defs::{PlayerId, PlayerInput, TickNum};
 use event::{self, Event};
 use entity;
 use repl::{self, tick};
-use game::{self, input};
+use game::{self, input, predict};
 use game::state::State;
 
 struct CommonRunner;
@@ -101,21 +101,28 @@ impl AuthRunner {
 pub struct ViewRunner {
     common: CommonRunner,
     my_player_id: PlayerId,
+    predict_log: Option<predict::Log>,
 }
 
 impl ViewRunner {
-    pub fn new(my_player_id: PlayerId) -> ViewRunner {
+    pub fn new(my_player_id: PlayerId, predict: bool) -> ViewRunner {
         ViewRunner {
             common: CommonRunner,
             my_player_id,
+            predict_log: if predict {
+                Some(predict::Log::new(my_player_id))
+            } else {
+                None
+            },
         }
     }
 
     /// Running a tick on the client side. We try to do things in the same order on the clients as
-    /// on the server, which is why we have put these functions next to each other here.
+    /// on the server, which is why we have put these functions in the same module here.
     pub fn run_tick(
         &mut self,
         state: &mut State,
+        tick_num: TickNum,
         tick_data: &tick::Data<game::EntitySnapshot>,
         input: &PlayerInput,
     ) -> Result<Vec<Box<Event>>, repl::Error> {
@@ -131,12 +138,22 @@ impl ViewRunner {
             // Snap entities to their state in the new tick
             let mut sys = game::LoadSnapshotSys {
                 snapshot,
-                exclude_player: None,
+                exclude_player: if self.predict_log.is_some() {
+                    Some(self.my_player_id)
+                } else {
+                    None
+                },
+                only_player: None,
             };
             sys.run_now(&state.world.res);
         }
 
-        // TODO: Client-side prediction here? What about input frequency > tick frequency?
+        // Prediction
+        // TODO: Should this happen before or after loading snapshots?
+        // TODO: Consider input frequency > tick frequency?
+        if let Some(predict_log) = self.predict_log.as_mut() {
+            predict_log.run(&mut state.world, tick_num, tick_data, input)?;
+        }
 
         self.common.run_tick(state)?;
         self.common.run_post_tick(state)

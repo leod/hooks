@@ -39,6 +39,8 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
     let (active, position, orientation, draw) = DrawData::fetch(&world.res, 0);
 
     for (_active, position, orientation, draw) in (&active, &position, &orientation, &draw).join() {
+        //debug!("rect at {}", position.0);
+
         let coords = position.0.coords;
         let scaling = Matrix4::from_diagonal(&Vector4::new(draw.width, draw.height, 1.0, 1.0));
         let isometry = Isometry3::new(

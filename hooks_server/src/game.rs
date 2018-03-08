@@ -306,8 +306,12 @@ impl Game {
                 .collect();
             for player in self.players.values_mut() {
                 // Remember the last input we run (i.e. the maximal number contained in the map)
-                player.last_input_num =
-                    player.queued_inputs.iter().next_back().map(|(&num, _)| num);
+                let max_queued_num = player.queued_inputs.iter().next_back().map(|(&num, _)| num);
+                if let Some(max_queued_num) = max_queued_num {
+                    // This if here is important, since otherwise we forget the player's last input
+                    // num if we don't have a queued input for a tick.
+                    player.last_input_num = Some(max_queued_num);
+                }
 
                 player.queued_inputs.clear();
             }
