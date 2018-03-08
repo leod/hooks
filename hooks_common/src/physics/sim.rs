@@ -5,7 +5,8 @@ use nalgebra::{dot, norm, zero, Point2, Vector2};
 use specs::{Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage,
             World, WriteStorage};
 
-use hooks_util::profile;
+use hooks_util::{profile, stats};
+
 use defs::GameInfo;
 use entity::{self, Active};
 use registry::Registry;
@@ -179,22 +180,20 @@ impl<'a> System<'a> for DragForceSys {
     type SystemData = (
         Fetch<'a, GameInfo>,
         Filter<'a>,
-        ReadStorage<'a, InvMass>,
         ReadStorage<'a, Drag>,
         WriteStorage<'a, Velocity>,
     );
 
-    fn run(&mut self, (game_info, filter, inv_mass, drag, mut velocity): Self::SystemData) {
+    fn run(&mut self, (game_info, filter, drag, mut velocity): Self::SystemData) {
         let dt = game_info.tick_duration_secs();
 
-        for (_, inv_mass, drag, velocity) in (filter.join(), &inv_mass, &drag, &mut velocity).join()
-        {
+        for (_, drag, velocity) in (filter.join(), &drag, &mut velocity).join() {
             let speed = norm(&velocity.0);
 
             if speed < MIN_SPEED {
                 velocity.0 = zero();
             } else {
-                let force = -velocity.0 * inv_mass.0 * drag.0;
+                let force = -velocity.0 * drag.0;
                 velocity.0 += force * dt;
 
                 if dot(&velocity.0, &force) >= 0.0 {
@@ -518,6 +517,8 @@ impl<'a> System<'a> for SolveConstraintsSys {
     ) {
         for _ in 0..NUM_ITERATIONS {
             for c in &constraints.0 {
+                stats::record("constraints", constraints.0.len() as f32);
+
                 let (p_new_a, p_new_b) = {
                     // Set up input for constraint solving
                     let x = |entity| {

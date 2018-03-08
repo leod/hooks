@@ -83,13 +83,13 @@ pub fn register(reg: &mut Registry) {
     );
 }
 
-pub const NUM_SEGMENTS: usize = 15;
+pub const NUM_SEGMENTS: usize = 20;
 pub const SEGMENT_LENGTH: f32 = 20.0;
 //const MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const SHOOT_SPEED: f32 = 1000.0;
 const LUNCH_TIME_SECS: f32 = 0.025;
 const LUNCH_RADIUS: f32 = 5.0;
-const ANGLE_STIFFNESS: f32 = 1.0;
+const ANGLE_STIFFNESS: f32 = 0.5;
 const OWNER_ANGLE_STIFFNESS: f32 = 0.5;
 
 /// This event is emitted when a hook attaches at some point. This is meant to be used for
@@ -470,7 +470,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                         let joint_def = constraint::Def::Joint {
                             distance: constraint_distance,
-                            p_object_a: Point2::origin(),
+                            p_object_a: Point2::new(1.0, 0.0), //Point2::origin(),
                             p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0, 0.0),
                         };
 
@@ -596,7 +596,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                         let joint_def = constraint::Def::Joint {
                             distance: constraint_distance,
-                            p_object_a: Point2::origin(),
+                            p_object_a: Point2::new(1.0, 0.0), //Point2::origin(),
                             p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0, 0.0),
                         };
                         let joint_constraint = Constraint {

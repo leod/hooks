@@ -48,8 +48,8 @@ pub enum Event {
     ClientGameMsg(PlayerId, ClientGameMsg),
 }
 
-// TODO
-pub const PEER_COUNT: usize = 32;
+// TODO: Transport peer count?
+pub const PEER_COUNT: usize = 64;
 
 impl Host {
     pub fn create(port: u16, game_info: GameInfo) -> Result<Host, transport::Error> {
