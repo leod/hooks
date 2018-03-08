@@ -27,10 +27,10 @@ run-game: build
 run-server: build
 	RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server
 
-run-game-release: build
+run-game-release: build-release
 	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game
 
-run-server-release: build
+run-server-release: build-release
 	RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server
 
 random-bot:

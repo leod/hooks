@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use specs::{Component, Entities, Fetch, Join, ReadStorage, System, VecStorage, WriteStorage};
 
+use defs::PlayerId;
 use entity::Active;
 use repl;
 use repl::snapshot::{EntitySnapshot, HasComponent, WorldSnapshot};
@@ -25,15 +26,25 @@ impl<C: Component + Send + Sync> Component for State<C> {
 /// Note that this system assumes that all the entities present in the left snapshot have already
 /// been created. The client handles this by calling `repl::entity::create_new_entities` on the
 /// left tick when starting it.
-pub struct LoadStateSys<'a, T: EntitySnapshot, C>(
-    &'a WorldSnapshot<T>,
-    &'a WorldSnapshot<T>,
-    PhantomData<C>,
-);
+pub struct LoadStateSys<'a, T: EntitySnapshot, C> {
+    left: &'a WorldSnapshot<T>,
+    right: &'a WorldSnapshot<T>,
+    exclude_player: Option<PlayerId>,
+    phantom: PhantomData<C>,
+}
 
 impl<'a, T: EntitySnapshot, C> LoadStateSys<'a, T, C> {
-    pub fn new(left: &'a WorldSnapshot<T>, right: &'a WorldSnapshot<T>) -> Self {
-        LoadStateSys(left, right, PhantomData)
+    pub fn new(
+        left: &'a WorldSnapshot<T>,
+        right: &'a WorldSnapshot<T>,
+        exclude_player: Option<PlayerId>,
+    ) -> Self {
+        LoadStateSys {
+            left,
+            right,
+            exclude_player,
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -51,9 +62,10 @@ where
     fn run(&mut self, (entity_map, active, mut states): Self::SystemData) {
         // Make sure to forget about entities that no longer exist.
         // TODO: This could definitely be done more efficiently.
+        //       Maybe use Option in State?
         states.clear();
 
-        for item in join::FullJoinIter::new((self.0).0.iter(), (self.1).0.iter()) {
+        for item in join::FullJoinIter::new(self.left.0.iter(), self.right.0.iter()) {
             let (id, left_state, right_state) = match item {
                 join::Item::Both(&id, &(_, ref left_state), &(_, ref right_state)) => {
                     // Load interpolation state
@@ -70,6 +82,12 @@ where
                     continue;
                 }
             };
+
+            if let Some(exclude_player) = self.exclude_player {
+                if id.0 == exclude_player {
+                    continue;
+                }
+            }
 
             if let Some(left_state) = HasComponent::<C>::get(left_state) {
                 // This is where we assume that the entity has already been created

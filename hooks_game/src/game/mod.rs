@@ -355,15 +355,26 @@ impl Game {
                     .as_ref()
                     .unwrap();
 
+                // Ignore player-owned entities here when prediction is enabled
+                // TODO: Will need to figure something out if prediction should also be
+                //       interpolated.
+                let exclude_player = if self.game_runner.predict() {
+                    Some(self.my_player_id)
+                } else {
+                    None
+                };
+
                 let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Position>::new(
                     &last_snapshot,
                     &next_snapshot,
+                    exclude_player,
                 );
                 sys.run_now(&self.game_state.world.res);
 
                 let mut sys = interp::LoadStateSys::<game::EntitySnapshot, Orientation>::new(
                     &last_snapshot,
                     &next_snapshot,
+                    exclude_player,
                 );
                 sys.run_now(&self.game_state.world.res);
 
