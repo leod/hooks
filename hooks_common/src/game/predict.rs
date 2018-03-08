@@ -59,7 +59,7 @@ impl Log {
         tick_data: &tick::Data<game::EntitySnapshot>,
     ) -> Result<(), repl::Error> {
         if let Some(last_input_num) = tick_data.last_input_num {
-            debug!("got correction for {}", last_input_num);
+            //debug!("got correction for {}", last_input_num);
 
             // The server informs us that this `tick_data` contains state after executing our input
             // number `last_input_num`.
@@ -77,7 +77,7 @@ impl Log {
 
                 if replay {
                     // Reset to auth state of player entities
-                    debug!("resetting");
+                    //debug!("resetting");
                     self.reset(world, auth_snapshot);
 
                     // Now apply our recorded inputs again
@@ -87,7 +87,7 @@ impl Log {
                             continue;
                         }
 
-                        debug!("replaying {}", log_input_num);
+                        //debug!("replaying {}", log_input_num);
 
                         input::auth::run_player_input(world, self.my_player_id, &log_entry.input)?;
                     }
@@ -116,7 +116,7 @@ impl Log {
         self.correct(world, tick_data)?;
 
         input::auth::run_player_input(world, self.my_player_id, input)?;
-        debug!("running {}", tick_num);
+        //debug!("running {}", tick_num);
 
         self.record(world, tick_num, input);
 

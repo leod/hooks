@@ -30,6 +30,9 @@ pub fn register(reg: &mut Registry) {
             ComponentType::HookSegmentDef,
             ComponentType::Position,
             ComponentType::Orientation,
+            // TODO: Only send to owner
+            ComponentType::Velocity,
+            ComponentType::AngularVelocity,
         ],
         build_segment,
     );
@@ -43,6 +46,9 @@ pub fn register(reg: &mut Registry) {
             ComponentType::HookSegmentDef,
             ComponentType::Position,
             ComponentType::Orientation,
+            // TODO: Only send to owner
+            ComponentType::Velocity,
+            ComponentType::AngularVelocity,
         ],
         build_segment,
     );

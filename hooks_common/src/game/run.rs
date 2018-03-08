@@ -158,4 +158,8 @@ impl ViewRunner {
         self.common.run_tick(state)?;
         self.common.run_post_tick(state)
     }
+
+    pub fn predict(&self) -> bool {
+        self.predict_log.is_some()
+    }
 }
