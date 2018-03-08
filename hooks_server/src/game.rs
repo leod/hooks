@@ -73,6 +73,9 @@ pub struct Game {
 
     /// Events queued for the next tick.
     queued_events: event::Sink,
+
+    /// Reusable buffer for serialization.
+    write_buffer: Vec<u8>,
 }
 
 fn register(reg: &mut Registry, game_info: &GameInfo) {
@@ -99,6 +102,7 @@ impl Game {
             next_tick: 0,
             update_stopwatch: Stopwatch::new(),
             queued_events: event::Sink::new(),
+            write_buffer: Vec::new(),
         }
     }
 
@@ -339,6 +343,8 @@ impl Game {
                 }
 
                 let snapshot = if send_snapshot {
+                    profile!("store");
+
                     // We don't do this yet, but here the snapshot will be filtered differently for
                     // every player.
                     let mut sys = game::StoreSnapshotSys {
@@ -365,17 +371,27 @@ impl Game {
                         //continue;
                     }
 
-                    let mut writer = BitWriter::new(Vec::new());
+                    let mut buffer = mem::replace(&mut self.write_buffer, Vec::new());
+                    buffer.clear();
 
-                    player.tick_history.delta_write_tick(
-                        player.last_ack_tick,
-                        self.next_tick,
-                        &entity_classes,
-                        &mut writer,
-                    )?;
+                    let mut writer = BitWriter::new(buffer);
 
-                    let data = writer.into_inner()?;
-                    host.send_game(player_id, &data)?;
+                    {
+                        profile!("write");
+                        player.tick_history.delta_write_tick(
+                            player.last_ack_tick,
+                            self.next_tick,
+                            &entity_classes,
+                            &mut writer,
+                        )?;
+                    }
+
+                    profile!("send");
+
+                    let buffer = writer.into_inner()?;
+                    host.send_game(player_id, &buffer)?;
+
+                    mem::replace(&mut self.write_buffer, buffer);
                 }
             }
 

@@ -44,6 +44,7 @@ pub fn register(reg: &mut Registry) {
 
 pub const NUM_HOOKS: usize = 2;
 const MOVE_ACCEL: f32 = 2000.0;
+const MASS: f32 = 200.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
@@ -140,10 +141,10 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         .with(Orientation(0.0))
         .with(Velocity(zero()))
         .with(AngularVelocity(0.0))
-        .with(InvMass(1.0 / 200.0))
+        .with(InvMass(1.0 / MASS))
         .with(InvAngularMass(1.0 / 10.0))
         .with(Dynamic)
-        .with(Drag(200.0 * 7.5))
+        .with(Drag(7.5))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
 }

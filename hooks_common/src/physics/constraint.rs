@@ -6,7 +6,7 @@ use std::f32;
 
 use specs::Entity;
 
-use nalgebra::{dot, norm, Matrix2x6, Point2, Rotation2, RowVector6, Vector2};
+use nalgebra::{dot, norm, normalize, Matrix2x6, Point2, Rotation2, RowVector6, Vector2};
 
 #[derive(Clone, Debug)]
 pub struct Position {
@@ -90,17 +90,26 @@ impl Def {
             } => {
                 let rot_a = Rotation2::new(x_a.angle).matrix().clone();
                 let rot_b = Rotation2::new(x_b.angle).matrix().clone();
-                let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
-                    .matrix()
-                    .clone();
-                let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
-                    .matrix()
-                    .clone();
                 let p_a = rot_a * p_object_a.coords + x_a.p.coords;
                 let p_b = rot_b * p_object_b.coords + x_b.p.coords;
 
                 let f = p_a - p_b;
                 let value_f = norm(&f);
+
+                // Smart boi
+                let f_norm = f / value_f;
+                let obj_a_rot_norm = normalize(&(rot_a * p_object_a.coords));
+                let obj_b_rot_norm = normalize(&(rot_b * p_object_b.coords));
+                let rot_impact_a = f_norm.perp(&obj_a_rot_norm).abs();
+                let rot_impact_b = f_norm.perp(&obj_b_rot_norm).abs();
+
+                let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
+                    .matrix()
+                    .clone() * rot_impact_a;
+                let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
+                    .matrix()
+                    .clone() * rot_impact_b;
+
                 let value = value_f - distance;
                 let jacobian_f = Matrix2x6::new(
                     1.0,
@@ -117,9 +126,6 @@ impl Def {
                     -p_object_b.coords.x * deriv_rot_b.m21 - p_object_b.coords.y * deriv_rot_b.m22,
                 );
                 let jacobian = jacobian_f.transpose() * f / value_f;
-
-                //debug!("f {}", f);
-                //debug!("jacobian_f {}", jacobian_f);
 
                 (value, jacobian.transpose())
             }
