@@ -489,7 +489,8 @@ macro_rules! snapshot {
             /// Snapshot. Note that this system does not create new entities.
             pub struct LoadSnapshotSys<'a> {
                 pub snapshot: &'a WorldSnapshot,
-                pub exclude_player: Option<PlayerId>
+                pub exclude_player: Option<PlayerId>,
+                pub only_player: Option<PlayerId>,
             }
 
             impl<'a> System<'a> for LoadSnapshotSys<'a> {
@@ -502,6 +503,11 @@ macro_rules! snapshot {
                     for (&entity_id, entity_snapshot) in &self.snapshot.0 {
                         if let Some(exclude_player) = self.exclude_player {
                             if entity_id.0 == exclude_player {
+                                continue;
+                            }
+                        }
+                        if let Some(only_player) = self.only_player {
+                            if entity_id.0 != only_player {
                                 continue;
                             }
                         }

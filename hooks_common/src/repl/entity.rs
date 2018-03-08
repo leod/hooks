@@ -92,6 +92,8 @@ where
         let player_class_id = try_get_class_id(world, &game_info.player_entity_class)?;
 
         if class_id == player_class_id {
+            debug!("Spawning {:?}", id);
+
             let mut players = world.write_resource::<player::Players>();
             let player = players
                 .0
@@ -164,6 +166,8 @@ impl<'a> System<'a> for RemovalSys {
                 if meta.class_id == player_class_id {
                     // We might have the case that the owner has just disconnected
                     if let Some(player) = players.0.get_mut(&(repl_id.0).0) {
+                        debug!("Despawning {:?}", repl_id.0);
+
                         assert!(player.entity.is_some());
                         player.entity = None;
                     }

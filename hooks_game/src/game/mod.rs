@@ -109,7 +109,7 @@ impl Game {
             target_lag_ticks: 2 * game_info.ticks_per_snapshot,
             my_player_id,
             game_state,
-            game_runner: game::run::ViewRunner::new(my_player_id),
+            game_runner: game::run::ViewRunner::new(my_player_id, true),
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
             recv_snapshot_timer: Timer::new(
@@ -195,8 +195,9 @@ impl Game {
             self.last_snapshot_tick = Some(tick);
         }
 
-        let events = self.game_runner
-            .run_tick(&mut self.game_state, tick_data, player_input)?;
+        let events =
+            self.game_runner
+                .run_tick(&mut self.game_state, tick, tick_data, player_input)?;
         Ok(events)
     }
 
