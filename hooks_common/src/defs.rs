@@ -69,6 +69,8 @@ pub struct PlayerInput {
     pub rot_angle: f32,
     pub move_forward: bool,
     pub move_backward: bool,
+    pub move_left: bool,
+    pub move_right: bool,
     pub shoot_one: bool,
     pub shoot_two: bool,
 }

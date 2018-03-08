@@ -98,7 +98,7 @@ pub enum Event {
 }
 
 impl Game {
-    pub fn new(reg: Registry, my_player_id: PlayerId, game_info: &GameInfo) -> Game {
+    pub fn new(reg: Registry, my_player_id: PlayerId, game_info: &GameInfo, predict: bool) -> Game {
         let mut game_state = game::State::from_registry(reg);
         game::init::view::create_state(&mut game_state.world);
 
@@ -109,7 +109,7 @@ impl Game {
             target_lag_ticks: 2 * game_info.ticks_per_snapshot,
             my_player_id,
             game_state,
-            game_runner: game::run::ViewRunner::new(my_player_id, true),
+            game_runner: game::run::ViewRunner::new(my_player_id, predict),
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
             recv_snapshot_timer: Timer::new(
@@ -135,6 +135,8 @@ impl Game {
     }
 
     fn on_received_tick(&mut self, client: &mut Client, data: Vec<u8>) -> Result<(), Error> {
+        stats::record("tick bytes", data.len() as f32);
+
         let mut reader = BitReader::new(Cursor::new(data));
 
         let entity_classes = self.game_state.world.read_resource::<game::EntityClasses>();
@@ -189,7 +191,9 @@ impl Game {
 
         let tick_data = self.tick_history.get(tick).unwrap();
 
-        if tick_data.snapshot.is_some() {
+        if let Some(snapshot) = tick_data.snapshot.as_ref() {
+            stats::record("snapshot entities", snapshot.0.len() as f32);
+
             // This tick contains a snapshot, so remember that we want to use it as the
             // basis for interpolation from now on
             self.last_snapshot_tick = Some(tick);

@@ -16,10 +16,10 @@ pub struct Data<T: EntitySnapshot> {
     /// State of replicated entities at the end of the tick. Note that not every tick needs to have
     /// a snapshot, meaning that the server can run ticks at a higher frequency than it sends
     /// snapshots to the clients. However, the client still receives events that happened in those
-    /// intermediate ticks, together with the data of the next tick that includes a snapshot.
+    /// intermediate ticks, together with the data of the next tick that does include a snapshot.
     pub snapshot: Option<WorldSnapshot<T>>,
 
-    /// The last of our player input that has been run to in this tick, if any.
+    /// The last of our player input that has been run in this tick, if any.
     pub last_input_num: Option<TickNum>,
 }
 
@@ -195,7 +195,7 @@ impl<T: EntitySnapshot> History<T> {
         Ok(())
     }
 
-    /// Decode tick data. If the tick was new to use, returns a pair of tick nums, where the first
+    /// Decode tick data. If the tick was new to us, returns a pair of tick nums, where the first
     /// element is the reference tick num and the second element is the new tick num.
     pub fn delta_read_tick(
         &mut self,
@@ -317,6 +317,7 @@ impl<T: EntitySnapshot> History<T> {
             for event in &tick_data.events {
                 match_event!(event:
                     entity::RemoveOrder => {
+                        debug!("Tick remove {:?}", event.0);
                         cur_snapshot.0.remove(&event.0);
                     },
                     player::LeftEvent => {
@@ -332,6 +333,7 @@ impl<T: EntitySnapshot> History<T> {
                             }).collect::<Vec<_>>();
 
                         for id in &ids {
+                            debug!("Tick remove {:?}", id);
                             cur_snapshot.0.remove(id);
                         }
                     },

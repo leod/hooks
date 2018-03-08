@@ -1,7 +1,16 @@
+use std::marker::PhantomData;
+
 use specs::{Entities, Entity, FetchMut, Join, ReadStorage, System, WriteStorage};
 
-use nalgebra::Isometry2;
-use ncollide::shape::ShapeHandle2;
+use nalgebra::{self, Isometry2};
+use ncollide::math::{Isometry, Point};
+use ncollide::shape::{self, Ball, Plane, ShapeHandle2};
+use ncollide::query::algorithms::{JohnsonSimplex, VoronoiSimplex2, VoronoiSimplex3};
+use ncollide::narrow_phase::{BallBallContactGenerator, CompositeShapeShapeContactGenerator,
+                             ContactAlgorithm, ContactDispatcher, DefaultNarrowPhase,
+                             DefaultProximityDispatcher, OneShotContactManifoldGenerator,
+                             PlaneSupportMapContactGenerator, ShapeCompositeShapeContactGenerator,
+                             SupportMapPlaneContactGenerator, SupportMapSupportMapContactGenerator};
 use ncollide::world::{CollisionObjectHandle, CollisionWorld2};
 
 use physics::{Orientation, Position};
@@ -16,7 +25,12 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Object>();
     reg.component::<ObjectHandle>();
 
-    let collision_world = CollisionWorld2::<f32, Entity>::new(0.02);
+    let contact_dispatcher = StatelessContactDispatcher::new();
+    let proximity_dispatcher = DefaultProximityDispatcher::new();
+    let narrow_phase =
+        DefaultNarrowPhase::new(Box::new(contact_dispatcher), Box::new(proximity_dispatcher));
+    let mut collision_world = CollisionWorld2::<f32, Entity>::new(0.02);
+    collision_world.set_narrow_phase(Box::new(narrow_phase));
     reg.resource(collision_world);
 
     reg.removal_system(RemovalSys, "collision");
@@ -198,6 +212,105 @@ impl<'a> System<'a> for RemovalSys {
 
         for entity in removed_entities {
             object_handle.remove(entity);
+        }
+    }
+}
+
+/// `ncollide` contact dispatcher that does not use state from previous tick.
+/// Adapted from the `DefaultContactDispatcher`.
+/// See also <http://users.nphysics.org/t/using-ncollide-in-less-stateful-ways/163>.
+pub struct StatelessContactDispatcher<P: Point, M> {
+    _point_type: PhantomData<P>,
+    _matrix_type: PhantomData<M>,
+}
+
+impl<P: Point, M> StatelessContactDispatcher<P, M> {
+    /// Creates a new basic collision dispatcher.
+    pub fn new() -> StatelessContactDispatcher<P, M> {
+        StatelessContactDispatcher {
+            _point_type: PhantomData,
+            _matrix_type: PhantomData,
+        }
+    }
+}
+
+impl<P: Point, M: Isometry<P>> ContactDispatcher<P, M> for StatelessContactDispatcher<P, M> {
+    fn get_contact_algorithm(
+        &self,
+        a: &shape::Shape<P, M>,
+        b: &shape::Shape<P, M>,
+    ) -> Option<ContactAlgorithm<P, M>> {
+        let a_is_ball = a.is_shape::<Ball<P::Real>>();
+        let b_is_ball = b.is_shape::<Ball<P::Real>>();
+
+        if a_is_ball && b_is_ball {
+            Some(Box::new(BallBallContactGenerator::<P, M>::new()))
+        } else if a.is_shape::<Plane<P::Vector>>() && b.is_support_map() {
+            let wo_manifold = PlaneSupportMapContactGenerator::<P, M>::new();
+
+            if !b_is_ball {
+                let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
+                manifold.set_always_one_shot(true);
+                Some(Box::new(manifold))
+            } else {
+                Some(Box::new(wo_manifold))
+            }
+        } else if b.is_shape::<Plane<P::Vector>>() && a.is_support_map() {
+            let wo_manifold = SupportMapPlaneContactGenerator::<P, M>::new();
+
+            if !a_is_ball {
+                let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
+                manifold.set_always_one_shot(true);
+                Some(Box::new(manifold))
+            } else {
+                Some(Box::new(wo_manifold))
+            }
+        } else if a.is_support_map() && b.is_support_map() {
+            match nalgebra::dimension::<P::Vector>() {
+                2 => {
+                    let simplex = VoronoiSimplex2::new();
+                    let wo_manifold = SupportMapSupportMapContactGenerator::new(simplex);
+
+                    if !a_is_ball && !b_is_ball {
+                        let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
+                        manifold.set_always_one_shot(true);
+                        Some(Box::new(manifold))
+                    } else {
+                        Some(Box::new(wo_manifold))
+                    }
+                }
+                3 => {
+                    let simplex = VoronoiSimplex3::new();
+                    let wo_manifold = SupportMapSupportMapContactGenerator::new(simplex);
+
+                    if !a_is_ball && !b_is_ball {
+                        let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
+                        manifold.set_always_one_shot(true);
+                        Some(Box::new(manifold))
+                    } else {
+                        Some(Box::new(wo_manifold))
+                    }
+                }
+                _ => {
+                    let simplex = JohnsonSimplex::new_w_tls();
+                    let wo_manifold = SupportMapSupportMapContactGenerator::new(simplex);
+
+                    if false {
+                        // !a_is_ball && !b_is_ball {
+                        let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
+                        manifold.set_always_one_shot(true);
+                        Some(Box::new(manifold))
+                    } else {
+                        Some(Box::new(wo_manifold))
+                    }
+                }
+            }
+        } else if a.is_composite_shape() {
+            Some(Box::new(CompositeShapeShapeContactGenerator::<P, M>::new()))
+        } else if b.is_composite_shape() {
+            Some(Box::new(ShapeCompositeShapeContactGenerator::<P, M>::new()))
+        } else {
+            None
         }
     }
 }

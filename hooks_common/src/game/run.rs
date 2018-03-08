@@ -1,5 +1,7 @@
 use specs::RunNow;
 
+use hooks_util::profile;
+
 use defs::{PlayerId, PlayerInput, TickNum};
 use event::{self, Event};
 use entity;
@@ -126,12 +128,16 @@ impl ViewRunner {
         tick_data: &tick::Data<game::EntitySnapshot>,
         input: &PlayerInput,
     ) -> Result<Vec<Box<Event>>, repl::Error> {
+        profile!("run");
+
         let events = event::Sink::clone_from_vec(&tick_data.events);
         state.push_events(events.into_vec());
 
         self.common.run_pre_tick(state)?;
 
         if let Some(ref snapshot) = tick_data.snapshot {
+            profile!("load");
+
             // By now we are up-to-date regarding the player list, so we can create new entities
             repl::entity::view::create_new_entities(&mut state.world, snapshot)?;
 
@@ -152,6 +158,8 @@ impl ViewRunner {
         // TODO: Should this happen before or after loading snapshots?
         // TODO: Consider input frequency > tick frequency?
         if let Some(predict_log) = self.predict_log.as_mut() {
+            profile!("predict");
+
             predict_log.run(&mut state.world, tick_num, tick_data, input)?;
         }
 
