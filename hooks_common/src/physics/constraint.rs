@@ -125,9 +125,19 @@ impl Def {
                     -1.0,
                     -p_object_b.coords.x * deriv_rot_b.m21 - p_object_b.coords.y * deriv_rot_b.m22,
                 );
-                let jacobian = jacobian_f.transpose() * f / value_f;
+                let jacobian = (jacobian_f.transpose() * f / value_f).transpose();
 
-                (value, jacobian.transpose())
+                /*let value = value_f * value_f - distance * distance;
+				let jacobian = 2.0 * RowVector6::new(
+					p_a.x - p_b.x,
+					p_a.y - p_b.y,
+					(p_b - p_a).perp(&(p_a - x_a.p.coords)),
+					p_b.x - p_a.x,
+					p_b.y - p_a.y,
+					(p_a - p_b).perp(&(p_b - x_b.p.coords)),
+				);*/
+
+                (value, jacobian)
             }
             &Def::Angle { angle } => {
                 let value = x_a.angle - x_b.angle - angle;

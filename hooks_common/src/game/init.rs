@@ -11,12 +11,12 @@ fn create_state(world: &mut World) {
     let mut rng = IsaacRng::new_unseeded();
 
     for _ in 0..n_walls {
-        let x = (rng.gen::<f32>() - 0.5) * 3000.0;
-        let y = (rng.gen::<f32>() - 0.5) * 3000.0;
+        let x = (rng.gen::<f32>() - 0.5) * 5000.0;
+        let y = (rng.gen::<f32>() - 0.5) * 5000.0;
         let pos = Point2::new(x, y);
 
-        let w = rng.gen::<f32>() * 100.0 + 20.0;
-        let h = 9.0; //rng.gen::<f32>() * 1.0 + 1.0;
+        let w = rng.gen::<f32>() * 300.0 + 50.0;
+        let h = 20.0; //rng.gen::<f32>() * 1.0 + 1.0;
         let size = Vector2::new(w, h);
 
         let angle = rng.gen::<f32>() * f32::consts::PI;
