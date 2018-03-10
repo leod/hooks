@@ -25,7 +25,7 @@ pub fn register(reg: &mut Registry) {
     reg.resource(Constraints(Vec::new()));
 }
 
-pub const NUM_ITERATIONS: usize = 10;
+pub const NUM_ITERATIONS: usize = 20;
 pub const CONTACT_MARGIN: f32 = 1.0;
 
 /// Tag components that all need to be given for entities that want to be simulated.

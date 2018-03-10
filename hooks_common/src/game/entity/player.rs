@@ -43,8 +43,8 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub const NUM_HOOKS: usize = 2;
-const MOVE_ACCEL: f32 = 2000.0;
-const MASS: f32 = 200.0;
+const MOVE_ACCEL: f32 = 3500.0;
+const MASS: f32 = 50.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]

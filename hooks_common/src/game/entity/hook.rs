@@ -84,13 +84,14 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub const NUM_SEGMENTS: usize = 20;
-pub const SEGMENT_LENGTH: f32 = 20.0;
+pub const SEGMENT_LENGTH: f32 = 50.0;
+const JOIN_MARGIN: f32 = 5.0;
 //const MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const SHOOT_SPEED: f32 = 1000.0;
 const LUNCH_TIME_SECS: f32 = 0.025;
 const LUNCH_RADIUS: f32 = 5.0;
-const ANGLE_STIFFNESS: f32 = 0.5;
-const OWNER_ANGLE_STIFFNESS: f32 = 0.5;
+const ANGLE_STIFFNESS: f32 = 0.7;
+const OWNER_ANGLE_STIFFNESS: f32 = 0.0;
 
 /// This event is emitted when a hook attaches at some point. This is meant to be used for
 /// visualization purposes.
@@ -329,6 +330,7 @@ struct InputData<'a> {
     position: WriteStorage<'a, Position>,
     velocity: WriteStorage<'a, Velocity>,
     orientation: WriteStorage<'a, Orientation>,
+    angular_velocity: WriteStorage<'a, AngularVelocity>,
     hook_state: WriteStorage<'a, State>,
 }
 
@@ -414,6 +416,8 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                                 .insert(next_segment, Orientation(owner_angle));
                             data.velocity
                                 .insert(next_segment, Velocity(owner_vel + vel));
+                            data.angular_velocity
+                                .insert(next_segment, AngularVelocity(0.0));
 
                             hook_state.0 = Some(ActiveState {
                                 num_active_segments: num_active_segments as u8 + 1,
@@ -459,19 +463,20 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         .ok_or(repl::Error::MissingComponent(join_id, "Orientation"))?
                         .0;
                     let join_rot = Rotation2::new(join_angle).matrix().clone();
-                    let join_attach_pos =
-                        join_rot * Point2::new(-SEGMENT_LENGTH / 2.0, 0.0) + join_pos.coords;
+                    let join_attach_pos = join_rot *
+                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
+                        join_pos.coords;
 
                     let target_distance = 0.0;
                     let cur_distance = norm(&(join_attach_pos - owner_pos));
 
-                    if cur_distance > SEGMENT_LENGTH / 2.0 {
+                    if cur_distance > SEGMENT_LENGTH / 2.0 - JOIN_MARGIN {
                         let constraint_distance = cur_distance.min(target_distance);
 
                         let joint_def = constraint::Def::Joint {
                             distance: constraint_distance,
                             p_object_a: Point2::new(1.0, 0.0), //Point2::origin(),
-                            p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0, 0.0),
+                            p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
                         };
 
                         let joint_constraint = Constraint {
@@ -511,7 +516,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         if let Some(fix_entity) = data.entity_map.get_id_to_entity(fix_entity_id) {
                             let joint_def = constraint::Def::Joint {
                                 distance: 0.0,
-                                p_object_a: Point2::new(SEGMENT_LENGTH / 2.0, 0.0),
+                                p_object_a: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
                                 p_object_b: Point2::new(fix_pos_object[0], fix_pos_object[1]),
                             };
                             let joint_constraint = Constraint {
@@ -547,8 +552,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         .ok_or(repl::Error::MissingComponent(last_id, "Orientation"))?
                         .0;
                     let last_rot = Rotation2::new(last_angle).matrix().clone();
-                    let last_attach_pos =
-                        last_rot * Point2::new(-SEGMENT_LENGTH / 2.0, 0.0) + last_pos.coords;
+                    let last_attach_pos = last_rot *
+                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
+                        last_pos.coords;
 
                     let cur_distance = norm(&(last_attach_pos - owner_pos));
 
@@ -586,8 +592,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             .ok_or(repl::Error::MissingComponent(last_id, "Orientation"))?
                             .0;
                         let last_rot = Rotation2::new(last_angle).matrix().clone();
-                        let last_attach_pos =
-                            last_rot * Point2::new(-SEGMENT_LENGTH / 2.0, 0.0) + last_pos.coords;
+                        let last_attach_pos = last_rot *
+                            Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
+                            last_pos.coords;
                         let cur_distance = norm(&(last_attach_pos - owner_pos));
 
                         let target_distance =
@@ -595,9 +602,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         let constraint_distance = cur_distance.min(target_distance);
 
                         let joint_def = constraint::Def::Joint {
-                            distance: constraint_distance,
+                            distance: constraint_distance.sqrt(),
                             p_object_a: Point2::new(1.0, 0.0), //Point2::origin(),
-                            p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0, 0.0),
+                            p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
                         };
                         let joint_constraint = Constraint {
                             def: joint_def,
@@ -671,8 +678,8 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                 let joint_def = constraint::Def::Joint {
                     distance: 0.0,
-                    p_object_a: Point2::new(-SEGMENT_LENGTH / 2.0, 0.0),
-                    p_object_b: Point2::new(SEGMENT_LENGTH / 2.0, 0.0),
+                    p_object_a: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                    p_object_b: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
                 };
                 let angle_def = constraint::Def::Angle { angle: 0.0 };
 

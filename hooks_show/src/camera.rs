@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use nalgebra::{norm, Matrix4, Point2, Translation3, Vector2, Vector3};
+use nalgebra::{norm, Matrix4, Point2, Similarity3, Translation3, UnitQuaternion, Vector2, Vector3};
 
 use hooks_util::timer::duration_to_secs;
 
@@ -33,9 +33,16 @@ impl Camera {
         self.pos += v * t;
     }
 
-    pub fn transform(&self) -> Matrix4<f32> {
-        let coords = -self.pos.coords + self.window_size / 2.0;
+    pub fn similarity(&self) -> Similarity3<f32> {
+        let scale = 0.75;
+        let coords = -self.pos.coords * scale + self.window_size / 2.0;
+        let trans = Translation3::from_vector(Vector3::new(coords.x, coords.y, 0.0));
+        let rot = UnitQuaternion::identity();
 
-        Translation3::from_vector(Vector3::new(coords.x, coords.y, 0.0)).to_homogeneous()
+        Similarity3::from_parts(trans, rot, scale)
+    }
+
+    pub fn transform(&self) -> Matrix4<f32> {
+        self.similarity().to_homogeneous()
     }
 }
