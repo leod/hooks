@@ -36,14 +36,20 @@ fn handle_event(
                     pos: event.pos,
                     orientation: event.vel[1].atan2(event.vel[0]),
                     spread: f32::consts::PI * 2.0, //f32::consts::PI / 12.0,
-                    min_speed: 50.0,
-                    max_speed: 400.0,
+                    min_speed: 1.0,
+                    max_speed: 1500.0,
                     angle: 0.0,
-                    friction: 1000.0,
+                    friction: 4000.0,
                     size: [3.0, 3.0],
-                    color: |_, speed| [(speed - 50.0) / 350.0, 0.5, 0.0],
+                    color: |_, speed| {
+                        if event.hook_index == 0 {
+                            [0.0, 0.5, (speed / 1000.0)]
+                        } else {
+                            [(speed / 1000.0), 0.5, 0.0]
+                        }
+                    }
                 };
-                cone.spawn(&mut context.particles, 1000);
+                cone.spawn(&mut context.particles, 10000);
             },
         );
     }
