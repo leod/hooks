@@ -418,7 +418,16 @@ macro_rules! snapshot {
                                         result.$field_name = Some(reader.read()?);
                                     } else {
                                         // Component has not changed, so take the previous value
-                                        assert!(self.$field_name.is_some());
+                                        if self.$field_name.is_none() {
+                                            return Err(snapshot::Error::ReceivedInvalidSnapshot(
+                                                format!(
+                                                    "previous snapshot is missing component {} \
+                                                     for entity with repl components {:?}",
+                                                    stringify!($field_name),
+                                                    components,
+                                                )
+                                            ));
+                                        }
                                         result.$field_name = self.$field_name.clone();
                                     }
                                 }

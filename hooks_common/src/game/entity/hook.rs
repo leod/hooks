@@ -8,7 +8,7 @@ use event::{self, Event};
 use entity::Active;
 use repl;
 use physics::{AngularVelocity, Dynamic, Friction, InvAngularMass, InvMass, Orientation, Position,
-              Velocity};
+              Update, Velocity};
 use physics::interaction;
 use physics::sim::Constraints;
 use physics::constraint::{self, Constraint};
@@ -79,7 +79,14 @@ pub fn register(reg: &mut Registry) {
             rotate_a: false,
             rotate_b: false,
         }),
-        Some(first_segment_wall_interaction),
+        Some(first_segment_interaction),
+    );
+    interaction::set(
+        reg,
+        "first_hook_segment",
+        "player",
+        None,
+        Some(first_segment_interaction),
     );
 }
 
@@ -180,7 +187,7 @@ fn build_segment(builder: EntityBuilder) -> EntityBuilder {
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
-    groups.set_whitelist(&[collision::GROUP_WALL]);
+    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
@@ -247,18 +254,18 @@ pub mod auth {
     }
 }
 
-fn first_segment_wall_interaction(
+fn first_segment_interaction(
     world: &World,
     segment_info: &interaction::EntityInfo,
-    wall_info: &interaction::EntityInfo,
+    other_info: &interaction::EntityInfo,
     pos: Point2<f32>,
     normal: Vector2<f32>,
 ) {
-    let wall_id = {
+    let other_id = {
         let repl_ids = world.read::<repl::Id>();
 
         // Can unwrap since every wall entity must have a `repl::Id`.
-        repl_ids.get(wall_info.entity).unwrap().0
+        repl_ids.get(other_info.entity).unwrap().0
     };
 
     // Get the corresponding hook entity.
@@ -268,6 +275,15 @@ fn first_segment_wall_interaction(
         .get(segment_info.entity)
         .unwrap()
         .hook;
+
+    if other_id.0 == hook_id.0 {
+        // Don't attach to entities that we own
+        return;
+    }
+
+    if world.read::<Update>().get(segment_info.entity).is_none() {
+        return;
+    }
 
     // TODO: Repl unwrap: server could send faulty hook id in segment definition
     let hook_entity = repl::get_id_to_entity(world, hook_id).unwrap();
@@ -290,7 +306,7 @@ fn first_segment_wall_interaction(
         Mode::Shooting { .. } => {
             active_state.mode = Mode::Contracting {
                 lunch_timer: 0.0,
-                fixed: Some((wall_id, wall_info.pos_object.coords.into())),
+                fixed: Some((other_id, other_info.pos_object.coords.into())),
             };
             true
         }
@@ -300,7 +316,7 @@ fn first_segment_wall_interaction(
         } => {
             active_state.mode = Mode::Contracting {
                 lunch_timer,
-                fixed: Some((wall_id, wall_info.pos_object.coords.into())),
+                fixed: Some((other_id, other_info.pos_object.coords.into())),
             };
             true
         }
