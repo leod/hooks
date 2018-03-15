@@ -144,13 +144,13 @@ impl Predictable for Velocity {
 
 impl Predictable for Orientation {
     fn distance(&self, other: &Orientation) -> f32 {
-        self.0.max(other.0)
+        (self.0 - other.0).abs()
     }
 }
 
 impl Predictable for AngularVelocity {
     fn distance(&self, other: &AngularVelocity) -> f32 {
-        self.0.max(other.0)
+        (self.0 - other.0).abs()
     }
 }
 
