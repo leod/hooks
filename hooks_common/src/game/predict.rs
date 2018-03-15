@@ -86,7 +86,9 @@ impl Log {
                     )));
                 };
 
-                debug!("prediction error: {}", distance);
+                if distance > 0.0 {
+                    debug!("prediction error: {}", distance);
+                }
 
                 let replay = true;
 

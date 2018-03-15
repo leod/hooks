@@ -474,7 +474,7 @@ macro_rules! snapshot {
                             (&Some(ref a), &Some(ref b)) => {
                                 let dist = repl::Predictable::distance(a, b);
                                 if dist > 0.0 {
-                                    debug!("{}: {}", stringify!($field_name), dist);
+                                    //debug!("{}: {}", stringify!($field_name), dist);
                                 }
                                 max_dist = max_dist.max(dist);
                             }
