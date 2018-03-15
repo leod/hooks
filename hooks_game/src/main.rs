@@ -228,8 +228,13 @@ impl debug::Inspect for MainState {
 fn main() {
     env_logger::init();
 
+    let host = env::args()
+        .skip(1)
+        .next()
+        .unwrap_or("localhost".to_string());
+
     let config = Config {
-        host: "localhost".to_string(),
+        host,
         port: 32444,
         name: "testy".to_string(),
     };
