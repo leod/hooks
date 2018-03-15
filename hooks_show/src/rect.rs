@@ -6,10 +6,11 @@ use ggez::graphics::{self, Drawable};
 
 use hooks_util::profile;
 use hooks_common;
+use hooks_common::repl;
 use hooks_common::entity::Active;
 use hooks_common::physics::{Orientation, Position};
 
-use {Assets, Registry};
+use {Input, Registry};
 
 pub fn register(reg: &mut hooks_common::Registry) {
     reg.component::<Draw>();
@@ -27,18 +28,21 @@ pub struct Draw {
 }
 
 type DrawData<'a> = (
+    ReadStorage<'a, repl::Id>,
     ReadStorage<'a, Active>,
     ReadStorage<'a, Position>,
     ReadStorage<'a, Orientation>,
     ReadStorage<'a, Draw>,
 );
 
-fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
+fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::GameResult<()> {
     profile!("rect");
 
-    let (active, position, orientation, draw) = DrawData::fetch(&world.res, 0);
+    let (repl_id, active, position, orientation, draw) = DrawData::fetch(&world.res, 0);
 
-    for (_active, position, orientation, draw) in (&active, &position, &orientation, &draw).join() {
+    for (repl_id, _active, position, orientation, draw) in
+        (&repl_id, &active, &position, &orientation, &draw).join()
+    {
         //debug!("rect at {}", position.0);
 
         let coords = position.0.coords;
@@ -53,15 +57,24 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
         graphics::push_transform(ctx, Some(curr_transform * matrix));
         graphics::apply_transformations(ctx)?;
 
-        let color = graphics::Color {
-            r: 1.0,
-            g: 0.0,
-            b: 0.0,
-            a: 1.0,
+        let color = if (repl_id.0).0 == input.my_player_id {
+            graphics::Color {
+                r: 0.0,
+                g: 0.0,
+                b: 1.0,
+                a: 1.0,
+            }
+        } else {
+            graphics::Color {
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            }
         };
         graphics::set_color(ctx, color)?;
 
-        assets.rect_line.draw(ctx, Point2::origin(), 0.0)?;
+        input.assets.rect_line.draw(ctx, Point2::origin(), 0.0)?;
 
         graphics::pop_transform(ctx);
     }

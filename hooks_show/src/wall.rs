@@ -8,7 +8,7 @@ use hooks_util::profile;
 use hooks_common::game::entity::wall;
 use hooks_common::physics::{Orientation, Position};
 
-use {Assets, Registry};
+use {Input, Registry};
 
 pub fn register_show(reg: &mut Registry) {
     reg.draw_fn(draw);
@@ -20,7 +20,7 @@ type DrawData<'a> = (
     ReadStorage<'a, wall::Size>,
 );
 
-fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
+fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::GameResult<()> {
     profile!("wall");
 
     let (position, orientation, size) = DrawData::fetch(&world.res, 0);
@@ -47,7 +47,7 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
                 a: 1.0,
             },
         )?;
-        assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
+        input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
 
         graphics::pop_transform(ctx);
     }

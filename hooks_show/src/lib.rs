@@ -50,10 +50,14 @@ pub struct Assets {
     pub rect_line: Mesh,
 }
 
-pub struct Context {
+pub struct Input {
+    pub my_player_id: PlayerId,
     pub assets: Assets,
-    pub particles: particle_frenzy::System<gfx_device_gl::Resources>,
     pub time: f32,
+}
+
+pub struct Output {
+    pub particles: particle_frenzy::System<gfx_device_gl::Resources>,
 }
 
 impl Assets {
@@ -87,8 +91,9 @@ impl Assets {
     }
 }
 
-pub type EventHandler = fn(&mut Context, &mut World, &[Box<Event>]) -> ggez::error::GameResult<()>;
-pub type DrawFn = fn(&mut ggez::Context, &Assets, &World) -> ggez::error::GameResult<()>;
+pub type EventHandler =
+    fn(&Input, &mut Output, &mut World, &[Box<Event>]) -> ggez::error::GameResult<()>;
+pub type DrawFn = fn(&mut ggez::Context, &Input, &World) -> ggez::error::GameResult<()>;
 
 #[derive(Default)]
 pub struct Registry {
@@ -113,8 +118,10 @@ pub struct Show {
     game_info: GameInfo,
     reg: Registry,
 
-    context: Context,
     camera: Camera,
+
+    input: Input,
+    output: Output,
 }
 
 impl Show {
@@ -134,19 +141,22 @@ impl Show {
             let factory = graphics::get_factory(ctx);
             particle_frenzy::System::new(factory, target, 10_000, 50)
         };
-        let context = Context {
+
+        let input = Input {
+            my_player_id,
             assets,
-            particles,
             time: 0.0,
         };
+
+        let output = Output { particles };
 
         Ok(Show {
             my_player_id,
             game_info: game_info.clone(),
             reg,
-
-            context,
             camera: Camera::new(view_size),
+            input,
+            output,
         })
     }
 
@@ -162,7 +172,7 @@ impl Show {
         self.update_time(ctx);
 
         for handler in &self.reg.event_handlers {
-            handler(&mut self.context, world, events)?;
+            handler(&self.input, &mut self.output, world, events)?;
         }
 
         Ok(())
@@ -195,7 +205,7 @@ impl Show {
             profile!("fns");
 
             for draw_fn in &self.reg.draw_fns {
-                draw_fn(ctx, &self.context.assets, world)?;
+                draw_fn(ctx, &self.input, world)?;
             }
         }
 
@@ -208,9 +218,9 @@ impl Show {
 
             let transform = graphics::get_projection(ctx) * camera_transform;
             let (factory, device, encoder, _depthview, _colorview) = graphics::get_gfx_objects(ctx);
-            self.context
+            self.output
                 .particles
-                .render(factory, encoder, self.context.time, &transform.into());
+                .render(factory, encoder, self.input.time, &transform.into());
             encoder.flush(device);
         }
 
@@ -219,7 +229,7 @@ impl Show {
 
     /// Once the game is finished, move the `Assets` so that we don't reload things unnecessarily.
     pub fn into_assets(self) -> Assets {
-        self.context.assets
+        self.input.assets
     }
 
     fn my_player_entity(&self, world: &World) -> Option<specs::Entity> {
@@ -237,7 +247,7 @@ impl Show {
     fn update_time(&mut self, ctx: &mut ggez::Context) {
         // TODO: Should this involve the game time somehow?
 
-        self.context.time =
+        self.input.time =
             ggez::timer::duration_to_f64(ggez::timer::get_time_since_start(ctx)) as f32;
     }
 }
