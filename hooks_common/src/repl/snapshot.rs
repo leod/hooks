@@ -7,6 +7,7 @@ use hooks_util::{join, stats};
 
 use defs::{EntityClassId, EntityId, PlayerId, INVALID_ENTITY_ID};
 use entity::Meta;
+use repl;
 
 #[derive(Debug)]
 pub enum Error {
@@ -43,6 +44,9 @@ pub trait EntitySnapshot: Clone + PartialEq + 'static {
         components: &[Self::ComponentType],
         reader: &mut R,
     ) -> Result<Self, Error>;
+
+    /// Calculate some kind of measure of how different two entity snapshots are.
+    fn distance(&self, other: &Self) -> Result<f32, repl::Error>;
 }
 
 pub trait HasComponent<T> {
@@ -265,6 +269,30 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
 
         Ok((new_entities, cur_snapshot))
     }
+
+    /// Calculate some kind of measure of how different two world snapshots are, restricted to the
+    /// entities that exist in both snapshots.
+    pub fn distance(&self, other: &Self) -> Result<f32, repl::Error> {
+        let mut dist = 0.0f32;
+
+        for join_item in join::FullJoinIter::new(self.0.iter(), other.0.iter()) {
+            match join_item {
+                join::Item::Both(
+                    &_id,
+                    &(ref left_meta, ref left_snapshot),
+                    &(ref right_meta, ref right_snapshot),
+                ) => {
+                    // This entity exists in the left and the right snapshot
+                    assert!(left_meta == right_meta);
+
+                    dist += left_snapshot.distance(right_snapshot)?;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(dist)
+    }
 }
 
 /// This macro generates an `EntitySnapshot` struct to be able to copy the state of a selection of
@@ -436,6 +464,34 @@ macro_rules! snapshot {
                     }
 
                     Ok(result)
+                }
+
+                fn distance(&self, other: &EntitySnapshot) -> Result<f32, repl::Error> {
+                    let mut max_dist = 0.0f32;
+
+                    $(
+                        match (&self.$field_name, &other.$field_name) {
+                            (&Some(ref a), &Some(ref b)) => {
+                                let dist = repl::Predictable::distance(a, b);
+                                if dist > 0.0 {
+                                    debug!("{}: {}", stringify!($field_name), dist);
+                                }
+                                max_dist = max_dist.max(dist);
+                            }
+                            (&None, &None) => {},
+                            _ => {
+                                return Err(repl::Error::Replication(
+                                    format!(
+                                        "component {} is given only for one of the entities\
+                                         while calculating entity distance",
+                                        stringify!($field_name)
+                                    )
+                                ));
+                            }
+                        }
+                    )+
+
+                    Ok(max_dist)
                 }
             }
 

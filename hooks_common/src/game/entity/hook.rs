@@ -1,3 +1,5 @@
+use std::f32;
+
 use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
 use specs::{Entity, EntityBuilder, Fetch, FetchMut, Join, ReadStorage, SystemData, World,
             WriteStorage};
@@ -139,12 +141,16 @@ pub struct Def {
     pub segments: [EntityId; NUM_SEGMENTS],
 }
 
+impl repl::Predictable for Def {}
+
 /// Definition of a hook segment. Again, this should not change in the entity's lifetime.
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
 pub struct SegmentDef {
     /// Every hook segment belongs to one hook.
     pub hook: EntityId,
 }
+
+impl repl::Predictable for SegmentDef {}
 
 /// The mode a hook can be in. This is replicated and expected to change frequently.
 #[derive(PartialEq, Clone, Debug, BitStore)]
@@ -173,6 +179,50 @@ pub struct ActiveState {
 /// The dynamic state of a hook.
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
 pub struct State(pub Option<ActiveState>);
+
+impl repl::Predictable for State {
+    fn distance(&self, other: &State) -> f32 {
+        // TODO: ActiveState distance
+        match (&self.0, &other.0) {
+            (&Some(ref state_a), &Some(ref state_b)) => {
+                let mut dist = 0.0;
+                dist += (state_a.num_active_segments as f32 - state_b.num_active_segments as f32)
+                    .abs() * 10.0;
+                dist += (state_a.want_fix as usize as f32 - state_b.want_fix as usize as f32)
+                    .abs() * 100.0;
+                dist += match (&state_a.mode, &state_b.mode) {
+                    (&Mode::Shooting, &Mode::Shooting) => 0.0,
+                    (
+                        &Mode::Contracting {
+                            lunch_timer: lunch_timer_a,
+                            fixed: fixed_a,
+                        },
+                        &Mode::Contracting {
+                            lunch_timer: lunch_timer_b,
+                            fixed: fixed_b,
+                        },
+                    ) => {
+                        (lunch_timer_a - lunch_timer_b).abs() + match (&fixed_a, &fixed_b) {
+                            (&Some((entity_a, x_a)), &Some((entity_b, x_b))) => {
+                                if entity_a != entity_b {
+                                    f32::INFINITY
+                                } else {
+                                    (x_a[0] - x_b[0]).abs().max((x_a[1] - x_b[1]).abs())
+                                }
+                            }
+                            (&None, &None) => 0.0,
+                            _ => f32::INFINITY,
+                        }
+                    }
+                    _ => f32::INFINITY,
+                };
+                dist
+            }
+            (&None, &None) => 0.0,
+            _ => f32::INFINITY,
+        }
+    }
+}
 
 /// Input for simulating a hook.
 #[derive(Component, Clone, Debug)]

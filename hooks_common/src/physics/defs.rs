@@ -6,6 +6,7 @@ use specs::{Component, FlaggedStorage, VecStorage};
 
 use registry::Registry;
 use repl::interp::Interp;
+use repl::Predictable;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Update>();
@@ -124,6 +125,32 @@ impl BitStore for Position {
     fn write_to<W: BitWrite>(&self, writer: &mut W) -> Result<()> {
         writer.write(&self.0.x)?;
         writer.write(&self.0.y)
+    }
+}
+
+impl Predictable for Position {
+    fn distance(&self, other: &Position) -> f32 {
+        let d = self.0 - other.0;
+        d.x.max(d.y)
+    }
+}
+
+impl Predictable for Velocity {
+    fn distance(&self, other: &Velocity) -> f32 {
+        let d = self.0 - other.0;
+        d.x.max(d.y)
+    }
+}
+
+impl Predictable for Orientation {
+    fn distance(&self, other: &Orientation) -> f32 {
+        self.0.max(other.0)
+    }
+}
+
+impl Predictable for AngularVelocity {
+    fn distance(&self, other: &AngularVelocity) -> f32 {
+        self.0.max(other.0)
     }
 }
 
