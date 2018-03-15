@@ -106,6 +106,9 @@ const OWNER_ANGLE_STIFFNESS: f32 = 0.0;
 /// visualization purposes.
 #[derive(Debug, Clone, BitStore)]
 pub struct FixedEvent {
+    /// Different hook colors for drawing.
+    pub hook_index: u32,
+
     pub pos: [f32; 2],
     pub vel: [f32; 2],
 }
@@ -342,6 +345,9 @@ fn first_segment_interaction(
     let mut state_storage = world.write::<State>();
     let state = state_storage.get_mut(hook_entity).unwrap();
 
+    let hook_def_storage = world.read::<Def>();
+    let hook_def = hook_def_storage.get(hook_entity).unwrap();
+
     let active_state = state
         .0
         .as_mut()
@@ -373,8 +379,9 @@ fn first_segment_interaction(
         _ => false,
     };
 
-    if fixed {
+    if fixed && active_state.num_active_segments > 3 {
         let event = FixedEvent {
+            hook_index: hook_def.index,
             pos: pos.coords.into(),
             vel: normal.into(),
         };
