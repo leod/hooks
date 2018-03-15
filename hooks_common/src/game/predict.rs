@@ -75,6 +75,19 @@ impl Log {
 
             // If the tick data contains a snapshot, we can correct our prediction
             if let Some(auth_snapshot) = tick_data.snapshot.as_ref() {
+                // Calculate prediction error
+                let distance = if let Some(log_entry) = self.entries.get(&last_input_num) {
+                    log_entry.snapshot.distance(&auth_snapshot)?
+                } else {
+                    return Err(repl::Error::Replication(format!(
+                        "Received prediction correction for input num {}\
+                         but we have no log entry for that",
+                        last_input_num,
+                    )));
+                };
+
+                debug!("prediction error: {}", distance);
+
                 let replay = true;
 
                 if replay {
@@ -96,7 +109,7 @@ impl Log {
                 }
             }
         } else {
-            // TODO: It is important that we load the initial snapshot for player entities.
+            // NOTE: It is important that we load the initial snapshot for player entities.
             //       The reason is that, when prediction is enabled, `game::run::ViewRunner`
             //       ignores player-owned entities when loading the server's snapshots.
             //       Not sure if this is the best place to load the initial state.

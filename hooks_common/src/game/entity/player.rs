@@ -58,6 +58,8 @@ pub struct Player {
     pub hooks: [EntityId; NUM_HOOKS],
 }
 
+impl repl::Predictable for Player {}
+
 pub fn run_input(
     world: &mut World,
     entity: Entity,

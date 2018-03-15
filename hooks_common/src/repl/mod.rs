@@ -23,6 +23,13 @@ pub fn register(reg: &mut Registry) {
     player::register(reg);
 }
 
+/// Trait that needs to be implemented by components that want to be replicated.
+pub trait Predictable {
+    fn distance(&self, _other: &Self) -> f32 {
+        0.0
+    }
+}
+
 /// Shared entity id for replication.
 #[derive(PartialEq, Component)]
 #[component(VecStorage)]
