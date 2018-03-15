@@ -147,12 +147,18 @@ pub struct Sink {
 
 impl Sink {
     pub fn new() -> Sink {
-        Sink { events: Vec::new(), ignore: false }
+        Sink {
+            events: Vec::new(),
+            ignore: false,
+        }
     }
 
     pub fn clone_from_vec(events: &Vec<Box<Event>>) -> Sink {
         let events = events.iter().map(|event| (**event).clone_event()).collect();
-        Sink { events, ignore: false }
+        Sink {
+            events,
+            ignore: false,
+        }
     }
 
     pub fn push<T: Event + Send>(&mut self, event: T) {
