@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use specs::{RunNow, World};
 
 use defs::{PlayerId, PlayerInput, TickNum};
+use event;
 use repl::{self, tick};
 use game::{self, input};
 
@@ -132,8 +133,14 @@ impl Log {
     ) -> Result<(), repl::Error> {
         self.correct(world, tick_data)?;
 
+        // For now, just ignore any events emitted locally in prediction.
+        // TODO: This will need to be refined. Might want to predict only some events.
+        let ignore = world.write_resource::<event::Sink>().set_ignore(true);
+
         input::auth::run_player_input(world, self.my_player_id, input)?;
         //debug!("running {}", tick_num);
+
+        world.write_resource::<event::Sink>().set_ignore(ignore);
 
         self.record(world, tick_num, input);
 
