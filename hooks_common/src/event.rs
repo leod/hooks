@@ -142,16 +142,17 @@ impl Registry {
 
 pub struct Sink {
     events: Vec<Box<Event>>,
+    ignore: bool,
 }
 
 impl Sink {
     pub fn new() -> Sink {
-        Sink { events: Vec::new() }
+        Sink { events: Vec::new(), ignore: false }
     }
 
     pub fn clone_from_vec(events: &Vec<Box<Event>>) -> Sink {
         let events = events.iter().map(|event| (**event).clone_event()).collect();
-        Sink { events }
+        Sink { events, ignore: false }
     }
 
     pub fn push<T: Event + Send>(&mut self, event: T) {
@@ -159,7 +160,9 @@ impl Sink {
     }
 
     pub fn push_box(&mut self, event: Box<Event>) {
-        self.events.push(event);
+        if !self.ignore {
+            self.events.push(event);
+        }
     }
 
     pub fn clear(&mut self) -> Vec<Box<Event>> {
@@ -176,6 +179,12 @@ impl Sink {
 
     pub fn into_vec(self) -> Vec<Box<Event>> {
         self.events
+    }
+
+    pub fn set_ignore(&mut self, b: bool) -> bool {
+        let old_b = self.ignore;
+        self.ignore = b;
+        old_b
     }
 }
 
