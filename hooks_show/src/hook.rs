@@ -14,7 +14,7 @@ use hooks_common::physics::{Orientation, Position};
 use hooks_common::repl::EntityMap;
 use hooks_common::game::entity::hook;
 
-use {Assets, Context, Registry};
+use {Input, Output, Registry};
 
 /// Draw joints for debugging.
 pub fn register_show(reg: &mut Registry) {
@@ -23,15 +23,16 @@ pub fn register_show(reg: &mut Registry) {
 }
 
 fn handle_event(
-    context: &mut Context,
-    _world: &mut World,
+    input: &Input,
+    output: &mut Output,
+    _: &mut World,
     events: &[Box<Event>],
 ) -> ggez::error::GameResult<()> {
     for event in events {
         match_event!(event:
             hook::FixedEvent => {
                 let cone = particle_frenzy::spawn::Cone {
-                    spawn_time: context.time,
+                    spawn_time: input.time,
                     life_time: 0.3,
                     pos: event.pos,
                     orientation: event.vel[1].atan2(event.vel[0]),
@@ -49,7 +50,7 @@ fn handle_event(
                         }
                     }
                 };
-                cone.spawn(&mut context.particles, 10000);
+                cone.spawn(&mut output.particles, 10000);
             },
         );
     }
@@ -65,7 +66,7 @@ type DrawData<'a> = (
     ReadStorage<'a, hook::State>,
 );
 
-fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error::GameResult<()> {
+fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::GameResult<()> {
     profile!("hook");
 
     let (entity_map, position, orientation, hook_def, hook_state) = DrawData::fetch(&world.res, 0);
@@ -123,7 +124,7 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
                     }
                 };
                 graphics::set_color(ctx, color)?;
-                assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
+                input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
                 graphics::pop_transform(ctx);
             }
 
@@ -169,7 +170,7 @@ fn draw(ctx: &mut ggez::Context, assets: &Assets, world: &World) -> ggez::error:
                     }
                 };
                 graphics::set_color(ctx, color)?;
-                assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
+                input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
                 graphics::pop_transform(ctx);
             }
         }
