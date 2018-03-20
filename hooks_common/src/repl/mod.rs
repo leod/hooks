@@ -52,6 +52,10 @@ impl EntityMap {
             .map(Ok)
             .unwrap_or(Err(Error::InvalidEntityId(id)))
     }
+
+    pub fn is_entity(&self, id: EntityId) -> bool {
+        self.get_id_to_entity(id).is_some()
+    }
 }
 
 pub fn get_id_to_entity(world: &World, id: EntityId) -> Option<Entity> {
@@ -60,6 +64,10 @@ pub fn get_id_to_entity(world: &World, id: EntityId) -> Option<Entity> {
 
 pub fn try_id_to_entity(world: &World, id: EntityId) -> Result<Entity, Error> {
     world.read_resource::<EntityMap>().try_id_to_entity(id)
+}
+
+pub fn is_entity(world: &World, id: EntityId) -> bool {
+    world.read_resource::<EntityMap>().is_entity(id)
 }
 
 /// An `Error` indicates that something went seriously wrong in replication. Either we have a bug,

@@ -435,8 +435,8 @@ impl<'a> System<'a> for HandleContactsSys {
 				);
 
                 // TODO: Easier way to get object-space contact coordinates?
-                let p_object_a = oa.position().inverse() * contact.world1;
-                let p_object_b = ob.position().inverse() * contact.world2;
+                let object_pos_a = oa.position().inverse() * contact.world1;
+                let object_pos_b = ob.position().inverse() * contact.world2;
 
                 if let Some(action) = action {
                     match action {
@@ -449,18 +449,18 @@ impl<'a> System<'a> for HandleContactsSys {
                                 def: constraint::Def::Contact {
                                     normal: contact.normal.unwrap(),
                                     margin: CONTACT_MARGIN,
-                                    p_object_a,
-                                    p_object_b,
+                                    object_pos_a,
+                                    object_pos_b,
                                 },
                                 stiffness: 1.0,
                                 entity_a,
                                 entity_b,
                                 vars_a: constraint::Vars {
-                                    p: filter_a,
+                                    pos: filter_a,
                                     angle: rotate_a && filter_a
                                 },
                                 vars_b: constraint::Vars {
-                                    p: filter_b,
+                                    pos: filter_b,
                                     angle: rotate_b && filter_b
                                 },
                             };
@@ -472,12 +472,12 @@ impl<'a> System<'a> for HandleContactsSys {
                 // Record the collision event
                 let info_a = interaction::EntityInfo {
                     entity: entity_a,
-                    pos_object: p_object_a,
+                    object_pos: object_pos_a,
                     vel: velocity.get(entity_a).map(|v| v.0),
                 };
                 let info_b = interaction::EntityInfo {
                     entity: entity_b,
-                    pos_object: p_object_b,
+                    object_pos: object_pos_b,
                     vel: velocity.get(entity_b).map(|v| v.0),
                 };
                 let event = interaction::Event {
@@ -523,7 +523,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     // Set up input for constraint solving
                     let x = |entity| {
                         constraint::Position {
-                            p: position.get(entity).unwrap().0,
+                            pos: position.get(entity).unwrap().0,
                             angle: normalize_angle(orientation.get(entity).unwrap().0),
                         }
                     };
@@ -549,11 +549,11 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     )
                 };
 
-                if c.vars_a.p {
-                    position.insert(c.entity_a, Position(p_new_a.p));
+                if c.vars_a.pos {
+                    position.insert(c.entity_a, Position(p_new_a.pos));
                 }
-                if c.vars_b.p {
-                    position.insert(c.entity_b, Position(p_new_b.p));
+                if c.vars_b.pos {
+                    position.insert(c.entity_b, Position(p_new_b.pos));
                 }
 
                 if c.vars_a.angle {
