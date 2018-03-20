@@ -186,43 +186,10 @@ pub struct State(pub Option<ActiveState>);
 impl repl::Predictable for State {
     fn distance(&self, other: &State) -> f32 {
         // TODO: ActiveState distance
-        match (&self.0, &other.0) {
-            (&Some(ref state_a), &Some(ref state_b)) => {
-                let mut dist = 0.0;
-                dist += (state_a.num_active_segments as f32 - state_b.num_active_segments as f32)
-                    .abs() * 10.0;
-                dist += (state_a.want_fix as usize as f32 - state_b.want_fix as usize as f32)
-                    .abs() * 100.0;
-                dist += match (&state_a.mode, &state_b.mode) {
-                    (&Mode::Shooting, &Mode::Shooting) => 0.0,
-                    (
-                        &Mode::Contracting {
-                            lunch_timer: lunch_timer_a,
-                            fixed: fixed_a,
-                        },
-                        &Mode::Contracting {
-                            lunch_timer: lunch_timer_b,
-                            fixed: fixed_b,
-                        },
-                    ) => {
-                        (lunch_timer_a - lunch_timer_b).abs() + match (&fixed_a, &fixed_b) {
-                            (&Some((entity_a, x_a)), &Some((entity_b, x_b))) => {
-                                if entity_a != entity_b {
-                                    f32::INFINITY
-                                } else {
-                                    (x_a[0] - x_b[0]).abs().max((x_a[1] - x_b[1]).abs())
-                                }
-                            }
-                            (&None, &None) => 0.0,
-                            _ => f32::INFINITY,
-                        }
-                    }
-                    _ => f32::INFINITY,
-                };
-                dist
-            }
-            (&None, &None) => 0.0,
-            _ => f32::INFINITY,
+        if self != other {
+            f32::INFINITY
+        } else {
+            0.0
         }
     }
 }
@@ -265,13 +232,7 @@ pub mod auth {
     use super::*;
 
     pub fn create(world: &mut World, owner: EntityId, index: u32) -> (EntityId, Entity) {
-        assert!(
-            world
-                .read_resource::<repl::EntityMap>()
-                .get_id_to_entity(owner)
-                .is_some(),
-            "hook owner entity does not exist"
-        );
+        assert!(repl::is_entity(world, owner));
 
         // Create hook
         let (id, entity) =
@@ -335,6 +296,9 @@ fn first_segment_interaction(
     }
 
     if world.read::<Update>().get(segment_info.entity).is_none() {
+        // FIXME: We need this because our collision filter is not narrow enough yet. For example,
+        //        ncollide will report segment-wall interactions even of segments that are not
+        //        currently being updated.
         return;
     }
 
@@ -358,26 +322,26 @@ fn first_segment_interaction(
     }
 
     // Only attach if we are not attached yet
-    let fixed = match active_state.mode.clone() {
-        Mode::Shooting { .. } => {
-            active_state.mode = Mode::Contracting {
+    let (fixed, new_mode) = match &active_state.mode {
+        &Mode::Shooting { .. } => {
+            (true, Mode::Contracting {
                 lunch_timer: 0.0,
-                fixed: Some((other_id, other_info.pos_object.coords.into())),
-            };
-            true
+                fixed: Some((other_id, other_info.object_pos.coords.into())),
+            })
         }
-        Mode::Contracting {
+        &Mode::Contracting {
             lunch_timer,
             fixed: None,
         } => {
-            active_state.mode = Mode::Contracting {
+            (true, Mode::Contracting {
                 lunch_timer,
-                fixed: Some((other_id, other_info.pos_object.coords.into())),
-            };
-            true
+                fixed: Some((other_id, other_info.object_pos.coords.into())),
+            })
         }
-        _ => false,
+        mode => (false, mode.clone()),
     };
+
+    active_state.mode = new_mode;
 
     if fixed && active_state.num_active_segments > 3 {
         let event = FixedEvent {
@@ -548,8 +512,8 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                         let joint_def = constraint::Def::Joint {
                             distance: constraint_distance,
-                            p_object_a: Point2::new(1.0, 0.0), //Point2::origin(),
-                            p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                            object_pos_a: Point2::new(1.0, 0.0), //Point2::origin(),
+                            object_pos_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
                         };
 
                         let joint_constraint = Constraint {
@@ -558,11 +522,11 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             entity_a: owner_entity,
                             entity_b: join_entity,
                             vars_a: constraint::Vars {
-                                p: false,
+                                pos: false,
                                 angle: false,
                             },
                             vars_b: constraint::Vars {
-                                p: true,
+                                pos: true,
                                 angle: true,
                             },
                         };
@@ -589,8 +553,8 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         if let Some(fix_entity) = data.entity_map.get_id_to_entity(fix_entity_id) {
                             let joint_def = constraint::Def::Joint {
                                 distance: 0.0,
-                                p_object_a: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
-                                p_object_b: Point2::new(fix_pos_object[0], fix_pos_object[1]),
+                                object_pos_a: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
+                                object_pos_b: Point2::new(fix_pos_object[0], fix_pos_object[1]),
                             };
                             let joint_constraint = Constraint {
                                 def: joint_def,
@@ -598,11 +562,11 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                                 entity_a: segment_entities[0],
                                 entity_b: fix_entity,
                                 vars_a: constraint::Vars {
-                                    p: true,
+                                    pos: true,
                                     angle: true,
                                 },
                                 vars_b: constraint::Vars {
-                                    p: false,
+                                    pos: false,
                                     angle: false,
                                 },
                             };
@@ -676,8 +640,8 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                         let joint_def = constraint::Def::Joint {
                             distance: constraint_distance.sqrt(),
-                            p_object_a: Point2::new(1.0, 0.0), //Point2::origin(),
-                            p_object_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                            object_pos_a: Point2::new(1.0, 0.0), //Point2::origin(),
+                            object_pos_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
                         };
                         let joint_constraint = Constraint {
                             def: joint_def,
@@ -685,11 +649,11 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             entity_a: owner_entity,
                             entity_b: last_entity,
                             vars_a: constraint::Vars {
-                                p: new_fixed.is_some(),
+                                pos: new_fixed.is_some(),
                                 angle: false,
                             },
                             vars_b: constraint::Vars {
-                                p: true,
+                                pos: true,
                                 angle: true,
                             },
                         };
@@ -703,11 +667,11 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                                 entity_a: owner_entity,
                                 entity_b: last_entity,
                                 vars_a: constraint::Vars {
-                                    p: false,
+                                    pos: false,
                                     angle: false,
                                 },
                                 vars_b: constraint::Vars {
-                                    p: false,
+                                    pos: false,
                                     angle: true,
                                 },
                             };
@@ -751,8 +715,8 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                 let joint_def = constraint::Def::Joint {
                     distance: 0.0,
-                    p_object_a: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
-                    p_object_b: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
+                    object_pos_a: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                    object_pos_b: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
                 };
                 let angle_def = constraint::Def::Angle { angle: 0.0 };
 
@@ -762,11 +726,11 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
-                        p: true,
+                        pos: true,
                         angle: true,
                     },
                     vars_b: constraint::Vars {
-                        p: true,
+                        pos: true,
                         angle: true,
                     },
                 };
@@ -779,11 +743,11 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     entity_a,
                     entity_b,
                     vars_a: constraint::Vars {
-                        p: false,
+                        pos: false,
                         angle: true,
                     },
                     vars_b: constraint::Vars {
-                        p: false,
+                        pos: false,
                         angle: true,
                     },
                 };

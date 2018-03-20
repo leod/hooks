@@ -36,7 +36,7 @@ pub struct EntityInfo {
     pub entity: Entity,
 
     /// Collision position in object coordinates.
-    pub pos_object: Point2<f32>,
+    pub object_pos: Point2<f32>,
 
     /// Velocity of the entity at the time of impact, if the entity has a velocity component.
     pub vel: Option<Vector2<f32>>,

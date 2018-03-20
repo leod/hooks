@@ -1,2 +1,6 @@
 [workspace]
 members = ["hooks_game", "hooks_server"]
+
+[profile.dev]
+opt-level = 1
+

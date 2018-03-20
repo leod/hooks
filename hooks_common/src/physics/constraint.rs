@@ -10,7 +10,7 @@ use nalgebra::{dot, norm, normalize, Matrix2x6, Point2, Rotation2, RowVector6, V
 
 #[derive(Clone, Debug)]
 pub struct Position {
-    pub p: Point2<f32>,
+    pub pos: Point2<f32>,
     pub angle: f32,
 }
 
@@ -26,20 +26,20 @@ pub enum Def {
         distance: f32,
 
         /// Object-space coordinates.
-        p_object_a: Point2<f32>,
+        object_pos_a: Point2<f32>,
 
         /// Object-space coordinates.
-        p_object_b: Point2<f32>,
+        object_pos_b: Point2<f32>,
     },
     Contact {
         normal: Vector2<f32>,
         margin: f32,
 
         /// Object-space coordinates.
-        p_object_a: Point2<f32>,
+        object_pos_a: Point2<f32>,
 
         /// Object-space coordinates.
-        p_object_b: Point2<f32>,
+        object_pos_b: Point2<f32>,
     },
     Angle {
         angle: f32,
@@ -50,7 +50,7 @@ pub enum Def {
 /// Which values can change in solving a constraint?
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Vars {
-    pub p: bool,
+    pub pos: bool,
     pub angle: bool,
 }
 
@@ -69,7 +69,7 @@ impl Mass {
     /// Set inverse mass to zero for elements that should not change.
     pub fn zero_out_constants(&self, vars: &Vars) -> Mass {
         Mass {
-            inv: if vars.p { self.inv } else { 0.0 },
+            inv: if vars.pos { self.inv } else { 0.0 },
             inv_angular: if vars.angle {
                 self.inv_angular
             } else {
@@ -85,21 +85,21 @@ impl Def {
         match self {
             &Def::Joint {
                 distance,
-                p_object_a,
-                p_object_b,
+                object_pos_a,
+                object_pos_b,
             } => {
                 let rot_a = Rotation2::new(x_a.angle).matrix().clone();
                 let rot_b = Rotation2::new(x_b.angle).matrix().clone();
-                let p_a = rot_a * p_object_a.coords + x_a.p.coords;
-                let p_b = rot_b * p_object_b.coords + x_b.p.coords;
+                let pos_a = rot_a * object_pos_a.coords + x_a.pos.coords;
+                let pos_b = rot_b * object_pos_b.coords + x_b.pos.coords;
 
-                let f = p_a - p_b;
+                let f = pos_a - pos_b;
                 let value_f = norm(&f);
 
                 // Smart boi
                 let f_norm = f / value_f;
-                let obj_a_rot_norm = normalize(&(rot_a * p_object_a.coords));
-                let obj_b_rot_norm = normalize(&(rot_b * p_object_b.coords));
+                let obj_a_rot_norm = normalize(&(rot_a * object_pos_a.coords));
+                let obj_b_rot_norm = normalize(&(rot_b * object_pos_b.coords));
                 let rot_impact_a = f_norm.perp(&obj_a_rot_norm).abs();
                 let rot_impact_b = f_norm.perp(&obj_b_rot_norm).abs();
 
@@ -114,27 +114,27 @@ impl Def {
                 let jacobian_f = Matrix2x6::new(
                     1.0,
                     0.0,
-                    p_object_a.coords.x * deriv_rot_a.m11 + p_object_a.coords.y * deriv_rot_a.m12,
+                    object_pos_a.coords.x * deriv_rot_a.m11 + object_pos_a.coords.y * deriv_rot_a.m12,
                     -1.0,
                     0.0,
-                    -p_object_b.coords.x * deriv_rot_b.m11 - p_object_b.coords.y * deriv_rot_b.m12,
+                    -object_pos_b.coords.x * deriv_rot_b.m11 - object_pos_b.coords.y * deriv_rot_b.m12,
                     0.0,
                     1.0,
-                    p_object_a.coords.x * deriv_rot_a.m21 + p_object_a.coords.y * deriv_rot_a.m22,
+                    object_pos_a.coords.x * deriv_rot_a.m21 + object_pos_a.coords.y * deriv_rot_a.m22,
                     0.0,
                     -1.0,
-                    -p_object_b.coords.x * deriv_rot_b.m21 - p_object_b.coords.y * deriv_rot_b.m22,
+                    -object_pos_b.coords.x * deriv_rot_b.m21 - object_pos_b.coords.y * deriv_rot_b.m22,
                 );
                 let jacobian = (jacobian_f.transpose() * f / value_f).transpose();
 
                 /*let value = value_f * value_f - distance * distance;
 				let jacobian = 2.0 * RowVector6::new(
-					p_a.x - p_b.x,
-					p_a.y - p_b.y,
-					(p_b - p_a).perp(&(p_a - x_a.p.coords)),
-					p_b.x - p_a.x,
-					p_b.y - p_a.y,
-					(p_a - p_b).perp(&(p_b - x_b.p.coords)),
+					pos_a.x - pos_b.x,
+					pos_a.y - pos_b.y,
+					(pos_b - pos_a).perp(&(pos_a - x_a.p.coords)),
+					pos_b.x - pos_a.x,
+					pos_b.y - pos_a.y,
+					(pos_a - pos_b).perp(&(pos_b - x_b.p.coords)),
 				);*/
 
                 (value, jacobian)
@@ -147,8 +147,8 @@ impl Def {
             &Def::Contact {
                 normal,
                 margin,
-                p_object_a,
-                p_object_b,
+                object_pos_a,
+                object_pos_b,
             } => {
                 // TODO: Create functions for this stuff
                 let rot_a = Rotation2::new(x_a.angle).matrix().clone();
@@ -159,17 +159,17 @@ impl Def {
                 let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
                     .matrix()
                     .clone();
-                let p_a = rot_a * p_object_a.coords + x_a.p.coords;
-                let p_b = rot_b * p_object_b.coords + x_b.p.coords;
+                let pos_a = rot_a * object_pos_a.coords + x_a.pos.coords;
+                let pos_b = rot_b * object_pos_b.coords + x_b.pos.coords;
 
-                let value = dot(&(p_a - p_b), &normal) - margin;
+                let value = dot(&(pos_a - pos_b), &normal) - margin;
                 let jacobian = RowVector6::new(
                     normal.x,
                     normal.y,
-                    dot(&(deriv_rot_a * p_object_a.coords), &normal),
+                    dot(&(deriv_rot_a * object_pos_a.coords), &normal),
                     -normal.x,
                     -normal.y,
-                    -dot(&(deriv_rot_b * p_object_b.coords), &normal),
+                    -dot(&(deriv_rot_b * object_pos_b.coords), &normal),
                 );
 
                 (-value, -jacobian)
@@ -224,11 +224,11 @@ pub fn solve_for_position(
 
     (
         Position {
-            p: x_a.p + Vector2::new(delta.x, delta.y),
+            pos: x_a.pos + Vector2::new(delta.x, delta.y),
             angle: x_a.angle + delta.z,
         },
         Position {
-            p: x_b.p + Vector2::new(delta.w, delta.a),
+            pos: x_b.pos + Vector2::new(delta.w, delta.a),
             angle: x_b.angle + delta.b,
         },
     )
