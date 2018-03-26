@@ -1,5 +1,5 @@
 pub mod auth {
-    use specs::{Join, World};
+    use specs::prelude::{Join, World};
 
     use defs::{PlayerId, PlayerInput};
     use physics::{self, Update};

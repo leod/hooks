@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use specs::{Component, Entities, Fetch, Join, ReadStorage, System, VecStorage, WriteStorage};
+use specs::prelude::*;
 
 use defs::PlayerId;
 use entity::Active;

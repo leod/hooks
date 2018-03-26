@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
-use specs::{Entities, Entity, FetchMut, Join, ReadStorage, System, WriteStorage};
+use specs::prelude::*;
+use specs::storage::{BTreeStorage, VecStorage};
 
 use nalgebra::{self, Isometry2};
 use ncollide::math::{Isometry, Point};
@@ -46,13 +47,13 @@ pub const GROUP_PLAYER_ENTITY: usize = 2;
 /// Collision shape.
 /// For now, we assume that an object's shape will not change in its lifetime.
 #[derive(Clone, Component)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct Shape(pub ShapeHandle2<f32>);
 
 /// Component which indicates that we should inform the collision world of this entity.
 /// Note that only `entity::Active` entities are kept in the collision world.
 #[derive(Component)]
-#[component(BTreeStorage)]
+#[storage(BTreeStorage)]
 pub struct Object {
     pub groups: CollisionGroups,
     pub query_type: GeometricQueryType<f32>,
@@ -60,11 +61,20 @@ pub struct Object {
 
 /// Handle of an ncollide CollisionObject.
 #[derive(Component)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct ObjectHandle(CollisionObjectHandle);
 
 /// System for running the collision pipeline.
-pub struct UpdateSys;
+pub struct UpdateSys {
+    modified_position_id: ReaderId<ModifiedFlag>,
+    modified_position: BitSet,
+    modified_orientation_id: ReaderId<ModifiedFlag>,
+    modified_orientation: BitSet,
+}
+
+impl UpdateSys {
+    pub fn new() -> UpdateSys {}
+}
 
 impl<'a> System<'a> for UpdateSys {
     type SystemData = (

@@ -1,5 +1,5 @@
 use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
-use specs::{Join, ReadStorage, SystemData, VecStorage, World};
+use specs::prelude::{Join, ReadStorage, SystemData, VecStorage, World};
 
 use ggez;
 use ggez::graphics::{self, Drawable};
@@ -21,7 +21,7 @@ pub fn register_show(reg: &mut Registry) {
 }
 
 #[derive(Component, Clone, Debug)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct Draw {
     pub width: f32,
     pub height: f32,

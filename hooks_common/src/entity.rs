@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
-use specs::{Entity, EntityBuilder, Join, World};
+use specs::prelude::{Entity, EntityBuilder, Join, VecStorage, World};
+use specs::storage::NullStorage;
 
 use defs::EntityClassId;
 use registry::Registry;
@@ -25,19 +26,19 @@ pub struct ClassIds(pub BTreeMap<String, EntityClassId>);
 
 /// Meta-information about entities.
 #[derive(Component, Debug, Clone, PartialEq, BitStore)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct Meta {
     pub class_id: EntityClassId,
 }
 
 /// Is this entity active in the game?
-#[derive(Component, PartialEq, Debug, Clone)]
-#[component(NullStorage)]
+#[derive(Component, PartialEq, Debug, Clone, Default)]
+#[storage(NullStorage)]
 pub struct Active;
 
 /// Entities tagged with this component shall be removed at the end of the tick.
-#[derive(Component, Debug)]
-#[component(NullStorage)]
+#[derive(Component, Debug, Default)]
+#[storage(NullStorage)]
 pub struct Remove;
 
 pub fn is_class_id_valid(world: &World, class_id: EntityClassId) -> bool {

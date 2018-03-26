@@ -1,7 +1,7 @@
 use std::f32;
 
 use nalgebra::{Isometry3, Matrix4, Point2, Rotation2, Vector3, Vector4};
-use specs::{Fetch, Join, ReadStorage, SystemData, World};
+use specs::prelude::{Fetch, Join, ReadStorage, SystemData, World};
 
 use ggez;
 use ggez::graphics::{self, Drawable};

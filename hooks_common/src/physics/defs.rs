@@ -1,8 +1,10 @@
 use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
 
-use nalgebra::{Point2, Vector2};
-use specs::{Component, FlaggedStorage, VecStorage};
+use nalgebra::{Point2, Rotation2, Vector2};
+
+use specs::prelude::{Component, FlaggedStorage, VecStorage};
+use specs::storage::NullStorage;
 
 use registry::Registry;
 use repl::interp::Interp;
@@ -23,23 +25,23 @@ pub fn register(reg: &mut Registry) {
 }
 
 /// Should this entity be updated in the next simulation run?
-#[derive(Component, PartialEq, Clone, Debug)]
-#[component(NullStorage)]
+#[derive(Component, PartialEq, Clone, Debug, Default)]
+#[storage(NullStorage)]
 pub struct Update;
 
 /// Non-static entities.
-#[derive(Component, PartialEq, Clone, Debug)]
-#[component(NullStorage)]
+#[derive(Component, PartialEq, Clone, Debug, Default)]
+#[storage(NullStorage)]
 pub struct Dynamic;
 
 /// Physical mass.
 #[derive(Component, PartialEq, Clone, Debug)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct InvMass(pub f32);
 
 /// Angular inertia.
 #[derive(Component, PartialEq, Clone, Debug)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct InvAngularMass(pub f32);
 
 /// Two-dimensional position.
@@ -48,7 +50,7 @@ pub struct Position(pub Point2<f32>);
 
 /// Two-dimensional velocity.
 #[derive(Component, PartialEq, Clone, Debug)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct Velocity(pub Vector2<f32>);
 
 impl Component for Position {
@@ -81,18 +83,30 @@ impl Component for Orientation {
 
 /// Angular velocity.
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct AngularVelocity(pub f32);
 
 /// Whether to apply friction to this entity.
-#[derive(Component, PartialEq, Clone, Debug)]
-#[component(NullStorage)]
+#[derive(Component, PartialEq, Clone, Debug, Default)]
+#[storage(NullStorage)]
 pub struct Friction(pub f32);
 
 /// Whether to apply drag to this entity.
-#[derive(Component, PartialEq, Clone, Debug)]
-#[component(NullStorage)]
+#[derive(Component, PartialEq, Clone, Debug, Default)]
+#[storage(NullStorage)]
 pub struct Drag(pub f32);
+
+/// Transform from object-space to world-space.
+pub fn to_world_pos(
+    position: &Position,
+    orientation: &Orientation,
+    object_pos: &Point2<f32>,
+) -> Point2<f32> {
+    // TODO: We might want to cache some of these calculations in the future.
+    let rot = Rotation2::new(orientation.0).matrix().clone();
+
+    position.0 + rot * object_pos.coords
+}
 
 /*/// Some kind of joint thingy.
 #[derive(PartialEq, Clone, Debug, BitStore)]
@@ -103,7 +117,7 @@ pub struct Joint {
 
 /// Entities that this entity is joined to.
 #[derive(Component, PartialEq, Clone, Debug)]
-#[component(BTreeStorage)]
+#[storage(BTreeStorage)]
 pub struct Joints(pub Vec<(specs::Entity, Joint)>);*/
 
 impl BitStore for Velocity {

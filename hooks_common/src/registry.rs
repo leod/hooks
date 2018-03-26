@@ -1,9 +1,7 @@
-use take_mut;
-
 use bit_manager::data::BitStore;
 
 use shred::Resource;
-use specs::{Component, DispatcherBuilder, System, World};
+use specs::prelude::{Component, DispatcherBuilder, System, World};
 
 use event::{self, Event};
 use repl;
@@ -33,16 +31,15 @@ impl Registry {
         &self.world
     }
 
-    pub fn component<T: Component>(&mut self) {
+    pub fn component<T: Component>(&mut self)
+    where
+        T::Storage: Default,
+    {
         self.world.register::<T>();
     }
 
     pub fn resource<T: Resource>(&mut self, res: T) {
         self.world.add_resource(res);
-    }
-
-    pub fn resource_with_id<T: Resource>(&mut self, res: T, id: usize) {
-        self.world.add_resource_with_id(res, id);
     }
 
     pub fn event<T: Event + BitStore + Send>(&mut self) {
@@ -61,9 +58,7 @@ impl Registry {
     where
         T: for<'a> System<'a> + Send + 'static,
     {
-        take_mut::take(&mut self.tick_systems, |tick_systems| {
-            tick_systems.add(system, name, dep)
-        });
+        self.tick_systems.add(system, name, dep);
     }
 
     pub fn event_handler_post_tick(&mut self, f: EventHandler) {
@@ -74,8 +69,6 @@ impl Registry {
     where
         T: for<'a> System<'a> + Send + 'static,
     {
-        take_mut::take(&mut self.removal_systems, |removal_systems| {
-            removal_systems.add(system, name, &[])
-        });
+        self.removal_systems.add(system, name, &[]);
     }
 }

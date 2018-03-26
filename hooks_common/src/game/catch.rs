@@ -1,7 +1,7 @@
 pub mod auth {
     use nalgebra::Point2;
     use rand::{self, Rng};
-    use specs::World;
+    use specs::prelude::World;
 
     use defs::GameInfo;
     use registry::Registry;

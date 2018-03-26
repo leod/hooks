@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map;
 
-use specs::{self, Join, World};
+use specs::prelude::{Entity, Join, World};
 
 use defs::{EntityIndex, LeaveReason, PlayerId, PlayerInfo};
 use event::{self, Event};
@@ -24,7 +24,7 @@ pub struct Player {
     pub info: PlayerInfo,
 
     /// Current controlled entity. Maintained by `repl::entity`.
-    pub entity: Option<specs::Entity>,
+    pub entity: Option<Entity>,
 
     /// Index of the next entity that will be created for this player. This is used by the server
     /// for all players, and might get used by clients for prediction of the creation of owned

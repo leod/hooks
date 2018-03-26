@@ -1,8 +1,9 @@
 use std::f32;
 
 use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
-use specs::{Entity, EntityBuilder, Fetch, FetchMut, Join, ReadStorage, SystemData, World,
-            WriteStorage};
+
+use specs::prelude::*;
+use specs::storage::BTreeStorage;
 
 use registry::Registry;
 use defs::{EntityId, GameInfo, INVALID_ENTITY_ID};
@@ -196,7 +197,7 @@ impl repl::Predictable for State {
 
 /// Input for simulating a hook.
 #[derive(Component, Clone, Debug)]
-#[component(BTreeStorage)]
+#[storage(BTreeStorage)]
 pub struct CurrentInput {
     pub shoot: bool,
 }
@@ -323,21 +324,23 @@ fn first_segment_interaction(
 
     // Only attach if we are not attached yet
     let (fixed, new_mode) = match &active_state.mode {
-        &Mode::Shooting { .. } => {
-            (true, Mode::Contracting {
+        &Mode::Shooting { .. } => (
+            true,
+            Mode::Contracting {
                 lunch_timer: 0.0,
                 fixed: Some((other_id, other_info.object_pos.coords.into())),
-            })
-        }
+            },
+        ),
         &Mode::Contracting {
             lunch_timer,
             fixed: None,
-        } => {
-            (true, Mode::Contracting {
+        } => (
+            true,
+            Mode::Contracting {
                 lunch_timer,
                 fixed: Some((other_id, other_info.object_pos.coords.into())),
-            })
-        }
+            },
+        ),
         mode => (false, mode.clone()),
     };
 
@@ -372,7 +375,7 @@ struct InputData<'a> {
 }
 
 pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
-    let mut data = InputData::fetch(&world.res, 0);
+    let mut data = InputData::fetch(&world.res);
 
     let dt = data.game_info.tick_duration_secs();
 
@@ -500,9 +503,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         .ok_or(repl::Error::MissingComponent(join_id, "Orientation"))?
                         .0;
                     let join_rot = Rotation2::new(join_angle).matrix().clone();
-                    let join_attach_pos = join_rot *
-                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
-                        join_pos.coords;
+                    let join_attach_pos = join_rot
+                        * Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
+                        + join_pos.coords;
 
                     let target_distance = 0.0;
                     let cur_distance = norm(&(join_attach_pos - owner_pos));
@@ -589,9 +592,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         .ok_or(repl::Error::MissingComponent(last_id, "Orientation"))?
                         .0;
                     let last_rot = Rotation2::new(last_angle).matrix().clone();
-                    let last_attach_pos = last_rot *
-                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
-                        last_pos.coords;
+                    let last_attach_pos = last_rot
+                        * Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
+                        + last_pos.coords;
 
                     let cur_distance = norm(&(last_attach_pos - owner_pos));
 
@@ -629,9 +632,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             .ok_or(repl::Error::MissingComponent(last_id, "Orientation"))?
                             .0;
                         let last_rot = Rotation2::new(last_angle).matrix().clone();
-                        let last_attach_pos = last_rot *
-                            Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
-                            last_pos.coords;
+                        let last_attach_pos = last_rot
+                            * Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
+                            + last_pos.coords;
                         let cur_distance = norm(&(last_attach_pos - owner_pos));
 
                         let target_distance =

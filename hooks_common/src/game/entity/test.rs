@@ -18,7 +18,8 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub mod auth {
-    use specs::{BTreeStorage, Entities, FetchMut, Join, ReadStorage, System};
+    use specs::prelude::*;
+    use specs::storage::BTreeStorage;
 
     use super::*;
 
@@ -39,7 +40,7 @@ pub mod auth {
     }
 
     #[derive(Component)]
-    #[component(BTreeStorage)]
+    #[storage(BTreeStorage)]
     struct Test(f64);
 
     struct TickSys;
