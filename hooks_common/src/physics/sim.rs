@@ -1,9 +1,7 @@
 use std::f32;
 
 use nalgebra::{dot, norm, zero, Point2, Vector2};
-
-use specs::{Entities, Entity, Fetch, FetchMut, Join, ReadStorage, RunNow, System, VecStorage,
-            World, WriteStorage};
+use specs::prelude::*;
 
 use hooks_util::{profile, stats};
 
@@ -55,8 +53,8 @@ impl<'a> Filter<'a> {
 
     pub fn filter(&self, entity: Entity) -> bool {
         // TODO: Replace with new specs Join interface when updated
-        self.dynamic.get(entity).is_some() && self.active.get(entity).is_some() &&
-            self.update.get(entity).is_some()
+        self.dynamic.get(entity).is_some() && self.active.get(entity).is_some()
+            && self.update.get(entity).is_some()
     }
 }
 
@@ -64,11 +62,11 @@ impl<'a> Filter<'a> {
 const MIN_SPEED: f32 = 0.01;
 
 #[derive(Component, PartialEq, Clone, Debug)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 struct OldPosition(Point2<f32>);
 
 #[derive(Component, PartialEq, Clone, Debug)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 struct OldOrientation(f32);
 
 /// Resource to store the interactions that were detected in a time step.
@@ -119,7 +117,7 @@ fn normalize_angle(angle: f32) -> f32 {
 }
 
 #[derive(Component)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 struct Force(Vector2<f32>);
 
 struct PrepareSys;

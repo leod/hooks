@@ -1,5 +1,5 @@
 use nalgebra::{Point2, Vector2};
-use specs::{DenseVecStorage, Entity, World};
+use specs::prelude::*;
 
 use defs::{EntityId, INVALID_PLAYER_ID};
 use registry::Registry;
@@ -15,7 +15,7 @@ pub fn register(reg: &mut Registry) {
 }
 
 #[derive(Component)]
-#[component(DenseVecStorage)]
+#[storage(DenseVecStorage)]
 pub struct Size(pub Vector2<f32>);
 
 pub fn create(

@@ -1,4 +1,4 @@
-use specs::{Dispatcher, World};
+use specs::prelude::{Dispatcher, World};
 
 use registry::{EventHandler, Registry, TickFn};
 use event::{self, Event};

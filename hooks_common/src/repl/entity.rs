@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use specs::{Entity, EntityBuilder, Fetch, FetchMut, Join, ReadStorage, System, World};
+use specs::prelude::*;
 
 use defs::{EntityClassId, EntityId, EntityIndex, GameInfo, PlayerId, INVALID_PLAYER_ID};
 use event::{self, Event};

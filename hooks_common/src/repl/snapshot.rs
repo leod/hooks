@@ -324,7 +324,7 @@ macro_rules! snapshot {
         pub mod $name {
             use bit_manager::{self, BitRead, BitWrite};
 
-            use specs::{Entities, System, ReadStorage, WriteStorage, Fetch, Join};
+            use specs::prelude::{Entities, System, ReadStorage, WriteStorage, Fetch, Join};
 
             use defs::PlayerId;
             use entity::Meta;

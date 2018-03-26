@@ -1,6 +1,7 @@
 use nalgebra::{normalize, zero, Point2, Rotation2, Vector2};
-use specs::{BTreeStorage, Entity, EntityBuilder, Fetch, Join, ReadStorage, RunNow, System, World,
-            WriteStorage};
+
+use specs::prelude::*;
+use specs::storage::BTreeStorage;
 
 use defs::{EntityId, GameInfo, PlayerId, PlayerInput, INVALID_ENTITY_ID};
 use registry::Registry;
@@ -49,11 +50,11 @@ const DRAG: f32 = 2.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
-#[component(BTreeStorage)]
+#[storage(BTreeStorage)]
 pub struct CurrentInput(pub PlayerInput);
 
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
-#[component(BTreeStorage)]
+#[storage(BTreeStorage)]
 pub struct Player {
     pub hooks: [EntityId; NUM_HOOKS],
 }
@@ -181,8 +182,8 @@ impl<'a> System<'a> for InputSys {
             let right = Vector2::new(-forward.y, forward.x);
 
             let mut direction = Vector2::new(0.0, 0.0);
-            let move_any = input.0.move_forward || input.0.move_backward || input.0.move_right ||
-                input.0.move_left;
+            let move_any = input.0.move_forward || input.0.move_backward || input.0.move_right
+                || input.0.move_left;
 
             if move_any {
                 if input.0.move_forward {

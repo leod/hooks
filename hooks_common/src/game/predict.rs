@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use specs::{RunNow, World};
+use specs::prelude::{RunNow, World};
 
 use defs::{PlayerId, PlayerInput, TickNum};
 use event;

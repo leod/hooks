@@ -18,7 +18,6 @@ extern crate shred_derive;
 extern crate specs;
 #[macro_use]
 extern crate specs_derive;
-extern crate take_mut;
 
 pub mod defs;
 pub mod entity;

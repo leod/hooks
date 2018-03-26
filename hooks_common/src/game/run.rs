@@ -1,4 +1,4 @@
-use specs::RunNow;
+use specs::prelude::RunNow;
 
 use hooks_util::profile;
 

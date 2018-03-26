@@ -2,7 +2,7 @@ use std::f32;
 
 use nalgebra::{Point2, Vector2};
 use rand::{IsaacRng, Rng};
-use specs::World;
+use specs::prelude::World;
 
 use game::entity::wall;
 

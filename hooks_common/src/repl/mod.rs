@@ -10,7 +10,7 @@ mod tests;
 
 use std::collections::BTreeMap;
 
-use specs::{Entity, World};
+use specs::prelude::{Entity, VecStorage, World};
 
 use defs::{EntityClassId, EntityId, PlayerId};
 use registry::Registry;
@@ -32,7 +32,7 @@ pub trait Predictable {
 
 /// Shared entity id for replication.
 #[derive(PartialEq, Component)]
-#[component(VecStorage)]
+#[storage(VecStorage)]
 pub struct Id(pub EntityId);
 
 /// Map from shared EntityId to the local ECS handle.
