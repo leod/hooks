@@ -52,8 +52,8 @@ impl<'a> Filter<'a> {
     }
 
     pub fn filter(&self, entity: Entity) -> bool {
-        self.dynamic.get(entity).is_some() && self.active.get(entity).is_some()
-            && self.update.get(entity).is_some()
+        self.dynamic.get(entity).is_some() && self.active.get(entity).is_some() &&
+            self.update.get(entity).is_some()
     }
 }
 
@@ -116,7 +116,6 @@ impl Runner {
 
         world.write_resource::<Constraints>().0.clear();
     }
-
 }
 
 fn normalize_angle(angle: f32) -> f32 {

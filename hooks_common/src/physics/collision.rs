@@ -74,7 +74,7 @@ pub struct UpdateSys {
 
 impl UpdateSys {
     pub fn new(world: &mut World) -> UpdateSys {
-        let mut position = world.write::<Position>(); 
+        let mut position = world.write::<Position>();
         let modified_position_id = position.track_modified();
 
         let mut orientation = world.write::<Orientation>();
@@ -103,7 +103,10 @@ impl<'a> System<'a> for UpdateSys {
     ) {
         // Update isometry of entities that have moved or rotated
         position.populate_modified(&mut self.modified_position_id, &mut self.modified_position);
-        orientation.populate_modified(&mut self.modified_orientation_id, &mut self.modified_orientation);
+        orientation.populate_modified(
+            &mut self.modified_orientation_id,
+            &mut self.modified_orientation,
+        );
 
         {
             let modified = &self.modified_position | &self.modified_orientation;

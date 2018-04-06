@@ -3,7 +3,7 @@ use bit_manager::data::BitStore;
 
 use nalgebra::{Point2, Rotation2, Vector2};
 
-use specs::prelude::{Component, FlaggedStorage, DenseVecStorage, VecStorage};
+use specs::prelude::{Component, DenseVecStorage, FlaggedStorage, VecStorage};
 use specs::storage::NullStorage;
 
 use registry::Registry;

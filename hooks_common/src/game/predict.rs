@@ -109,7 +109,12 @@ impl Log {
 
                         //debug!("replaying {}", log_input_num);
 
-                        input::auth::run_player_input(world, physics_runner, self.my_player_id, &log_entry.input)?;
+                        input::auth::run_player_input(
+                            world,
+                            physics_runner,
+                            self.my_player_id,
+                            &log_entry.input,
+                        )?;
                     }
                 }
             }

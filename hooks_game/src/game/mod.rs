@@ -149,8 +149,8 @@ impl Game {
             //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
             assert!(self.tick_history.max_num() == Some(new_tick_num));
 
-            let timer_error = timer::duration_to_secs(self.recv_snapshot_timer.accum())
-                - timer::duration_to_secs(self.recv_snapshot_timer.period());
+            let timer_error = timer::duration_to_secs(self.recv_snapshot_timer.accum()) -
+                timer::duration_to_secs(self.recv_snapshot_timer.period());
             stats::record("recv timer error", timer_error);
 
             self.recv_snapshot_timer.reset();

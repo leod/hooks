@@ -23,7 +23,7 @@ pub mod debug;
 
 use nalgebra::Point2;
 
-use specs::prelude::{World, Entity};
+use specs::prelude::{Entity, World};
 
 use ggez::graphics::{self, DrawMode, Mesh};
 

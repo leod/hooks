@@ -114,20 +114,20 @@ impl Def {
                 let jacobian_f = Matrix2x6::new(
                     1.0,
                     0.0,
-                    object_pos_a.coords.x * deriv_rot_a.m11
-                        + object_pos_a.coords.y * deriv_rot_a.m12,
+                    object_pos_a.coords.x * deriv_rot_a.m11 +
+                        object_pos_a.coords.y * deriv_rot_a.m12,
                     -1.0,
                     0.0,
-                    -object_pos_b.coords.x * deriv_rot_b.m11
-                        - object_pos_b.coords.y * deriv_rot_b.m12,
+                    -object_pos_b.coords.x * deriv_rot_b.m11 -
+                        object_pos_b.coords.y * deriv_rot_b.m12,
                     0.0,
                     1.0,
-                    object_pos_a.coords.x * deriv_rot_a.m21
-                        + object_pos_a.coords.y * deriv_rot_a.m22,
+                    object_pos_a.coords.x * deriv_rot_a.m21 +
+                        object_pos_a.coords.y * deriv_rot_a.m22,
                     0.0,
                     -1.0,
-                    -object_pos_b.coords.x * deriv_rot_b.m21
-                        - object_pos_b.coords.y * deriv_rot_b.m22,
+                    -object_pos_b.coords.x * deriv_rot_b.m21 -
+                        object_pos_b.coords.y * deriv_rot_b.m22,
                 );
                 let jacobian = (jacobian_f.transpose() * f / value_f).transpose();
 
