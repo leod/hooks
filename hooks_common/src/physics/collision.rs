@@ -73,29 +73,43 @@ pub struct UpdateSys {
 }
 
 impl UpdateSys {
-    pub fn new() -> UpdateSys {}
+    pub fn new(world: &mut World) -> UpdateSys {
+        let mut position = world.write::<Position>(); 
+        let modified_position_id = position.track_modified();
+
+        let mut orientation = world.write::<Orientation>();
+        let modified_orientation_id = orientation.track_modified();
+
+        UpdateSys {
+            modified_position_id,
+            modified_position: BitSet::new(),
+            modified_orientation_id,
+            modified_orientation: BitSet::new(),
+        }
+    }
 }
 
 impl<'a> System<'a> for UpdateSys {
     type SystemData = (
         FetchMut<'a, CollisionWorld>,
-        WriteStorage<'a, Position>,
-        WriteStorage<'a, Orientation>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, Orientation>,
         ReadStorage<'a, ObjectHandle>,
     );
 
     fn run(
         &mut self,
-        (mut collision_world, mut position, mut orientation, object_handle): Self::SystemData,
+        (mut collision_world, position, orientation, object_handle): Self::SystemData,
     ) {
         // Update isometry of entities that have moved or rotated
+        position.populate_modified(&mut self.modified_position_id, &mut self.modified_position);
+        orientation.populate_modified(&mut self.modified_orientation_id, &mut self.modified_orientation);
+
         {
-            let position_changed = position.open().1.open().0;
-            let orientation_changed = orientation.open().1.open().0;
-            let changed = position_changed | orientation_changed;
+            let modified = &self.modified_position | &self.modified_orientation;
 
             for (_, position, orientation, object_handle) in
-                (&changed, &position, &orientation, &object_handle).join()
+                (&modified, &position, &orientation, &object_handle).join()
             {
                 /*if collision_world.collision_object(object_handle.0).is_none() {
                     // This should happen exactly once for each object when it is first created.
@@ -108,9 +122,6 @@ impl<'a> System<'a> for UpdateSys {
                 collision_world.set_position(object_handle.0, isometry);
             }
         }
-
-        (&mut position).open().1.clear_flags();
-        (&mut orientation).open().1.clear_flags();
 
         collision_world.update();
     }

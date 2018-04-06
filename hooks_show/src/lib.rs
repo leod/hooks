@@ -23,7 +23,7 @@ pub mod debug;
 
 use nalgebra::Point2;
 
-use specs::prelude::World;
+use specs::prelude::{World, Entity};
 
 use ggez::graphics::{self, DrawMode, Mesh};
 
@@ -232,7 +232,7 @@ impl Show {
         self.input.assets
     }
 
-    fn my_player_entity(&self, world: &World) -> Option<specs::Entity> {
+    fn my_player_entity(&self, world: &World) -> Option<Entity> {
         let players = world.read_resource::<Players>();
 
         if let Some(player) = players.get(self.my_player_id) {

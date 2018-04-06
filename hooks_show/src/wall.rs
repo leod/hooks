@@ -23,7 +23,7 @@ type DrawData<'a> = (
 fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::GameResult<()> {
     profile!("wall");
 
-    let (position, orientation, size) = DrawData::fetch(&world.res, 0);
+    let (position, orientation, size) = DrawData::fetch(&world.res);
 
     for (position, orientation, size) in (&position, &orientation, &size).join() {
         let coords = position.0.coords;

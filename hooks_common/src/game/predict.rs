@@ -4,6 +4,7 @@ use specs::prelude::{RunNow, World};
 
 use defs::{PlayerId, PlayerInput, TickNum};
 use event;
+use physics;
 use repl::{self, tick};
 use game::{self, input};
 
@@ -59,6 +60,7 @@ impl Log {
     fn correct(
         &mut self,
         world: &mut World,
+        physics_runner: &mut physics::sim::Runner,
         tick_data: &tick::Data<game::EntitySnapshot>,
     ) -> Result<(), repl::Error> {
         if let Some(last_input_num) = tick_data.last_input_num {
@@ -107,7 +109,7 @@ impl Log {
 
                         //debug!("replaying {}", log_input_num);
 
-                        input::auth::run_player_input(world, self.my_player_id, &log_entry.input)?;
+                        input::auth::run_player_input(world, physics_runner, self.my_player_id, &log_entry.input)?;
                     }
                 }
             }
@@ -127,17 +129,18 @@ impl Log {
     pub fn run(
         &mut self,
         world: &mut World,
+        physics_runner: &mut physics::sim::Runner,
         tick_num: TickNum,
         tick_data: &tick::Data<game::EntitySnapshot>,
         input: &PlayerInput,
     ) -> Result<(), repl::Error> {
-        self.correct(world, tick_data)?;
+        self.correct(world, physics_runner, tick_data)?;
 
         // For now, just ignore any events emitted locally in prediction.
         // TODO: This will need to be refined. Might want to predict only some events.
         let ignore = world.write_resource::<event::Sink>().set_ignore(true);
 
-        input::auth::run_player_input(world, self.my_player_id, input)?;
+        input::auth::run_player_input(world, physics_runner, self.my_player_id, input)?;
         //debug!("running {}", tick_num);
 
         world.write_resource::<event::Sink>().set_ignore(ignore);
