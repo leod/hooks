@@ -104,12 +104,14 @@ impl Game {
 
         let tick_history = tick::History::new(game_state.event_reg.clone());
 
+        let game_runner = game::run::ViewRunner::new(&mut game_state.world, my_player_id, predict);
+
         Game {
             game_info: game_info.clone(),
             target_lag_ticks: 2 * game_info.ticks_per_snapshot,
             my_player_id,
             game_state,
-            game_runner: game::run::ViewRunner::new(my_player_id, predict),
+            game_runner,
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
             recv_snapshot_timer: Timer::new(

@@ -2,7 +2,8 @@ use std::ops::Deref;
 use std::collections::BTreeMap;
 
 use nalgebra::{Point2, Vector2};
-use specs::prelude::{Entity, Fetch, FlaggedStorage, Storage, World};
+use specs::prelude::{Entity, Fetch, Storage, World};
+use specs::storage::MaskedStorage;
 
 use hooks_util::ordered_pair::OrderedPair;
 
@@ -107,7 +108,7 @@ pub fn get_action<D>(
     entity_b: Entity,
 ) -> Option<Action>
 where
-    D: Deref<Target = FlaggedStorage<entity::Meta>>,
+    D: Deref<Target = MaskedStorage<entity::Meta>>,
 {
     // TODO: In a bit of an extreme edge case, we might have an interaction here, but not have
     //       called `setup` yet.

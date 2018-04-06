@@ -9,6 +9,7 @@ pub mod auth {
 
     pub fn run_player_input(
         world: &mut World,
+        physics_runner: &mut physics::sim::Runner,
         player_id: PlayerId,
         input: &PlayerInput,
     ) -> Result<(), repl::Error> {
@@ -39,7 +40,7 @@ pub mod auth {
             }
         }
 
-        physics::sim::run(world);
+        physics_runner.run(world);
 
         Ok(())
     }

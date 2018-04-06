@@ -69,7 +69,7 @@ type DrawData<'a> = (
 fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::GameResult<()> {
     profile!("hook");
 
-    let (entity_map, position, orientation, hook_def, hook_state) = DrawData::fetch(&world.res, 0);
+    let (entity_map, position, orientation, hook_def, hook_state) = DrawData::fetch(&world.res);
 
     for (hook_def, hook_state) in (&hook_def, &hook_state).join() {
         if let &Some(hook::ActiveState {

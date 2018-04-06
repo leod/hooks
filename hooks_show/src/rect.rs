@@ -38,7 +38,7 @@ type DrawData<'a> = (
 fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::GameResult<()> {
     profile!("rect");
 
-    let (repl_id, active, position, orientation, draw) = DrawData::fetch(&world.res, 0);
+    let (repl_id, active, position, orientation, draw) = DrawData::fetch(&world.res);
 
     for (repl_id, _active, position, orientation, draw) in
         (&repl_id, &active, &position, &orientation, &draw).join()

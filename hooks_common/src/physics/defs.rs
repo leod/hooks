@@ -3,7 +3,7 @@ use bit_manager::data::BitStore;
 
 use nalgebra::{Point2, Rotation2, Vector2};
 
-use specs::prelude::{Component, FlaggedStorage, VecStorage};
+use specs::prelude::{Component, FlaggedStorage, DenseVecStorage, VecStorage};
 use specs::storage::NullStorage;
 
 use registry::Registry;
@@ -88,12 +88,12 @@ pub struct AngularVelocity(pub f32);
 
 /// Whether to apply friction to this entity.
 #[derive(Component, PartialEq, Clone, Debug, Default)]
-#[storage(NullStorage)]
+#[storage(DenseVecStorage)]
 pub struct Friction(pub f32);
 
 /// Whether to apply drag to this entity.
 #[derive(Component, PartialEq, Clone, Debug, Default)]
-#[storage(NullStorage)]
+#[storage(DenseVecStorage)]
 pub struct Drag(pub f32);
 
 /// Transform from object-space to world-space.

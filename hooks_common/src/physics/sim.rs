@@ -52,7 +52,6 @@ impl<'a> Filter<'a> {
     }
 
     pub fn filter(&self, entity: Entity) -> bool {
-        // TODO: Replace with new specs Join interface when updated
         self.dynamic.get(entity).is_some() && self.active.get(entity).is_some()
             && self.update.get(entity).is_some()
     }
@@ -81,34 +80,43 @@ impl Constraints {
     }
 }
 
-/// For now, it seems that putting the whole physics simulation into a set of systems would be
-/// clumsy. For example, to resolve collisions with impulses, we might need to iterate some systems
-/// multiple times. However, systems don't seem to be easily composable with specs.
-///
-/// Thus, we are putting the simulation into this function.
-pub fn run(world: &World) {
-    profile!("physics");
+/// Stores the state necessary to run a simulation.
+pub struct Runner {
+    collision_update_sys: collision::UpdateSys,
+}
 
-    collision::MaintainSys.run_now(&world.res);
-    collision::UpdateSys.run_now(&world.res);
-
-    PrepareSys.run_now(&world.res);
-    FrictionForceSys.run_now(&world.res);
-    DragForceSys.run_now(&world.res);
-    //JointForceSys.run_now(&world.res);
-    IntegrateForceSys.run_now(&world.res);
-    SavePositionSys.run_now(&world.res);
-    IntegrateVelocitySys.run_now(&world.res);
-    HandleContactsSys.run_now(&world.res);
-    SolveConstraintsSys.run_now(&world.res);
-    CorrectVelocitySys.run_now(&world.res);
-
-    let interactions = world.read_resource::<InteractionEvents>().0.clone();
-    for event in &interactions {
-        interaction::run(world, event);
+impl Runner {
+    pub fn new(world: &mut World) -> Runner {
+        Runner {
+            collision_update_sys: collision::UpdateSys::new(world),
+        }
     }
 
-    world.write_resource::<Constraints>().0.clear();
+    pub fn run(&mut self, world: &World) {
+        profile!("physics");
+
+        collision::MaintainSys.run_now(&world.res);
+        self.collision_update_sys.run_now(&world.res);
+
+        PrepareSys.run_now(&world.res);
+        FrictionForceSys.run_now(&world.res);
+        DragForceSys.run_now(&world.res);
+        //JointForceSys.run_now(&world.res);
+        IntegrateForceSys.run_now(&world.res);
+        SavePositionSys.run_now(&world.res);
+        IntegrateVelocitySys.run_now(&world.res);
+        HandleContactsSys.run_now(&world.res);
+        SolveConstraintsSys.run_now(&world.res);
+        CorrectVelocitySys.run_now(&world.res);
+
+        let interactions = world.read_resource::<InteractionEvents>().0.clone();
+        for event in &interactions {
+            interaction::run(world, event);
+        }
+
+        world.write_resource::<Constraints>().0.clear();
+    }
+
 }
 
 fn normalize_angle(angle: f32) -> f32 {

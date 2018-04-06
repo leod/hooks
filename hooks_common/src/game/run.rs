@@ -1,4 +1,4 @@
-use specs::prelude::RunNow;
+use specs::prelude::{RunNow, World};
 
 use hooks_util::profile;
 
@@ -6,12 +6,21 @@ use defs::{PlayerId, PlayerInput, TickNum};
 use event::{self, Event};
 use entity;
 use repl::{self, tick};
+use physics;
 use game::{self, input, predict};
 use game::state::State;
 
-struct CommonRunner;
+struct CommonRunner {
+    physics_runner: physics::sim::Runner,
+}
 
 impl CommonRunner {
+    fn new(world: &mut World) -> CommonRunner {
+        CommonRunner {
+            physics_runner: physics::sim::Runner::new(world),
+        }
+    }
+
     /// Execute the deferred removal of entities tagged with `Remove`. Right now, we try to call
     /// this function after every step of the tick, with the hope of avoiding any interaction with
     /// removed entities in subsequent steps.
@@ -75,9 +84,9 @@ pub struct AuthRunner {
 }
 
 impl AuthRunner {
-    pub fn new() -> AuthRunner {
+    pub fn new(world: &mut World) -> AuthRunner {
         AuthRunner {
-            common: CommonRunner,
+            common: CommonRunner::new(world),
         }
     }
 
@@ -92,7 +101,7 @@ impl AuthRunner {
         // TODO: For now, just run everyone's input here. This might need to get refined!
         for (player_id, input) in inputs {
             // Replication error on the server side is a bug, so unwrap
-            input::auth::run_player_input(&mut state.world, player_id, &input).unwrap();
+            input::auth::run_player_input(&mut state.world, &mut self.common.physics_runner, player_id, &input).unwrap();
         }
 
         self.common.run_tick(state)?;
@@ -107,9 +116,9 @@ pub struct ViewRunner {
 }
 
 impl ViewRunner {
-    pub fn new(my_player_id: PlayerId, predict: bool) -> ViewRunner {
+    pub fn new(world: &mut World, my_player_id: PlayerId, predict: bool) -> ViewRunner {
         ViewRunner {
-            common: CommonRunner,
+            common: CommonRunner::new(world),
             my_player_id,
             predict_log: if predict {
                 Some(predict::Log::new(my_player_id))
@@ -160,7 +169,7 @@ impl ViewRunner {
         if let Some(predict_log) = self.predict_log.as_mut() {
             profile!("predict");
 
-            predict_log.run(&mut state.world, tick_num, tick_data, input)?;
+            predict_log.run(&mut state.world, &mut self.common.physics_runner, tick_num, tick_data, input)?;
         }
 
         self.common.run_tick(state)?;

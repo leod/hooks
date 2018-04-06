@@ -91,12 +91,13 @@ impl Game {
 
             game::State::from_registry(reg)
         };
-
         game::init::auth::create_state(&mut game_state.world);
+
+        let game_runner = game::run::AuthRunner::new(&mut game_state.world);
 
         Game {
             game_state,
-            game_runner: game::run::AuthRunner::new(),
+            game_runner,
             players: BTreeMap::new(),
             tick_timer: Timer::new(game_info.tick_duration()),
             next_tick: 0,
