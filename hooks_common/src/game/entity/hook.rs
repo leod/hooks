@@ -358,6 +358,8 @@ fn first_segment_interaction(
 
 #[derive(SystemData)]
 struct InputData<'a> {
+    entities: Entities<'a>,
+
     game_info: Fetch<'a, GameInfo>,
     entity_map: Fetch<'a, repl::EntityMap>,
 
@@ -384,20 +386,15 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
     {
         //debug!("{:?}", hook_state);
 
-        // Stalk our owner
+        // Need to know the position of our owner entity
         let owner_entity = data.entity_map.try_id_to_entity(hook_def.owner)?;
-        let owner_pos = data.position
-            .get(owner_entity)
-            .ok_or(repl::Error::MissingComponent(hook_def.owner, "Position"))?
-            .0;
-        let owner_angle = data.orientation
-            .get(owner_entity)
-            .ok_or(repl::Error::MissingComponent(hook_def.owner, "Orientation"))?
-            .0;
-        let owner_vel = data.velocity
-            .get(owner_entity)
-            .ok_or(repl::Error::MissingComponent(hook_def.owner, "Velocity"))?
-            .0;
+        let (owner_pos, owner_orientation, owner_velocity) = {
+            let comps = (&data.position, &data.orientation, &data.velocity)
+                .join()
+                .get(owner_entity, &data.entities)
+                .ok_or(repl::Error::MissingComponent(hook_def.owner, "hook owner"))?;
+            (comps.0.clone(), comps.1.clone(), comps.2.clone())
+        };
 
         // Look up our segments
         let mut segment_entities = [owner_entity; NUM_SEGMENTS];
@@ -438,7 +435,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                                 "Position",
                             ))?
                             .0;
-                        let distance = norm(&(last_pos - owner_pos));
+                        let distance = norm(&(last_pos - owner_pos.0));
                         distance >= SEGMENT_LENGTH / 2.0
                     };
 
@@ -447,15 +444,17 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             let segment_index = num_active_segments;
                             let next_segment = segment_entities[segment_index];
 
-                            let vel =
-                                Vector2::new(owner_angle.cos(), owner_angle.sin()) * SHOOT_SPEED;
+                            let vel = Vector2::new(
+                                owner_orientation.0.cos(),
+                                owner_orientation.0.sin(),
+                            ) * SHOOT_SPEED;
 
-                            //debug!("shoot at {}", owner_angle);
-                            data.position.insert(next_segment, Position(owner_pos));
+                            //debug!("shoot at {}", owner_orientation.0);
+                            data.position.insert(next_segment, Position(owner_pos.0));
                             data.orientation
-                                .insert(next_segment, Orientation(owner_angle));
+                                .insert(next_segment, Orientation(owner_orientation.0));
                             data.velocity
-                                .insert(next_segment, Velocity(owner_vel + vel));
+                                .insert(next_segment, Velocity(owner_velocity.0 + vel));
                             data.angular_velocity
                                 .insert(next_segment, AngularVelocity(0.0));
 
@@ -508,7 +507,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         join_pos.coords;
 
                     let target_distance = 0.0;
-                    let cur_distance = norm(&(join_attach_pos - owner_pos));
+                    let cur_distance = norm(&(join_attach_pos - owner_pos.0));
 
                     if cur_distance > SEGMENT_LENGTH / 2.0 - JOIN_MARGIN {
                         let constraint_distance = cur_distance.min(target_distance);
@@ -596,7 +595,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
                         last_pos.coords;
 
-                    let cur_distance = norm(&(last_attach_pos - owner_pos));
+                    let cur_distance = norm(&(last_attach_pos - owner_pos.0));
 
                     let (new_lunch_timer, new_num_active_segments) = if cur_distance < LUNCH_RADIUS
                     {
@@ -635,7 +634,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         let last_attach_pos = last_rot *
                             Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
                             last_pos.coords;
-                        let cur_distance = norm(&(last_attach_pos - owner_pos));
+                        let cur_distance = norm(&(last_attach_pos - owner_pos.0));
 
                         let target_distance =
                             (1.0 - new_lunch_timer / LUNCH_TIME_SECS) * SEGMENT_LENGTH;
