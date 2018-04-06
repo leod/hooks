@@ -503,9 +503,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         .ok_or(repl::Error::MissingComponent(join_id, "Orientation"))?
                         .0;
                     let join_rot = Rotation2::new(join_angle).matrix().clone();
-                    let join_attach_pos = join_rot
-                        * Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
-                        + join_pos.coords;
+                    let join_attach_pos = join_rot *
+                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
+                        join_pos.coords;
 
                     let target_distance = 0.0;
                     let cur_distance = norm(&(join_attach_pos - owner_pos));
@@ -592,9 +592,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         .ok_or(repl::Error::MissingComponent(last_id, "Orientation"))?
                         .0;
                     let last_rot = Rotation2::new(last_angle).matrix().clone();
-                    let last_attach_pos = last_rot
-                        * Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
-                        + last_pos.coords;
+                    let last_attach_pos = last_rot *
+                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
+                        last_pos.coords;
 
                     let cur_distance = norm(&(last_attach_pos - owner_pos));
 
@@ -632,9 +632,9 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             .ok_or(repl::Error::MissingComponent(last_id, "Orientation"))?
                             .0;
                         let last_rot = Rotation2::new(last_angle).matrix().clone();
-                        let last_attach_pos = last_rot
-                            * Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
-                            + last_pos.coords;
+                        let last_attach_pos = last_rot *
+                            Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
+                            last_pos.coords;
                         let cur_distance = norm(&(last_attach_pos - owner_pos));
 
                         let target_distance =

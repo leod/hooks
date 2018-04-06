@@ -182,8 +182,8 @@ impl<'a> System<'a> for InputSys {
             let right = Vector2::new(-forward.y, forward.x);
 
             let mut direction = Vector2::new(0.0, 0.0);
-            let move_any = input.0.move_forward || input.0.move_backward || input.0.move_right
-                || input.0.move_left;
+            let move_any = input.0.move_forward || input.0.move_backward || input.0.move_right ||
+                input.0.move_left;
 
             if move_any {
                 if input.0.move_forward {
