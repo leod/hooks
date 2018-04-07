@@ -94,10 +94,10 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub const NUM_SEGMENTS: usize = 20;
-pub const SEGMENT_LENGTH: f32 = 50.0;
-const JOIN_MARGIN: f32 = 5.0;
+pub const SEGMENT_LENGTH: f32 = 200.0;
+const JOIN_MARGIN: f32 = 1.0;
 //const MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const SHOOT_SPEED: f32 = 1000.0;
+const SHOOT_SPEED: f32 = 100.0;
 const LUNCH_TIME_SECS: f32 = 0.025;
 const LUNCH_RADIUS: f32 = 5.0;
 const ANGLE_STIFFNESS: f32 = 0.7;
@@ -156,28 +156,32 @@ pub struct SegmentDef {
 
 impl repl::Predictable for SegmentDef {}
 
-/// The mode a hook can be in. This is replicated and expected to change frequently.
-#[derive(PartialEq, Clone, Debug, BitStore)]
+/// Hook mode.
+#[derive(PartialEq, Eq, Clone, Copy, Debug, BitStore)]
 pub enum Mode {
-    /// The hook is expanding, shooting out new segments.
     Shooting,
-    /// The hook is contracting.
-    Contracting {
-        /// Timer for when we expect to munch up the next hook segment.
-        lunch_timer: f32,
-
-        /// While contracting, the hook can be attached to another entity. We store the
-        /// object-space coordinates in terms of the other entity.
-        fixed: Option<(EntityId, [f32; 2])>,
-    },
+    DoneShooting,
 }
 
-/// The dynamic state of an active hook.
+/// The dynamic state of an active hook. This is replicated and expected to change frequently.
 #[derive(PartialEq, Clone, Debug, BitStore)]
 pub struct ActiveState {
-    pub num_active_segments: u8,
-    pub want_fix: bool,
+    /// Hook mode.
     pub mode: Mode,
+
+    /// How many segments are currently in play? Note that this describes the length of an initial
+    /// slice of the `Def::segments` array.
+    pub num_active_segments: u8,
+
+    /// The hook can be attached to another entity. We store the object-space coordinates in
+    /// terms of the other entity.
+    pub fixed: Option<(EntityId, [f32; 2])>,
+
+    /// Does the user want the first hook segment to attach?
+    want_fix: bool,
+
+    /// Timer for how much time has passed since eating the last segment.
+    lunch_timer: f32,
 }
 
 /// The dynamic state of a hook.
@@ -200,11 +204,12 @@ impl repl::Predictable for State {
 #[storage(BTreeStorage)]
 pub struct CurrentInput {
     pub shoot: bool,
+    pub pull: bool,
 }
 
 fn build_segment(builder: EntityBuilder) -> EntityBuilder {
     // TODO
-    let shape = Cuboid::new(Vector2::new(SEGMENT_LENGTH / 2.0, 3.0));
+    let shape = Cuboid::new(Vector2::new(SEGMENT_LENGTH / 2.0, 1.5));
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
@@ -319,36 +324,22 @@ fn first_segment_interaction(
         .expect("got segment wall interaction, but hook is inactive");
 
     if !active_state.want_fix {
+        // Only if attach if the player wants to
         return Ok(());
     }
 
-    // Only attach if we are not attached yet
-    let (fixed, new_mode) = match &active_state.mode {
-        &Mode::Shooting { .. } => (
-            true,
-            Mode::Contracting {
-                lunch_timer: 0.0,
-                fixed: Some((other_id, other_info.object_pos.coords.into())),
-            },
-        ),
-        &Mode::Contracting {
-            lunch_timer,
-            fixed: None,
-        } => (
-            true,
-            Mode::Contracting {
-                lunch_timer,
-                fixed: Some((other_id, other_info.object_pos.coords.into())),
-            },
-        ),
-        mode => (false, mode.clone()),
-    };
+    if active_state.fixed.is_some() {
+        // Only attach if we are not attached yet
+        return Ok(());
+    }
 
-    active_state.mode = new_mode;
+    active_state.fixed = Some((other_id, other_info.object_pos.coords.into()));
+    active_state.lunch_timer = 0.0;
+    active_state.mode = Mode::DoneShooting;
 
-    if fixed && active_state.num_active_segments > 3 {
+    // If the hook is long enough, emit event for showing to the users that we attached
+    if active_state.num_active_segments > 3 {
         let hook_def = repl::try_component(&data.hook_def, hook_entity)?;
-
         data.events.push(FixedEvent {
             hook_index: hook_def.index,
             pos: pos.coords.into(),
@@ -361,8 +352,6 @@ fn first_segment_interaction(
 
 #[derive(SystemData)]
 struct InputData<'a> {
-    entities: Entities<'a>,
-
     game_info: Fetch<'a, GameInfo>,
     entity_map: Fetch<'a, repl::EntityMap>,
 
@@ -387,19 +376,11 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
     // Update all hooks that currently have some input attached to them
     for (input, hook_def, hook_state) in (&data.input, &data.hook_def, &mut data.hook_state).join()
     {
-        //debug!("{:?}", hook_state);
-
         // Need to know the position of our owner entity
         let owner_entity = data.entity_map.try_id_to_entity(hook_def.owner)?;
-        let (owner_pos, owner_orientation, owner_velocity) = {
-            let c = repl::try_join_get(
-                owner_entity,
-                &data.entities,
-                (&data.position, &data.orientation, &data.velocity).join(),
-            )?;
-
-            (c.0.clone(), c.1.clone(), c.2.clone())
-        };
+        let owner_pos = repl::try_component(&data.position, owner_entity)?.clone();
+        let owner_orientation = repl::try_component(&data.orientation, owner_entity)?.clone();
+        let owner_velocity = repl::try_component(&data.velocity, owner_entity)?.clone();
 
         // Look up the segment entities of this hook
         let mut segment_entities = [owner_entity; NUM_SEGMENTS];
@@ -408,171 +389,101 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
         }
 
         // Update hook state
-        match hook_state.0.clone() {
-            Some(ActiveState {
-                num_active_segments,
-                mode: Mode::Shooting,
-                ..
-            }) => {
-                if !input.shoot {
-                    // Start contracting the hook
-                    hook_state.0 = Some(ActiveState {
-                        num_active_segments,
-                        want_fix: false,
-                        mode: Mode::Contracting {
-                            lunch_timer: 0.0,
-                            fixed: None,
-                        },
-                    });
+        let mut overwrite_hook_state = None;
+
+        if let Some(active_state) = hook_state.0.as_mut() {
+            active_state.want_fix = input.shoot;
+            if !input.shoot {
+                active_state.fixed = None;
+                active_state.mode = Mode::DoneShooting;
+            }
+
+            // Fix first hook segment to the entity it has been attached to
+            if let Some((fix_entity_id, fix_pos_object)) = active_state.fixed {
+                if let Some(fix_entity) = data.entity_map.get_id_to_entity(fix_entity_id) {
+                    data.constraints.add(fix_first_segment_constraint(
+                        segment_entities[0],
+                        fix_entity,
+                        fix_pos_object,
+                    ));
                 } else {
-                    let num_active_segments = num_active_segments as usize;
-                    let new_want_fix = input.shoot;
+                    warn!("hook attached to dead entity {:?}", fix_entity_id);
+                    active_state.fixed = None;
+                }
+            }
 
-                    // Keep on shooting
-                    let activate_next = num_active_segments == 0 || {
-                        // Activate next segment when the last one is far enough from us
-                        let last_entity = segment_entities[num_active_segments - 1];
-                        let last_pos = repl::try_component(&data.position, last_entity)?.0;
-                        let distance = norm(&(last_pos - owner_pos.0));
-                        distance >= SEGMENT_LENGTH / 2.0
-                    };
+            let num_active_segments = active_state.num_active_segments as usize;
 
-                    let join_index = if activate_next {
-                        if num_active_segments + 1 < NUM_SEGMENTS {
-                            let segment_index = num_active_segments;
-                            let next_segment = segment_entities[segment_index];
+            match active_state.mode.clone() {
+                Mode::Shooting => {
+                    if input.shoot && num_active_segments < NUM_SEGMENTS {
+                        // Keep on shooting
+                        let activate_next = num_active_segments == 0 || {
+                            // Activate next segment when the last one is far enough from us
+                            let last_entity = segment_entities[num_active_segments - 1];
+                            let last_pos = repl::try_component(&data.position, last_entity)?.0;
+                            let distance = norm(&(last_pos - owner_pos.0));
+                            distance >= SEGMENT_LENGTH
+                        };
 
-                            let vel = Vector2::new(
+                        if activate_next {
+                            let next_segment = segment_entities[num_active_segments];
+
+                            let velocity = Vector2::new(
                                 owner_orientation.0.cos(),
                                 owner_orientation.0.sin(),
                             ) * SHOOT_SPEED;
 
-                            //debug!("shoot at {}", owner_orientation.0);
                             data.position.insert(next_segment, Position(owner_pos.0));
                             data.orientation
                                 .insert(next_segment, Orientation(owner_orientation.0));
                             data.velocity
-                                .insert(next_segment, Velocity(owner_velocity.0 + vel));
+                                .insert(next_segment, Velocity(owner_velocity.0 + velocity));
                             data.angular_velocity
                                 .insert(next_segment, AngularVelocity(0.0));
 
-                            hook_state.0 = Some(ActiveState {
-                                num_active_segments: num_active_segments as u8 + 1,
-                                want_fix: new_want_fix,
-                                mode: Mode::Shooting,
-                            });
-
-                            // Join with this new last segment
-                            num_active_segments
-                        } else {
-                            // No segments left, switch to contracting
-                            hook_state.0 = Some(ActiveState {
-                                num_active_segments: num_active_segments as u8,
-                                want_fix: new_want_fix,
-                                mode: Mode::Contracting {
-                                    lunch_timer: 0.0,
-                                    fixed: None,
-                                },
-                            });
-
-                            // Still join with last segment if necessary
-                            num_active_segments - 1
+                            active_state.num_active_segments += 1;
                         }
-                    } else {
-                        hook_state.0 = Some(ActiveState {
-                            num_active_segments: num_active_segments as u8,
-                            want_fix: new_want_fix,
-                            mode: Mode::Shooting,
-                        });
-
-                        num_active_segments - 1
-                    };
 
                     // Join player with last hook segment if it gets too far away
-                    let last_entity = segment_entities[join_index];
-                    let last_pos = repl::try_component(&data.position, last_entity)?.0;
-                    let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
-                    let last_attach_pos = physics::to_world_pos(
-                        last_pos,
-                        last_angle,
-                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
-                    );
-                    let cur_distance = norm(&(last_attach_pos - owner_pos.0));
-                    let target_distance = 0.0;
+                        /*let last_entity = segment_entities[active_state.num_active_segments as usize - 1];
+                        let last_pos = repl::try_component(&data.position, last_entity)?.0;
+                        let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
+                        let last_attach_pos = physics::to_world_pos(
+                            last_pos,
+                            last_angle,
+                            Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                        );
+                        let cur_distance = norm(&(last_attach_pos - owner_pos.0));
+                        let target_distance = 0.0;
 
-                    if cur_distance > SEGMENT_LENGTH / 2.0 - JOIN_MARGIN {
-                        let constraint_distance = cur_distance.min(target_distance);
-                        data.constraints.add(owner_segment_joint_constraint(
-                            owner_entity,
-                            last_entity,
-                            false,
-                            constraint_distance,
-                        ));
+                        if cur_distance > SEGMENT_LENGTH / 2.0 - JOIN_MARGIN {
+                            let constraint_distance = cur_distance.min(target_distance);
+                            data.constraints.add(owner_segment_joint_constraint(
+                                owner_entity,
+                                last_entity,
+                                active_state.fixed.is_some(),
+                                Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                                constraint_distance,
+                            ));
+                        }*/                    } else {
+                        active_state.mode = Mode::DoneShooting;
                     }
                 }
-            }
-            Some(ActiveState {
-                num_active_segments,
-                mode: Mode::Contracting { lunch_timer, fixed },
-                ..
-            }) => {
-                let new_want_fix = input.shoot;
-
-                // Are we done contracting?
-                if num_active_segments == 0 {
-                    hook_state.0 = None;
-                } else {
-                    let new_fixed = if !input.shoot { None } else { fixed };
-                    let new_lunch_timer = (lunch_timer + dt).min(LUNCH_TIME_SECS);
-
-                    // Fix last hook segment to the entity it has been attached to
-                    if let Some((fix_entity_id, fix_pos_object)) = new_fixed {
-                        if let Some(fix_entity) = data.entity_map.get_id_to_entity(fix_entity_id) {
-                            data.constraints.add(fix_first_segment_constraint(
-                                segment_entities[0],
-                                fix_entity,
-                                fix_pos_object,
-                            ));
-                        } else {
-                            warn!("hook attached to dead entity {:?}", fix_entity_id);
-                        }
-                    }
-
-                    // Eat up the last segment if it comes close enough to our mouth.
-                    let last_index = num_active_segments as usize - 1;
-                    let last_entity = segment_entities[last_index];
-                    let last_pos = repl::try_component(&data.position, last_entity)?.0;
-                    let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
-                    let last_attach_pos = physics::to_world_pos(
-                        last_pos,
-                        last_angle,
-                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
-                    );
-                    let cur_distance = norm(&(last_attach_pos - owner_pos.0));
-
-                    let (new_lunch_timer, new_num_active_segments) = if cur_distance < LUNCH_RADIUS
-                    {
-                        // Yummy!
-                        (0.0, num_active_segments - 1)
+                Mode::DoneShooting => {
+                    if num_active_segments == 0 {
+                        // Done contracting, deactivate hook
+                        overwrite_hook_state = Some(None);
                     } else {
-                        (new_lunch_timer, num_active_segments)
-                    };
+                        // Contract the hook
+                        active_state.lunch_timer =
+                            (active_state.lunch_timer + dt).min(LUNCH_TIME_SECS);
 
-                    if new_num_active_segments == 0 {
-                        // We are done eating...
-                        hook_state.0 = None;
-                    } else {
-                        hook_state.0 = Some(ActiveState {
-                            num_active_segments: new_num_active_segments as u8,
-                            want_fix: new_want_fix,
-                            mode: Mode::Contracting {
-                                lunch_timer: new_lunch_timer,
-                                fixed: new_fixed,
-                            },
-                        });
+                        //active_state.lunch_timer = 0.0;
+                        //debug!("{} {} {}", input.pull, active_state.fixed.is_none(), active_state.lunch_timer);
 
-                        // Constrain ourself to the last segment, getting closer over time
-                        let last_index = new_num_active_segments as usize - 1;
+                        // Eat up the last segment if it comes close enough to our mouth.
+                        let last_index = num_active_segments as usize - 1;
                         let last_entity = segment_entities[last_index];
                         let last_pos = repl::try_component(&data.position, last_entity)?.0;
                         let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
@@ -583,34 +494,63 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         );
                         let cur_distance = norm(&(last_attach_pos - owner_pos.0));
 
-                        let target_distance =
-                            (1.0 - new_lunch_timer / LUNCH_TIME_SECS) * SEGMENT_LENGTH;
-                        let constraint_distance = cur_distance.min(target_distance);
+                        if cur_distance < LUNCH_RADIUS &&
+                            (!input.pull || active_state.fixed.is_none())
+                        {
+                            active_state.lunch_timer = 0.0;
+                            active_state.num_active_segments -= 1;
+                        }
 
-                        data.constraints.add(owner_segment_joint_constraint(
-                            owner_entity,
-                            last_entity,
-                            new_fixed.is_some(),
-                            constraint_distance,
-                        ));
+                        if active_state.num_active_segments > 0 {
+                            // Constrain ourself to the last segment, getting closer over time
+                            let last_index = active_state.num_active_segments as usize - 1;
+                            let last_entity = segment_entities[last_index];
+                            let last_pos = repl::try_component(&data.position, last_entity)?.0;
+                            let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
+                            let last_attach_pos = physics::to_world_pos(
+                                last_pos,
+                                last_angle,
+                                Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                            );
+                            let cur_distance = norm(&(last_attach_pos - owner_pos.0));
 
-                        if new_fixed.is_none() {
-                            data.constraints
-                                .add(owner_segment_angle_constraint(owner_entity, last_entity));
+                            let target_distance =
+                                (1.0 - active_state.lunch_timer / LUNCH_TIME_SECS) * SEGMENT_LENGTH;
+                            //let target_distance = 0.0;
+                            let constraint_distance = cur_distance.min(target_distance);
+
+                            data.constraints.add(owner_segment_joint_constraint(
+                                owner_entity,
+                                last_entity,
+                                active_state.fixed.is_some(),
+                                Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                                constraint_distance,
+                            ));
+
+                            if active_state.fixed.is_none() {
+                                data.constraints
+                                    .add(owner_segment_angle_constraint(owner_entity, last_entity));
+                            }
                         }
                     }
                 }
             }
-            None => {
-                if input.shoot {
-                    // Start shooting the hook
-                    hook_state.0 = Some(ActiveState {
-                        num_active_segments: 0,
-                        want_fix: true,
-                        mode: Mode::Shooting,
-                    });
-                }
+        } else {
+            // Hook currently inactive
+            if input.shoot {
+                // Start shooting the hook
+                overwrite_hook_state = Some(Some(ActiveState {
+                    mode: Mode::Shooting,
+                    num_active_segments: 0,
+                    fixed: None,
+                    want_fix: true,
+                    lunch_timer: 0.0,
+                }));
             }
+        }
+
+        if let Some(overwrite_hook_state) = overwrite_hook_state {
+            hook_state.0 = overwrite_hook_state;
         }
 
         // Maintain the `Active` flag of our segments
@@ -690,12 +630,13 @@ fn owner_segment_joint_constraint(
     owner_entity: Entity,
     last_entity: Entity,
     owner_pos_var: bool,
+    last_object_pos: Point2<f32>,
     distance: f32,
 ) -> Constraint {
     let joint_def = constraint::Def::Joint {
-        distance: distance.sqrt(),
-        object_pos_a: Point2::new(1.0, 0.0), //Point2::origin(),
-        object_pos_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+        distance: distance,
+        object_pos_a: Point2::new(0.01, 0.0), //Point2::origin(),
+        object_pos_b: last_object_pos,
     };
     Constraint {
         def: joint_def,

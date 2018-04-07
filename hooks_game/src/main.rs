@@ -159,6 +159,8 @@ impl MainState {
                 Keycode::S => self.next_player_input.move_backward = true,
                 Keycode::A => self.next_player_input.move_left = true,
                 Keycode::D => self.next_player_input.move_right = true,
+                Keycode::Q => self.next_player_input.pull_one = true,
+                Keycode::E => self.next_player_input.pull_two = true,
                 Keycode::F1 => self.show_debug = !self.show_debug,
                 Keycode::F2 => self.show_profiler = !self.show_profiler,
                 Keycode::F3 => self.show_stats = !self.show_stats,
@@ -175,6 +177,8 @@ impl MainState {
                 Keycode::S => self.next_player_input.move_backward = false,
                 Keycode::A => self.next_player_input.move_left = false,
                 Keycode::D => self.next_player_input.move_right = false,
+                Keycode::Q => self.next_player_input.pull_one = false,
+                Keycode::E => self.next_player_input.pull_two = false,
                 _ => {}
             },
             _ => {}

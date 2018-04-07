@@ -73,6 +73,8 @@ pub struct PlayerInput {
     pub move_right: bool,
     pub shoot_one: bool,
     pub shoot_two: bool,
+    pub pull_one: bool,
+    pub pull_two: bool,
 }
 
 #[derive(Debug, Copy, Clone, BitStore)]

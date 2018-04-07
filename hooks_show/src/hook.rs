@@ -74,7 +74,7 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
     for (hook_def, hook_state) in (&hook_def, &hook_state).join() {
         if let &Some(hook::ActiveState {
             num_active_segments,
-            ref mode,
+            ref fixed,
             ..
         }) = &hook_state.0
         {
@@ -86,11 +86,6 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 segments.push(entity_map.try_id_to_entity(hook_def.segments[i]).unwrap());
             }
 
-            let is_fixed = match mode {
-                &hook::Mode::Contracting { fixed: Some(_), .. } => true,
-                _ => false,
-            };
-
             // Draw segment rects
             for &segment in segments.iter() {
                 // TODO: specs unwrap
@@ -98,7 +93,7 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 let angle = orientation.get(segment).unwrap().0;
 
                 let scaling =
-                    Matrix4::from_diagonal(&Vector4::new(hook::SEGMENT_LENGTH, 6.0, 1.0, 1.0));
+                    Matrix4::from_diagonal(&Vector4::new(hook::SEGMENT_LENGTH, 3.0, 1.0, 1.0));
                 let isometry = Isometry3::new(
                     Vector3::new(pos.x, pos.y, 0.0),
                     angle * Vector3::z_axis().unwrap(),
@@ -136,7 +131,7 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
 
                 let rot = Rotation2::new(angle).matrix().clone();
                 let attach_p = rot * Point2::new(hook::SEGMENT_LENGTH / 2.0, 0.0) + pos;
-                let size = if i == 0 { 12.0 } else { 8.0 };
+                let size = if i == 0 { 12.0 } else { 4.0 };
                 let scaling = Matrix4::from_diagonal(&Vector4::new(size, size, 1.0, 1.0));
                 let isometry = Isometry3::new(
                     Vector3::new(attach_p.x, attach_p.y, 0.0),
@@ -147,7 +142,7 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 let curr_transform = graphics::get_transform(ctx);
                 graphics::push_transform(ctx, Some(curr_transform * matrix));
                 graphics::apply_transformations(ctx)?;
-                let color = if i == 0 && is_fixed {
+                let color = if i == 0 && fixed.is_some() {
                     graphics::Color {
                         r: 1.0,
                         g: 0.0,
