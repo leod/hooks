@@ -2,12 +2,12 @@ use std::io;
 use std::thread;
 use std::time::Duration;
 
-use hooks_util::debug::Inspect;
-use hooks_util::profile::PROFILER;
-use hooks_util::timer::{Stopwatch, Timer};
 use hooks_common::GameInfo;
 #[cfg(feature = "show")]
 use hooks_show::Show;
+use hooks_util::debug::Inspect;
+use hooks_util::profile::PROFILER;
+use hooks_util::timer::{Stopwatch, Timer};
 
 use game::Game;
 use host::{self, Host};

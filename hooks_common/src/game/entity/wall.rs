@@ -2,11 +2,11 @@ use nalgebra::{Point2, Vector2};
 use specs::prelude::*;
 
 use defs::{EntityId, INVALID_PLAYER_ID};
-use registry::Registry;
-use physics::{Orientation, Position};
-use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
-use repl;
 use game;
+use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
+use physics::{Orientation, Position};
+use registry::Registry;
+use repl;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Size>();

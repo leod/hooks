@@ -1,3 +1,5 @@
+#![feature(core_intrinsics)]
+
 extern crate bit_manager;
 #[macro_use]
 extern crate bit_manager_derive;
@@ -27,8 +29,8 @@ pub mod event;
 pub mod registry;
 #[macro_use]
 pub mod repl;
-pub mod net;
 pub mod game;
+pub mod net;
 
 pub use defs::*;
 pub use event::Event;

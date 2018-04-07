@@ -11,8 +11,8 @@ extern crate rand;
 extern crate shred;
 
 mod client;
-mod host;
 mod game;
+mod host;
 mod server;
 
 use hooks_common::{GameInfo, MapInfo};

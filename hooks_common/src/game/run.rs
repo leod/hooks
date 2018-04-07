@@ -3,12 +3,12 @@ use specs::prelude::{RunNow, World};
 use hooks_util::profile;
 
 use defs::{PlayerId, PlayerInput, TickNum};
-use event::{self, Event};
 use entity;
-use repl::{self, tick};
-use physics;
-use game::{self, input, predict};
+use event::{self, Event};
 use game::state::State;
+use game::{self, input, predict};
+use physics;
+use repl::{self, tick};
 
 struct CommonRunner {
     physics_runner: physics::sim::Runner,

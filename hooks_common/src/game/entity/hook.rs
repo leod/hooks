@@ -1,22 +1,22 @@
 use std::f32;
 
-use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
+use nalgebra::{norm, zero, Point2, Vector2};
 
 use specs::prelude::*;
 use specs::storage::BTreeStorage;
 
-use registry::Registry;
 use defs::{EntityId, GameInfo, INVALID_ENTITY_ID};
-use event::{self, Event};
 use entity::Active;
-use repl;
+use event::{self, Event};
+use game::ComponentType;
+use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
+use physics::constraint::{self, Constraint};
+use physics::sim::Constraints;
+use physics::{self, interaction};
 use physics::{AngularVelocity, Dynamic, Friction, InvAngularMass, InvMass, Orientation, Position,
               Update, Velocity};
-use physics::interaction;
-use physics::sim::Constraints;
-use physics::constraint::{self, Constraint};
-use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
-use game::ComponentType;
+use registry::Registry;
+use repl;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Def>();
@@ -269,49 +269,49 @@ pub mod auth {
     }
 }
 
+#[derive(SystemData)]
+struct InteractionData<'a> {
+    entity_map: Fetch<'a, repl::EntityMap>,
+    events: FetchMut<'a, event::Sink>,
+
+    repl_id: ReadStorage<'a, repl::Id>,
+    update: ReadStorage<'a, Update>,
+    segment_def: ReadStorage<'a, SegmentDef>,
+    hook_def: ReadStorage<'a, Def>,
+
+    hook_state: WriteStorage<'a, State>,
+}
+
 fn first_segment_interaction(
     world: &World,
     segment_info: &interaction::EntityInfo,
     other_info: &interaction::EntityInfo,
     pos: Point2<f32>,
     normal: Vector2<f32>,
-) {
-    let other_id = {
-        let repl_ids = world.read::<repl::Id>();
+) -> Result<(), repl::Error> {
+    let mut data = InteractionData::fetch(&world.res);
 
-        // Can unwrap since every wall entity must have a `repl::Id`.
-        repl_ids.get(other_info.entity).unwrap().0
-    };
+    // Can unwrap since every attachable entity has a `repl::Id`.
+    let other_id = data.repl_id.get(other_info.entity).unwrap().0;
 
-    // Get the corresponding hook entity.
-    // TODO: Validate that received entities have the components specified by their class.
-    let hook_id = world
-        .read::<SegmentDef>()
-        .get(segment_info.entity)
-        .unwrap()
-        .hook;
-
-    if other_id.0 == hook_id.0 {
-        // Don't attach to entities that we own
-        return;
-    }
-
-    if world.read::<Update>().get(segment_info.entity).is_none() {
+    if data.update.get(segment_info.entity).is_none() {
+        // Don't attach segments that are not currently being simulated
         // FIXME: We need this because our collision filter is not narrow enough yet. For example,
         //        ncollide will report segment-wall interactions even of segments that are not
         //        currently being updated.
-        return;
+        return Ok(());
     }
 
-    // TODO: Repl unwrap: server could send faulty hook id in segment definition
-    let hook_entity = repl::get_id_to_entity(world, hook_id).unwrap();
+    // Get the hook entity to which this segment belongs
+    let hook_id = repl::try_component(&data.segment_def, segment_info.entity)?.hook;
+    let hook_entity = data.entity_map.try_id_to_entity(hook_id)?;
 
-    // TODO: Validate that received entities have the components specified by their class.
-    let mut state_storage = world.write::<State>();
-    let state = state_storage.get_mut(hook_entity).unwrap();
+    if other_id.0 == hook_id.0 {
+        // Don't attach to entities that we own
+        return Ok(());
+    }
 
-    let hook_def_storage = world.read::<Def>();
-    let hook_def = hook_def_storage.get(hook_entity).unwrap();
+    let state = repl::try_component_mut(&mut data.hook_state, hook_entity)?;
 
     let active_state = state
         .0
@@ -319,7 +319,7 @@ fn first_segment_interaction(
         .expect("got segment wall interaction, but hook is inactive");
 
     if !active_state.want_fix {
-        return;
+        return Ok(());
     }
 
     // Only attach if we are not attached yet
@@ -347,13 +347,16 @@ fn first_segment_interaction(
     active_state.mode = new_mode;
 
     if fixed && active_state.num_active_segments > 3 {
-        let event = FixedEvent {
+        let hook_def = repl::try_component(&data.hook_def, hook_entity)?;
+
+        data.events.push(FixedEvent {
             hook_index: hook_def.index,
             pos: pos.coords.into(),
             vel: normal.into(),
-        };
-        world.write_resource::<event::Sink>().push(event);
+        });
     }
+
+    Ok(())
 }
 
 #[derive(SystemData)]
@@ -389,19 +392,20 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
         // Need to know the position of our owner entity
         let owner_entity = data.entity_map.try_id_to_entity(hook_def.owner)?;
         let (owner_pos, owner_orientation, owner_velocity) = {
-            let comps = (&data.position, &data.orientation, &data.velocity)
-                .join()
-                .get(owner_entity, &data.entities)
-                .ok_or(repl::Error::MissingComponent(hook_def.owner, "hook owner"))?;
-            (comps.0.clone(), comps.1.clone(), comps.2.clone())
+            let c = repl::try_join_get(
+                owner_entity,
+                &data.entities,
+                (&data.position, &data.orientation, &data.velocity).join(),
+            )?;
+
+            (c.0.clone(), c.1.clone(), c.2.clone())
         };
 
-        // Look up our segments
+        // Look up the segment entities of this hook
         let mut segment_entities = [owner_entity; NUM_SEGMENTS];
         for i in 0..NUM_SEGMENTS {
             segment_entities[i] = data.entity_map.try_id_to_entity(hook_def.segments[i])?;
         }
-        // TODO: num_active_segments could be out of bounds
 
         // Update hook state
         match hook_state.0.clone() {
@@ -428,13 +432,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     let activate_next = num_active_segments == 0 || {
                         // Activate next segment when the last one is far enough from us
                         let last_entity = segment_entities[num_active_segments - 1];
-                        let last_pos = data.position
-                            .get(last_entity)
-                            .ok_or(repl::Error::MissingComponent(
-                                hook_def.segments[num_active_segments - 1],
-                                "Position",
-                            ))?
-                            .0;
+                        let last_pos = repl::try_component(&data.position, last_entity)?.0;
                         let distance = norm(&(last_pos - owner_pos.0));
                         distance >= SEGMENT_LENGTH / 2.0
                     };
@@ -491,48 +489,25 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     };
 
                     // Join player with last hook segment if it gets too far away
-                    let join_entity = segment_entities[join_index];
-                    let join_id = hook_def.segments[join_index];
-                    let join_pos = data.position
-                        .get(join_entity)
-                        .ok_or(repl::Error::MissingComponent(join_id, "Position"))?
-                        .0;
-                    let join_angle = data.orientation
-                        .get(join_entity)
-                        .ok_or(repl::Error::MissingComponent(join_id, "Orientation"))?
-                        .0;
-                    let join_rot = Rotation2::new(join_angle).matrix().clone();
-                    let join_attach_pos = join_rot *
-                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
-                        join_pos.coords;
-
+                    let last_entity = segment_entities[join_index];
+                    let last_pos = repl::try_component(&data.position, last_entity)?.0;
+                    let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
+                    let last_attach_pos = physics::to_world_pos(
+                        last_pos,
+                        last_angle,
+                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                    );
+                    let cur_distance = norm(&(last_attach_pos - owner_pos.0));
                     let target_distance = 0.0;
-                    let cur_distance = norm(&(join_attach_pos - owner_pos.0));
 
                     if cur_distance > SEGMENT_LENGTH / 2.0 - JOIN_MARGIN {
                         let constraint_distance = cur_distance.min(target_distance);
-
-                        let joint_def = constraint::Def::Joint {
-                            distance: constraint_distance,
-                            object_pos_a: Point2::new(1.0, 0.0), //Point2::origin(),
-                            object_pos_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
-                        };
-
-                        let joint_constraint = Constraint {
-                            def: joint_def,
-                            stiffness: 1.0,
-                            entity_a: owner_entity,
-                            entity_b: join_entity,
-                            vars_a: constraint::Vars {
-                                pos: false,
-                                angle: false,
-                            },
-                            vars_b: constraint::Vars {
-                                pos: true,
-                                angle: true,
-                            },
-                        };
-                        data.constraints.add(joint_constraint);
+                        data.constraints.add(owner_segment_joint_constraint(
+                            owner_entity,
+                            last_entity,
+                            false,
+                            constraint_distance,
+                        ));
                     }
                 }
             }
@@ -553,26 +528,11 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                     // Fix last hook segment to the entity it has been attached to
                     if let Some((fix_entity_id, fix_pos_object)) = new_fixed {
                         if let Some(fix_entity) = data.entity_map.get_id_to_entity(fix_entity_id) {
-                            let joint_def = constraint::Def::Joint {
-                                distance: 0.0,
-                                object_pos_a: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
-                                object_pos_b: Point2::new(fix_pos_object[0], fix_pos_object[1]),
-                            };
-                            let joint_constraint = Constraint {
-                                def: joint_def,
-                                stiffness: 1.0,
-                                entity_a: segment_entities[0],
-                                entity_b: fix_entity,
-                                vars_a: constraint::Vars {
-                                    pos: true,
-                                    angle: true,
-                                },
-                                vars_b: constraint::Vars {
-                                    pos: false,
-                                    angle: false,
-                                },
-                            };
-                            data.constraints.add(joint_constraint);
+                            data.constraints.add(fix_first_segment_constraint(
+                                segment_entities[0],
+                                fix_entity,
+                                fix_pos_object,
+                            ));
                         } else {
                             warn!("hook attached to dead entity {:?}", fix_entity_id);
                         }
@@ -580,21 +540,14 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                     // Eat up the last segment if it comes close enough to our mouth.
                     let last_index = num_active_segments as usize - 1;
-                    let last_id = hook_def.segments[last_index];
                     let last_entity = segment_entities[last_index];
-                    let last_pos = data.position
-                        .get(last_entity)
-                        .ok_or(repl::Error::MissingComponent(last_id, "Position"))?
-                        .0;
-                    let last_angle = data.orientation
-                        .get(last_entity)
-                        .ok_or(repl::Error::MissingComponent(last_id, "Orientation"))?
-                        .0;
-                    let last_rot = Rotation2::new(last_angle).matrix().clone();
-                    let last_attach_pos = last_rot *
-                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
-                        last_pos.coords;
-
+                    let last_pos = repl::try_component(&data.position, last_entity)?.0;
+                    let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
+                    let last_attach_pos = physics::to_world_pos(
+                        last_pos,
+                        last_angle,
+                        Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                    );
                     let cur_distance = norm(&(last_attach_pos - owner_pos.0));
 
                     let (new_lunch_timer, new_num_active_segments) = if cur_distance < LUNCH_RADIUS
@@ -620,64 +573,30 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
 
                         // Constrain ourself to the last segment, getting closer over time
                         let last_index = new_num_active_segments as usize - 1;
-                        let last_id = hook_def.segments[last_index];
                         let last_entity = segment_entities[last_index];
-                        let last_pos = data.position
-                            .get(last_entity)
-                            .ok_or(repl::Error::MissingComponent(last_id, "Position"))?
-                            .0;
-                        let last_angle = data.orientation
-                            .get(last_entity)
-                            .ok_or(repl::Error::MissingComponent(last_id, "Orientation"))?
-                            .0;
-                        let last_rot = Rotation2::new(last_angle).matrix().clone();
-                        let last_attach_pos = last_rot *
-                            Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0) +
-                            last_pos.coords;
+                        let last_pos = repl::try_component(&data.position, last_entity)?.0;
+                        let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
+                        let last_attach_pos = physics::to_world_pos(
+                            last_pos,
+                            last_angle,
+                            Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+                        );
                         let cur_distance = norm(&(last_attach_pos - owner_pos.0));
 
                         let target_distance =
                             (1.0 - new_lunch_timer / LUNCH_TIME_SECS) * SEGMENT_LENGTH;
                         let constraint_distance = cur_distance.min(target_distance);
 
-                        let joint_def = constraint::Def::Joint {
-                            distance: constraint_distance.sqrt(),
-                            object_pos_a: Point2::new(1.0, 0.0), //Point2::origin(),
-                            object_pos_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
-                        };
-                        let joint_constraint = Constraint {
-                            def: joint_def,
-                            stiffness: 1.0,
-                            entity_a: owner_entity,
-                            entity_b: last_entity,
-                            vars_a: constraint::Vars {
-                                pos: new_fixed.is_some(),
-                                angle: false,
-                            },
-                            vars_b: constraint::Vars {
-                                pos: true,
-                                angle: true,
-                            },
-                        };
-                        data.constraints.add(joint_constraint);
+                        data.constraints.add(owner_segment_joint_constraint(
+                            owner_entity,
+                            last_entity,
+                            new_fixed.is_some(),
+                            constraint_distance,
+                        ));
 
                         if new_fixed.is_none() {
-                            let angle_def = constraint::Def::Angle { angle: 0.0 };
-                            let angle_constraint = Constraint {
-                                def: angle_def,
-                                stiffness: OWNER_ANGLE_STIFFNESS,
-                                entity_a: owner_entity,
-                                entity_b: last_entity,
-                                vars_a: constraint::Vars {
-                                    pos: false,
-                                    angle: false,
-                                },
-                                vars_b: constraint::Vars {
-                                    pos: false,
-                                    angle: true,
-                                },
-                            };
-                            data.constraints.add(angle_constraint);
+                            data.constraints
+                                .add(owner_segment_angle_constraint(owner_entity, last_entity));
                         }
                     }
                 }
@@ -715,49 +634,125 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                 let entity_a = segment_entities[i];
                 let entity_b = segment_entities[i + 1];
 
-                let joint_def = constraint::Def::Joint {
-                    distance: 0.0,
-                    object_pos_a: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
-                    object_pos_b: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
-                };
-                let angle_def = constraint::Def::Angle { angle: 0.0 };
-
-                let joint_constraint = Constraint {
-                    def: joint_def,
-                    stiffness: 1.0,
-                    entity_a,
-                    entity_b,
-                    vars_a: constraint::Vars {
-                        pos: true,
-                        angle: true,
-                    },
-                    vars_b: constraint::Vars {
-                        pos: true,
-                        angle: true,
-                    },
-                };
-                //let j = active_segments.len() - i - 1;
-                //let stiffness = (j as f32 / NUM_SEGMENTS as f32).powi(2);
-                let stiffness = ANGLE_STIFFNESS;
-                let angle_constraint = Constraint {
-                    def: angle_def,
-                    stiffness: stiffness,
-                    entity_a,
-                    entity_b,
-                    vars_a: constraint::Vars {
-                        pos: false,
-                        angle: true,
-                    },
-                    vars_b: constraint::Vars {
-                        pos: false,
-                        angle: true,
-                    },
-                };
-                data.constraints.add(joint_constraint);
-                data.constraints.add(angle_constraint);
+                data.constraints
+                    .add(segments_joint_constraint(entity_a, entity_b));
+                data.constraints
+                    .add(segments_angle_constraint(entity_a, entity_b));
             }
         }
     }
 
     Ok(())
+}
+
+fn segments_joint_constraint(entity_a: Entity, entity_b: Entity) -> Constraint {
+    let joint_def = constraint::Def::Joint {
+        distance: 0.0,
+        object_pos_a: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+        object_pos_b: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
+    };
+    Constraint {
+        def: joint_def,
+        stiffness: 1.0,
+        entity_a,
+        entity_b,
+        vars_a: constraint::Vars {
+            pos: true,
+            angle: true,
+        },
+        vars_b: constraint::Vars {
+            pos: true,
+            angle: true,
+        },
+    }
+}
+
+fn segments_angle_constraint(entity_a: Entity, entity_b: Entity) -> Constraint {
+    let angle_def = constraint::Def::Angle { angle: 0.0 };
+    let stiffness = ANGLE_STIFFNESS;
+    Constraint {
+        def: angle_def,
+        stiffness: stiffness,
+        entity_a,
+        entity_b,
+        vars_a: constraint::Vars {
+            pos: false,
+            angle: true,
+        },
+        vars_b: constraint::Vars {
+            pos: false,
+            angle: true,
+        },
+    }
+}
+
+fn owner_segment_joint_constraint(
+    owner_entity: Entity,
+    last_entity: Entity,
+    owner_pos_var: bool,
+    distance: f32,
+) -> Constraint {
+    let joint_def = constraint::Def::Joint {
+        distance: distance.sqrt(),
+        object_pos_a: Point2::new(1.0, 0.0), //Point2::origin(),
+        object_pos_b: Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
+    };
+    Constraint {
+        def: joint_def,
+        stiffness: 1.0,
+        entity_a: owner_entity,
+        entity_b: last_entity,
+        vars_a: constraint::Vars {
+            pos: owner_pos_var,
+            angle: false,
+        },
+        vars_b: constraint::Vars {
+            pos: true,
+            angle: true,
+        },
+    }
+}
+
+fn owner_segment_angle_constraint(owner_entity: Entity, last_entity: Entity) -> Constraint {
+    let angle_def = constraint::Def::Angle { angle: 0.0 };
+    Constraint {
+        def: angle_def,
+        stiffness: OWNER_ANGLE_STIFFNESS,
+        entity_a: owner_entity,
+        entity_b: last_entity,
+        vars_a: constraint::Vars {
+            pos: false,
+            angle: false,
+        },
+        vars_b: constraint::Vars {
+            pos: false,
+            angle: true,
+        },
+    }
+}
+
+fn fix_first_segment_constraint(
+    first_entity: Entity,
+    fix_entity: Entity,
+    fix_pos_object: [f32; 2],
+) -> Constraint {
+    let joint_def = constraint::Def::Joint {
+        distance: 0.0,
+        object_pos_a: Point2::new(SEGMENT_LENGTH / 2.0 - JOIN_MARGIN, 0.0),
+        object_pos_b: Point2::new(fix_pos_object[0], fix_pos_object[1]),
+    };
+    Constraint {
+        def: joint_def,
+        stiffness: 1.0,
+        entity_a: first_entity,
+        entity_b: fix_entity,
+        vars_a: constraint::Vars {
+            pos: true,
+            angle: true,
+        },
+        vars_b: constraint::Vars {
+            pos: false,
+            angle: false,
+        },
+    }
 }

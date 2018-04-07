@@ -6,8 +6,8 @@ use bit_manager::{self, BitRead, BitWrite};
 
 use defs::{TickDeltaNum, TickNum, INVALID_PLAYER_ID, NO_DELTA_TICK};
 use event::{self, Event};
-use repl::{entity, player};
 use repl::snapshot::{self, EntityClasses, EntitySnapshot, WorldSnapshot};
+use repl::{entity, player};
 
 pub struct Data<T: EntitySnapshot> {
     /// Game events that happened in this tick.

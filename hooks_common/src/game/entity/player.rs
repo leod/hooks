@@ -4,14 +4,14 @@ use specs::prelude::*;
 use specs::storage::BTreeStorage;
 
 use defs::{EntityId, GameInfo, PlayerId, PlayerInput, INVALID_ENTITY_ID};
-use registry::Registry;
+use game::ComponentType;
+use game::entity::hook;
+use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use physics::interaction;
 use physics::{AngularVelocity, Drag, Dynamic, InvAngularMass, InvMass, Orientation, Position,
               Velocity};
-use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
+use registry::Registry;
 use repl;
-use game::ComponentType;
-use game::entity::hook;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<CurrentInput>();

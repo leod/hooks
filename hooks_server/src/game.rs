@@ -7,13 +7,13 @@ use bit_manager::BitWriter;
 
 use shred::{Fetch, RunNow};
 
-use hooks_util::timer::{Stopwatch, Timer};
-use hooks_util::profile;
-use hooks_common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
-                   TickDeltaNum, TickNum};
 use hooks_common::net::protocol::ClientGameMsg;
 use hooks_common::registry::Registry;
 use hooks_common::repl::{player, tick};
+use hooks_common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
+                   TickDeltaNum, TickNum};
+use hooks_util::profile;
+use hooks_util::timer::{Stopwatch, Timer};
 
 use host::{self, Host};
 

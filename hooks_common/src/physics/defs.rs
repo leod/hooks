@@ -1,5 +1,5 @@
-use bit_manager::{BitRead, BitWrite, Result};
 use bit_manager::data::BitStore;
+use bit_manager::{BitRead, BitWrite, Result};
 
 use nalgebra::{Point2, Rotation2, Vector2};
 
@@ -7,8 +7,8 @@ use specs::prelude::{Component, DenseVecStorage, FlaggedStorage, VecStorage};
 use specs::storage::NullStorage;
 
 use registry::Registry;
-use repl::interp::Interp;
 use repl::Predictable;
+use repl::interp::Interp;
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Update>();
@@ -97,15 +97,11 @@ pub struct Friction(pub f32);
 pub struct Drag(pub f32);
 
 /// Transform from object-space to world-space.
-pub fn to_world_pos(
-    position: &Position,
-    orientation: &Orientation,
-    object_pos: &Point2<f32>,
-) -> Point2<f32> {
+pub fn to_world_pos(pos: Point2<f32>, angle: f32, object_pos: Point2<f32>) -> Point2<f32> {
     // TODO: We might want to cache some of these calculations in the future.
-    let rot = Rotation2::new(orientation.0).matrix().clone();
+    let rot = Rotation2::new(angle).matrix().clone();
 
-    position.0 + rot * object_pos.coords
+    pos + rot * object_pos.coords
 }
 
 /*/// Some kind of joint thingy.
