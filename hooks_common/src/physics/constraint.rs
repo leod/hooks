@@ -6,7 +6,7 @@ use std::f32;
 
 use specs::prelude::Entity;
 
-use nalgebra::{dot, norm, normalize, Matrix2x6, Point2, Rotation2, RowVector6, Vector2};
+use nalgebra::{dot, norm, Matrix2x6, Point2, Rotation2, RowVector6, Vector2};
 
 #[derive(Clone, Debug)]
 pub struct Position {
@@ -95,13 +95,33 @@ impl Def {
 
                 let f = pos_a - pos_b;
                 let value_f = norm(&f);
+                let value = value_f - distance;
+
+                if value_f < 1e-12 {
+                    // TODO: No idea
+                    //debug!("small value_f");
+                    return (
+                        value,
+                        RowVector6::<f32>::new(0.001, 0.0, 0.0, 0.0, 0.0, 0.0),
+                    );
+                }
 
                 // Smart boi
                 let f_norm = f / value_f;
-                let obj_a_rot_norm = normalize(&(rot_a * object_pos_a.coords));
-                let obj_b_rot_norm = normalize(&(rot_b * object_pos_b.coords));
-                let rot_impact_a = f_norm.perp(&obj_a_rot_norm).abs();
-                let rot_impact_b = f_norm.perp(&obj_b_rot_norm).abs();
+                let obj_a_rot = rot_a * object_pos_a.coords;
+                let obj_b_rot = rot_b * object_pos_b.coords;
+                let obj_a_rot_norm = norm(&obj_a_rot);
+                let obj_b_rot_norm = norm(&obj_b_rot);
+                let rot_impact_a = if obj_a_rot_norm > 1e-9 {
+                    f_norm.perp(&(obj_a_rot / obj_a_rot_norm)).abs()
+                } else {
+                    0.0
+                };
+                let rot_impact_b = if obj_b_rot_norm > 1e-9 {
+                    f_norm.perp(&(obj_b_rot / obj_b_rot_norm)).abs()
+                } else {
+                    0.0
+                };
 
                 let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
                     .matrix()
@@ -110,7 +130,6 @@ impl Def {
                     .matrix()
                     .clone() * rot_impact_b;
 
-                let value = value_f - distance;
                 let jacobian_f = Matrix2x6::new(
                     1.0,
                     0.0,
@@ -217,12 +236,19 @@ pub fn solve_for_position(
     );
     let (value, jacobian) = constraint.calculate(x_a, x_b);
 
-    if (constraint.is_inequality() && value >= 0.0) || value.abs() <= 0.0001 {
+    if (constraint.is_inequality() && value >= 0.0) || value.abs() <= 1e-9 {
         return (x_a.clone(), x_b.clone());
     }
 
-    let lambda = value / dot(&jacobian.component_mul(&inv_m), &jacobian);
-    //debug!("{} {}", value, lambda);
+    let denom = dot(&jacobian.component_mul(&inv_m), &jacobian);
+
+    if denom <= 1e-9 {
+        // TODO: No idea
+        debug!("small denom");
+        return (x_a.clone(), x_b.clone());
+    }
+
+    let lambda = value / denom;
 
     let delta = -lambda * stiffness * jacobian.component_mul(&inv_m).transpose();
 
