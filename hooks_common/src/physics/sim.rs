@@ -122,8 +122,9 @@ impl Runner {
     }
 }
 
-fn normalize_angle(angle: f32) -> f32 {
-    angle
+pub fn normalize_angle(angle: f32) -> f32 {
+    angle % (2.0 * f32::consts::PI)
+    //angle
     //angle - 2.0 * f32::consts::PI * ((angle + f32::consts::PI) / (2.0 * f32::consts::PI)).floor()
 }
 

@@ -94,11 +94,11 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub const NUM_SEGMENTS: usize = 20;
-pub const SEGMENT_LENGTH: f32 = 200.0;
+pub const SEGMENT_LENGTH: f32 = 50.0;
 const JOIN_MARGIN: f32 = 1.0;
 //const MAX_SHOOT_TIME_SECS: f32 = 2.0;
 const SHOOT_SPEED: f32 = 100.0;
-const LUNCH_TIME_SECS: f32 = 0.025;
+const LUNCH_TIME_SECS: f32 = 0.5;
 const LUNCH_RADIUS: f32 = 5.0;
 const ANGLE_STIFFNESS: f32 = 0.7;
 const OWNER_ANGLE_STIFFNESS: f32 = 0.0;
@@ -423,22 +423,21 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                             let last_entity = segment_entities[num_active_segments - 1];
                             let last_pos = repl::try_component(&data.position, last_entity)?.0;
                             let distance = norm(&(last_pos - owner_pos.0));
-                            distance >= SEGMENT_LENGTH
+                            distance >= SEGMENT_LENGTH * 1.5
                         };
 
                         if activate_next {
                             let next_segment = segment_entities[num_active_segments];
 
-                            let velocity = Vector2::new(
-                                owner_orientation.0.cos(),
-                                owner_orientation.0.sin(),
-                            ) * SHOOT_SPEED;
+                            let direction =
+                                Vector2::new(owner_orientation.0.cos(), owner_orientation.0.sin());
+                            let velocity = owner_velocity.0 + direction * SHOOT_SPEED;
+                            let position = owner_pos.0 + direction * SEGMENT_LENGTH / 2.0;
 
-                            data.position.insert(next_segment, Position(owner_pos.0));
+                            data.position.insert(next_segment, Position(position));
                             data.orientation
                                 .insert(next_segment, Orientation(owner_orientation.0));
-                            data.velocity
-                                .insert(next_segment, Velocity(owner_velocity.0 + velocity));
+                            data.velocity.insert(next_segment, Velocity(velocity));
                             data.angular_velocity
                                 .insert(next_segment, AngularVelocity(0.0));
 
