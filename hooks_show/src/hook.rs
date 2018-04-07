@@ -18,7 +18,7 @@ use {Input, Output, Registry};
 
 /// Draw joints for debugging.
 pub fn register_show(reg: &mut Registry) {
-    reg.event_handler(handle_event);
+    //reg.event_handler(handle_event);
     reg.draw_fn(draw);
 }
 

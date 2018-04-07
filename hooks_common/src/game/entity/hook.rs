@@ -94,14 +94,14 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub const NUM_SEGMENTS: usize = 20;
-pub const SEGMENT_LENGTH: f32 = 50.0;
+pub const SEGMENT_LENGTH: f32 = 35.0;
 const JOIN_MARGIN: f32 = 1.0;
 //const MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const SHOOT_SPEED: f32 = 100.0;
-const LUNCH_TIME_SECS: f32 = 0.5;
+const SHOOT_SPEED: f32 = 1000.0;
+const LUNCH_TIME_SECS: f32 = 0.025;
 const LUNCH_RADIUS: f32 = 5.0;
 const ANGLE_STIFFNESS: f32 = 0.7;
-const OWNER_ANGLE_STIFFNESS: f32 = 0.0;
+const OWNER_ANGLE_STIFFNESS: f32 = 1.0;
 
 /// This event is emitted when a hook attaches at some point. This is meant to be used for
 /// visualization purposes.
@@ -203,6 +203,7 @@ impl repl::Predictable for State {
 #[derive(Component, Clone, Debug)]
 #[storage(BTreeStorage)]
 pub struct CurrentInput {
+    pub rot_angle: f32,
     pub shoot: bool,
     pub pull: bool,
 }
@@ -379,7 +380,6 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
         // Need to know the position of our owner entity
         let owner_entity = data.entity_map.try_id_to_entity(hook_def.owner)?;
         let owner_pos = repl::try_component(&data.position, owner_entity)?.clone();
-        let owner_orientation = repl::try_component(&data.orientation, owner_entity)?.clone();
         let owner_velocity = repl::try_component(&data.velocity, owner_entity)?.clone();
 
         // Look up the segment entities of this hook
@@ -429,14 +429,18 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                         if activate_next {
                             let next_segment = segment_entities[num_active_segments];
 
-                            let direction =
-                                Vector2::new(owner_orientation.0.cos(), owner_orientation.0.sin());
+                            let angle = if num_active_segments == 0 {
+                                input.rot_angle
+                            } else {
+                                let previous_entity = segment_entities[num_active_segments - 1];
+                                repl::try_component(&data.orientation, previous_entity)?.0
+                            };
+                            let direction = Vector2::new(angle.cos(), angle.sin());
                             let velocity = owner_velocity.0 + direction * SHOOT_SPEED;
                             let position = owner_pos.0 + direction * SEGMENT_LENGTH / 2.0;
 
                             data.position.insert(next_segment, Position(position));
-                            data.orientation
-                                .insert(next_segment, Orientation(owner_orientation.0));
+                            data.orientation.insert(next_segment, Orientation(angle));
                             data.velocity.insert(next_segment, Velocity(velocity));
                             data.angular_velocity
                                 .insert(next_segment, AngularVelocity(0.0));
@@ -526,7 +530,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
                                 constraint_distance,
                             ));
 
-                            if active_state.fixed.is_none() {
+                            if active_state.fixed.is_some() {
                                 data.constraints
                                     .add(owner_segment_angle_constraint(owner_entity, last_entity));
                             }
@@ -634,7 +638,7 @@ fn owner_segment_joint_constraint(
 ) -> Constraint {
     let joint_def = constraint::Def::Joint {
         distance: distance,
-        object_pos_a: Point2::new(0.01, 0.0), //Point2::origin(),
+        object_pos_a: Point2::new(0.0, 0.0), //Point2::origin(),
         object_pos_b: last_object_pos,
     };
     Constraint {
@@ -662,11 +666,11 @@ fn owner_segment_angle_constraint(owner_entity: Entity, last_entity: Entity) -> 
         entity_b: last_entity,
         vars_a: constraint::Vars {
             pos: false,
-            angle: false,
+            angle: true,
         },
         vars_b: constraint::Vars {
             pos: false,
-            angle: true,
+            angle: false,
         },
     }
 }

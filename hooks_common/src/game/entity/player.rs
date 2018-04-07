@@ -1,6 +1,6 @@
 use std::f32;
 
-use nalgebra::{normalize, zero, Point2, Rotation2, Vector2};
+use nalgebra::{norm, zero, Point2, Rotation2, Vector2};
 
 use specs::prelude::*;
 use specs::storage::BTreeStorage;
@@ -10,7 +10,6 @@ use game::ComponentType;
 use game::entity::hook;
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use physics::interaction;
-use physics::sim;
 use physics::{AngularVelocity, Drag, Dynamic, InvAngularMass, InvMass, Orientation, Position,
               Velocity};
 use registry::Registry;
@@ -51,6 +50,8 @@ const MOVE_ACCEL: f32 = 800.0;
 const ROT_ACCEL: f32 = 200.0;
 const MASS: f32 = 50.0;
 const DRAG: f32 = 2.0;
+const SNAP_ANGLE: f32 = f32::consts::PI / 12.0;
+const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
@@ -97,6 +98,7 @@ pub fn run_input(
             world.write::<hook::CurrentInput>().insert(
                 hook_entity,
                 hook::CurrentInput {
+                    rot_angle: input.rot_angle,
                     shoot: if i == 0 {
                         input.shoot_one
                     } else {
@@ -192,50 +194,48 @@ impl<'a> System<'a> for InputSys {
                 orientation.0 = input.0.rot_angle;
             }*/
 
-            let delta_angle = input.0.rot_angle - orientation.0;
-            let norm_angle = delta_angle.sin().atan2(delta_angle.cos());
-
             let diff = (input.0.rot_angle - orientation.0 + f32::consts::PI) %
                 (2.0 * f32::consts::PI) - f32::consts::PI;
-            let norm_angle = if diff < -f32::consts::PI {
+            let smallest_angle = if diff < -f32::consts::PI {
                 diff + 2.0 * f32::consts::PI
             } else {
                 diff
             };
+            if smallest_angle.abs() <= SNAP_ANGLE {
+                orientation.0 = input.0.rot_angle;
+            } else {
+                if smallest_angle < 0.0 {
+                    angular_velocity.0 -= ROT_ACCEL * dt;
+                } else if smallest_angle > 0.0 {
+                    angular_velocity.0 += ROT_ACCEL * dt;
+                }
+            }
 
-            debug!(
-                "{} - {} = {} -> {}",
-                input.0.rot_angle, orientation.0, delta_angle, norm_angle
-            );
-
-            if norm_angle < 0.0 {
-                angular_velocity.0 -= ROT_ACCEL * dt;
-            } else if norm_angle > 0.0 {
-                angular_velocity.0 += ROT_ACCEL * dt;
+            if angular_velocity.0.abs() > MAX_ANGULAR_VEL {
+                angular_velocity.0 = angular_velocity.0.signum() * MAX_ANGULAR_VEL;
             }
 
             let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
             let right = Vector2::new(-forward.y, forward.x);
 
             let mut direction = Vector2::new(0.0, 0.0);
-            let move_any = input.0.move_forward || input.0.move_backward || input.0.move_right ||
-                input.0.move_left;
 
-            if move_any {
-                if input.0.move_forward {
-                    direction += forward;
-                }
-                if input.0.move_backward {
-                    direction -= forward;
-                }
-                if input.0.move_right {
-                    direction += right;
-                }
-                if input.0.move_left {
-                    direction -= right;
-                }
+            if input.0.move_forward {
+                direction += forward;
+            }
+            if input.0.move_backward {
+                direction -= forward;
+            }
+            if input.0.move_right {
+                direction += right;
+            }
+            if input.0.move_left {
+                direction -= right;
+            }
 
-                velocity.0 += normalize(&direction) * MOVE_ACCEL * dt;
+            let direction_norm = norm(&direction);
+            if direction_norm > 0.0 {
+                velocity.0 += direction / direction_norm * MOVE_ACCEL * dt;
             }
         }
     }
