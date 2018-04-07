@@ -28,7 +28,7 @@ pub struct Player {
 
     /// Index of the next entity that will be created for this player. This is used by the server
     /// for all players, and might get used by clients for prediction of the creation of owned
-    /// entities.
+    /// entities in the future.
     pub next_entity_index: EntityIndex,
 }
 

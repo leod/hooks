@@ -75,7 +75,7 @@ impl Assets {
         )?;
         let rect_line = Mesh::new_polygon(
             ctx,
-            DrawMode::Line(1.0),
+            DrawMode::Line(0.1),
             &[
                 Point2::new(-0.5, -0.5),
                 Point2::new(0.5, -0.5),

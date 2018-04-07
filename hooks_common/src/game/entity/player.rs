@@ -98,6 +98,11 @@ pub fn run_input(
                     } else {
                         input.shoot_two
                     },
+                    pull: if i == 0 {
+                        input.pull_one
+                    } else {
+                        input.pull_two
+                    },
                 },
             );
         }
