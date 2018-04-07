@@ -1,16 +1,20 @@
 #[macro_use]
 pub mod snapshot;
-pub mod tick;
-pub mod interp;
 pub mod entity;
+pub mod interp;
 pub mod player;
+pub mod tick;
 
 #[cfg(test)]
 mod tests;
 
 use std::collections::BTreeMap;
+use std::intrinsics::type_name;
+use std::ops::{Deref, DerefMut};
 
-use specs::prelude::{Entity, VecStorage, World};
+use specs::join::JoinIter;
+use specs::prelude::{Component, Entities, Entity, Join, Storage, VecStorage, World};
+use specs::storage::MaskedStorage;
 
 use defs::{EntityClassId, EntityId, PlayerId};
 use registry::Registry;
@@ -70,6 +74,45 @@ pub fn is_entity(world: &World, id: EntityId) -> bool {
     world.read_resource::<EntityMap>().is_entity(id)
 }
 
+pub fn try_component<'a, T, D>(storage: &'a Storage<T, D>, entity: Entity) -> Result<&'a T, Error>
+where
+    T: Component,
+    D: Deref<Target = MaskedStorage<T>>,
+{
+    storage
+        .get(entity)
+        .ok_or(Error::EntityMissingComponent(entity, unsafe {
+            type_name::<T>()
+        }))
+}
+
+pub fn try_component_mut<'a, T, D>(
+    storage: &'a mut Storage<T, D>,
+    entity: Entity,
+) -> Result<&'a mut T, Error>
+where
+    T: Component,
+    D: DerefMut<Target = MaskedStorage<T>>,
+{
+    storage
+        .get_mut(entity)
+        .ok_or(Error::EntityMissingComponent(entity, unsafe {
+            type_name::<T>()
+        }))
+}
+
+pub fn try_join_get<'a, J: Join>(
+    entity: Entity,
+    entities: &Entities<'a>,
+    mut join_iter: JoinIter<J>,
+) -> Result<J::Type, Error> {
+    join_iter
+        .get(entity, entities)
+        .ok_or(Error::EntityMissingComponent(entity, unsafe {
+            type_name::<J::Type>()
+        }))
+}
+
 /// An `Error` indicates that something went seriously wrong in replication. Either we have a bug,
 /// or the server sent us an invalid snapshot. It is not possible to recover from this, so we
 /// should disconnect if such an error occurs.
@@ -83,4 +126,5 @@ pub enum Error {
     InvalidState(String),
     InvalidEntity(EntityId),
     MissingComponent(EntityId, &'static str),
+    EntityMissingComponent(Entity, &'static str),
 }

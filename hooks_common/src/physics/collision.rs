@@ -5,18 +5,18 @@ use specs::storage::{BTreeStorage, VecStorage};
 
 use nalgebra::{self, Isometry2};
 use ncollide::math::{Isometry, Point};
-use ncollide::shape::{self, Ball, Plane, ShapeHandle2};
-use ncollide::query::algorithms::{JohnsonSimplex, VoronoiSimplex2, VoronoiSimplex3};
 use ncollide::narrow_phase::{BallBallContactGenerator, CompositeShapeShapeContactGenerator,
                              ContactAlgorithm, ContactDispatcher, DefaultNarrowPhase,
                              DefaultProximityDispatcher, OneShotContactManifoldGenerator,
                              PlaneSupportMapContactGenerator, ShapeCompositeShapeContactGenerator,
                              SupportMapPlaneContactGenerator, SupportMapSupportMapContactGenerator};
+use ncollide::query::algorithms::{JohnsonSimplex, VoronoiSimplex2, VoronoiSimplex3};
+use ncollide::shape::{self, Ball, Plane, ShapeHandle2};
 use ncollide::world::{CollisionObjectHandle, CollisionWorld2};
 
+use entity;
 use physics::{Orientation, Position};
 use registry::Registry;
-use entity;
 
 pub use ncollide::shape::{Cuboid, ShapeHandle};
 pub use ncollide::world::{CollisionGroups, GeometricQueryType};

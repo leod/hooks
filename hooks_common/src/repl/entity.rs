@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use specs::prelude::*;
 
 use defs::{EntityClassId, EntityId, EntityIndex, GameInfo, PlayerId, INVALID_PLAYER_ID};
+use entity;
 use event::{self, Event};
 use registry::Registry;
 use repl::{self, player};
-use entity;
 
 pub use entity::Meta;
 pub use repl::snapshot::{ComponentType, EntityClass, EntityClasses, EntitySnapshot, WorldSnapshot};

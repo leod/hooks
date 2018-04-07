@@ -8,11 +8,12 @@ use hooks_util::{profile, stats};
 use defs::GameInfo;
 use entity::{self, Active};
 use registry::Registry;
+use repl;
 
-use physics::{collision, constraint, interaction, AngularVelocity, Drag, Dynamic, Friction,
-              InvAngularMass, InvMass, Orientation, Position, Update, Velocity};
 use physics::collision::CollisionWorld;
 use physics::constraint::Constraint;
+use physics::{collision, constraint, interaction, AngularVelocity, Drag, Dynamic, Friction,
+              InvAngularMass, InvMass, Orientation, Position, Update, Velocity};
 
 pub fn register(reg: &mut Registry) {
     reg.component::<OldPosition>();
@@ -109,12 +110,15 @@ impl Runner {
         SolveConstraintsSys.run_now(&world.res);
         CorrectVelocitySys.run_now(&world.res);
 
-        let interactions = world.read_resource::<InteractionEvents>().0.clone();
-        for event in &interactions {
-            interaction::run(world, event);
-        }
-
         world.write_resource::<Constraints>().0.clear();
+    }
+
+    pub fn run_interaction_events(&self, world: &World) -> Result<(), repl::Error> {
+        let mut interactions = world.write_resource::<InteractionEvents>();
+        for event in interactions.0.drain(..) {
+            interaction::run(world, &event)?;
+        }
+        Ok(())
     }
 }
 
@@ -130,19 +134,12 @@ struct Force(Vector2<f32>);
 struct PrepareSys;
 
 impl<'a> System<'a> for PrepareSys {
-    type SystemData = (
-        FetchMut<'a, InteractionEvents>,
-        Entities<'a>,
-        Filter<'a>,
-        WriteStorage<'a, Force>,
-    );
+    type SystemData = (Entities<'a>, Filter<'a>, WriteStorage<'a, Force>);
 
-    fn run(&mut self, (mut interactions, entities, filter, mut force): Self::SystemData) {
+    fn run(&mut self, (entities, filter, mut force): Self::SystemData) {
         for (entity, _) in (&*entities, filter.join()).join() {
             force.insert(entity, Force(zero()));
         }
-
-        interactions.0.clear();
     }
 }
 

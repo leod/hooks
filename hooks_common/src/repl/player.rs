@@ -4,9 +4,9 @@ use std::collections::btree_map;
 use specs::prelude::{Entity, Join, World};
 
 use defs::{EntityIndex, LeaveReason, PlayerId, PlayerInfo};
+use entity;
 use event::{self, Event};
 use registry::Registry;
-use entity;
 use repl;
 
 pub fn register(reg: &mut Registry) {

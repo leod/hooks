@@ -1,5 +1,5 @@
-use std::ops::Deref;
 use std::collections::BTreeMap;
+use std::ops::Deref;
 
 use nalgebra::{Point2, Vector2};
 use specs::prelude::{Entity, Fetch, Storage, World};
@@ -8,15 +8,17 @@ use specs::storage::MaskedStorage;
 use hooks_util::ordered_pair::OrderedPair;
 
 use defs::EntityClassId;
-use registry::Registry;
 use entity;
+use registry::Registry;
+use repl;
 
 pub fn register(reg: &mut Registry) {
     reg.resource(HandlersSetup(Vec::new()));
     reg.resource(Handlers(BTreeMap::new()));
 }
 
-type Handler = fn(&World, &EntityInfo, &EntityInfo, Point2<f32>, Vector2<f32>);
+type Handler =
+    fn(&World, &EntityInfo, &EntityInfo, Point2<f32>, Vector2<f32>) -> Result<(), repl::Error>;
 
 /// An action that should be taken when two entities overlap in a physics prediction step.
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -61,6 +63,7 @@ pub struct Event {
 /// only resolve to ids later in `setup`.
 struct HandlersSetup(Vec<(String, String, Def)>);
 
+/// Resource to store the entity handlers for pairs of entity classes.
 pub struct Handlers(BTreeMap<OrderedPair<EntityClassId>, (EntityClassId, EntityClassId, Def)>);
 
 pub fn set(
@@ -136,7 +139,7 @@ where
         .and_then(|x| x)
 }
 
-pub fn run(world: &World, event: &Event) {
+pub fn run(world: &World, event: &Event) -> Result<(), repl::Error> {
     setup(world);
 
     let (id_a, id_b) = {
@@ -159,10 +162,14 @@ pub fn run(world: &World, event: &Event) {
         if let Some(handler) = def.handler {
             // Make sure to pass the entities in the order in which the handler expects them
             if id_a == handler_id_a {
-                handler(world, &event.a, &event.b, event.pos, event.normal);
+                handler(world, &event.a, &event.b, event.pos, event.normal)
             } else {
-                handler(world, &event.b, &event.a, event.pos, event.normal);
+                handler(world, &event.b, &event.a, event.pos, event.normal)
             }
+        } else {
+            Ok(())
         }
+    } else {
+        Ok(())
     }
 }

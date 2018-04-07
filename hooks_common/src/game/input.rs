@@ -2,10 +2,10 @@ pub mod auth {
     use specs::prelude::{Join, World};
 
     use defs::{PlayerId, PlayerInput};
+    use game::entity::player;
     use physics::{self, Update};
     use repl;
     use repl::player::Players;
-    use game::entity::player;
 
     pub fn run_player_input(
         world: &mut World,
@@ -41,6 +41,7 @@ pub mod auth {
         }
 
         physics_runner.run(world);
+        physics_runner.run_interaction_events(world)?;
 
         Ok(())
     }

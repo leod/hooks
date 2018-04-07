@@ -4,9 +4,9 @@ pub mod auth {
     use specs::prelude::World;
 
     use defs::GameInfo;
+    use game::entity;
     use registry::Registry;
     use repl;
-    use game::entity;
 
     pub fn register(reg: &mut Registry) {
         reg.pre_tick_fn(pre_tick);

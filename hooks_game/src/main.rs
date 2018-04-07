@@ -14,19 +14,19 @@ use std::{env, io, path, thread};
 
 use nalgebra::{Point2, Vector2};
 
-use ggez::{conf, ContextBuilder};
 use ggez::event::{self, Keycode, MouseButton};
 use ggez::graphics::Font;
+use ggez::{conf, ContextBuilder};
 
-use hooks_util::debug::{self, Inspect};
-use hooks_util::profile::{self, PROFILER};
-use hooks_util::stats;
-use hooks_util::timer;
 use hooks_common::defs::{GameInfo, PlayerInput};
 use hooks_common::registry::Registry;
 use hooks_game::client::Client;
 use hooks_game::game::Game;
 use hooks_show::{Assets, Show};
+use hooks_util::debug::{self, Inspect};
+use hooks_util::profile::{self, PROFILER};
+use hooks_util::stats;
+use hooks_util::timer;
 
 fn register(reg: &mut Registry, game_info: &GameInfo) {
     // Game state

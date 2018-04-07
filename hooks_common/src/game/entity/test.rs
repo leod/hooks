@@ -1,11 +1,11 @@
 use nalgebra::Point2;
 
+use entity;
 use game::ComponentType;
-use physics::{Dynamic, InvAngularMass, InvMass, Orientation};
 use physics::constraint::{self, Constraint};
 use physics::sim::Constraints;
+use physics::{Dynamic, InvAngularMass, InvMass, Orientation};
 use registry::Registry;
-use entity;
 use repl;
 
 pub fn register(reg: &mut Registry) {

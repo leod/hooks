@@ -1,7 +1,7 @@
-mod defs;
 pub mod collision;
-pub mod interaction;
 pub mod constraint;
+mod defs;
+pub mod interaction;
 pub mod sim;
 
 use registry::Registry;

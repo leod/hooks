@@ -5,8 +5,8 @@ use std::io::Cursor;
 use std::mem;
 use std::u16;
 
-use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 use bit_manager::data::BitStore;
+use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use mopa;
 

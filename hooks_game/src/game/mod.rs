@@ -5,15 +5,15 @@ use bit_manager::BitReader;
 use rand::{self, Rng};
 use specs::prelude::{RunNow, World};
 
+use hooks_common::net::protocol::ClientGameMsg;
+use hooks_common::physics::{Orientation, Position};
+use hooks_common::registry::Registry;
+use hooks_common::repl::{self, interp, tick};
+use hooks_common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
 use hooks_util::debug;
 use hooks_util::profile;
 use hooks_util::stats;
 use hooks_util::timer::{self, Timer};
-use hooks_common::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
-use hooks_common::net::protocol::ClientGameMsg;
-use hooks_common::registry::Registry;
-use hooks_common::physics::{Orientation, Position};
-use hooks_common::repl::{self, interp, tick};
 
 use client::{self, Client};
 

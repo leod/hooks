@@ -1,7 +1,7 @@
 use specs::prelude::{Dispatcher, World};
 
-use registry::{EventHandler, Registry, TickFn};
 use event::{self, Event};
+use registry::{EventHandler, Registry, TickFn};
 
 pub struct State {
     pub world: World,

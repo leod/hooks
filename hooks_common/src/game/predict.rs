@@ -4,9 +4,9 @@ use specs::prelude::{RunNow, World};
 
 use defs::{PlayerId, PlayerInput, TickNum};
 use event;
+use game::{self, input};
 use physics;
 use repl::{self, tick};
-use game::{self, input};
 
 struct LogEntry {
     input: PlayerInput,
