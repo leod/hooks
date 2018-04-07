@@ -1,3 +1,5 @@
+use std::f32;
+
 use nalgebra::{normalize, zero, Point2, Rotation2, Vector2};
 
 use specs::prelude::*;
@@ -8,6 +10,7 @@ use game::ComponentType;
 use game::entity::hook;
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use physics::interaction;
+use physics::sim;
 use physics::{AngularVelocity, Drag, Dynamic, InvAngularMass, InvMass, Orientation, Position,
               Velocity};
 use registry::Registry;
@@ -45,6 +48,7 @@ pub fn register(reg: &mut Registry) {
 
 pub const NUM_HOOKS: usize = 2;
 const MOVE_ACCEL: f32 = 800.0;
+const ROT_ACCEL: f32 = 200.0;
 const MASS: f32 = 50.0;
 const DRAG: f32 = 2.0;
 
@@ -162,8 +166,9 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 struct InputData<'a> {
     game_info: Fetch<'a, GameInfo>,
     input: ReadStorage<'a, CurrentInput>,
-    velocity: WriteStorage<'a, Velocity>,
     orientation: WriteStorage<'a, Orientation>,
+    velocity: WriteStorage<'a, Velocity>,
+    angular_velocity: WriteStorage<'a, AngularVelocity>,
 }
 
 struct InputSys;
@@ -175,12 +180,38 @@ impl<'a> System<'a> for InputSys {
         let dt = data.game_info.tick_duration_secs();
 
         // Movement
-        for (input, orientation, velocity) in
-            (&data.input, &mut data.orientation, &mut data.velocity).join()
+        for (input, orientation, velocity, angular_velocity) in (
+            &data.input,
+            &mut data.orientation,
+            &mut data.velocity,
+            &mut data.angular_velocity,
+        ).join()
         {
-            if input.0.rot_angle != orientation.0 {
+            /*if input.0.rot_angle != orientation.0 {
                 // TODO: Only mutate if changed
                 orientation.0 = input.0.rot_angle;
+            }*/
+
+            let delta_angle = input.0.rot_angle - orientation.0;
+            let norm_angle = delta_angle.sin().atan2(delta_angle.cos());
+
+            let diff = (input.0.rot_angle - orientation.0 + f32::consts::PI) %
+                (2.0 * f32::consts::PI) - f32::consts::PI;
+            let norm_angle = if diff < -f32::consts::PI {
+                diff + 2.0 * f32::consts::PI
+            } else {
+                diff
+            };
+
+            debug!(
+                "{} - {} = {} -> {}",
+                input.0.rot_angle, orientation.0, delta_angle, norm_angle
+            );
+
+            if norm_angle < 0.0 {
+                angular_velocity.0 -= ROT_ACCEL * dt;
+            } else if norm_angle > 0.0 {
+                angular_velocity.0 += ROT_ACCEL * dt;
             }
 
             let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
