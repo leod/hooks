@@ -205,6 +205,7 @@ impl repl::Predictable for State {
 pub struct CurrentInput {
     pub rot_angle: f32,
     pub shoot: bool,
+    pub previous_shoot: bool,
     pub pull: bool,
 }
 
@@ -369,7 +370,7 @@ struct InputData<'a> {
     hook_state: WriteStorage<'a, State>,
 }
 
-pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
+pub fn run_input(world: &World) -> Result<(), repl::Error> {
     let mut data = InputData::fetch(&world.res);
 
     let dt = data.game_info.tick_duration_secs();
@@ -540,7 +541,7 @@ pub fn run_input_sys(world: &World) -> Result<(), repl::Error> {
             }
         } else {
             // Hook currently inactive
-            if input.shoot {
+            if input.shoot && !input.previous_shoot {
                 // Start shooting the hook
                 overwrite_hook_state = Some(Some(ActiveState {
                     mode: Mode::Shooting,
