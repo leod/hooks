@@ -54,17 +54,32 @@ const MASS: f32 = 50.0;
 const DRAG: f32 = 2.0;
 const SNAP_ANGLE: f32 = f32::consts::PI / 12.0;
 const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
+const TAP_TIME_SECS: f32 = 0.25;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
 #[storage(BTreeStorage)]
 pub struct CurrentInput(pub PlayerInput);
 
+// Tappable keys
+const MOVE_FORWARD_KEY: usize = 0;
+const MOVE_BACKWARD_KEY: usize = 1;
+const MOVE_LEFT_KEY: usize = 2;
+const MOVE_RIGHT_KEY: usize = 3;
+const NUM_TAP_KEYS: usize = 4;
+
+#[derive(PartialEq, Clone, Debug, Default, BitStore)]
+struct TapState {
+    secs_left: f32,
+}
+
 #[derive(Component, PartialEq, Clone, Debug, Default, BitStore)]
 #[storage(BTreeStorage)]
 pub struct InputState {
     previous_shoot_one: bool,
     previous_shoot_two: bool,
+    previous_tap_input: [bool; NUM_TAP_KEYS],
+    tap_state: [TapState; NUM_TAP_KEYS],
 }
 
 impl repl::Predictable for InputState {}
@@ -207,6 +222,35 @@ impl<'a> System<'a> for InputSys {
     fn run(&mut self, mut data: InputData<'a>) {
         let dt = data.game_info.tick_duration_secs();
 
+        // Update tap state
+        let mut tapped_keys = [false; NUM_TAP_KEYS];
+        for (input, input_state) in (&data.input, &mut data.input_state).join() {
+            let tap_input = [
+                input.0.move_forward,
+                input.0.move_backward,
+                input.0.move_left,
+                input.0.move_right,
+            ];
+
+            for i in 0..NUM_TAP_KEYS {
+                if tap_input[i] && !input_state.previous_tap_input[i] {
+                    if input_state.tap_state[i].secs_left > 0.0 {
+                        tapped_keys[i] = true;
+                        input_state.tap_state[i].secs_left = 0.0;
+                    } else {
+                        input_state.tap_state[i].secs_left = TAP_TIME_SECS;
+                    }
+                }
+
+                input_state.tap_state[i].secs_left -= dt;
+                if input_state.tap_state[i].secs_left < 0.0 {
+                    input_state.tap_state[i].secs_left = 0.0;
+                }
+
+                input_state.previous_tap_input[i] = tap_input[i];
+            }
+        }
+
         // Movement
         for (input, orientation, velocity, angular_velocity) in (
             &data.input,
@@ -215,6 +259,10 @@ impl<'a> System<'a> for InputSys {
             &mut data.angular_velocity,
         ).join()
         {
+            if tapped_keys[MOVE_FORWARD_KEY] {
+                debug!("tapped it");
+            }
+
             /*if input.0.rot_angle != orientation.0 {
                 // TODO: Only mutate if changed
                 orientation.0 = input.0.rot_angle;
@@ -265,7 +313,7 @@ impl<'a> System<'a> for InputSys {
             }
         }
 
-        // Update input state
+        // Remember some input state
         for (input, input_state) in (&data.input, &mut data.input_state).join() {
             input_state.previous_shoot_one = input.0.shoot_one;
             input_state.previous_shoot_two = input.0.shoot_two;
