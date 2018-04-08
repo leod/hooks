@@ -7,7 +7,7 @@ use specs::prelude::{Component, DenseVecStorage, FlaggedStorage, VecStorage};
 use specs::storage::NullStorage;
 
 use registry::Registry;
-use repl::Predictable;
+use repl;
 use repl::interp::Interp;
 
 pub fn register(reg: &mut Registry) {
@@ -45,11 +45,11 @@ pub struct InvMass(pub f32);
 pub struct InvAngularMass(pub f32);
 
 /// Two-dimensional position.
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Position(pub Point2<f32>);
 
 /// Two-dimensional velocity.
-#[derive(Component, PartialEq, Clone, Debug)]
+#[derive(Component, PartialEq, Clone, Copy, Debug)]
 #[storage(VecStorage)]
 pub struct Velocity(pub Vector2<f32>);
 
@@ -65,7 +65,7 @@ impl Interp for Position {
 }
 
 /// Rotation angle.
-#[derive(PartialEq, Clone, Debug, BitStore)]
+#[derive(PartialEq, Clone, Copy, Debug, BitStore)]
 pub struct Orientation(pub f32);
 
 impl Interp for Orientation {
@@ -82,17 +82,17 @@ impl Component for Orientation {
 }
 
 /// Angular velocity.
-#[derive(Component, PartialEq, Clone, Debug, BitStore)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, BitStore)]
 #[storage(VecStorage)]
 pub struct AngularVelocity(pub f32);
 
 /// Whether to apply friction to this entity.
-#[derive(Component, PartialEq, Clone, Debug, Default)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, Default)]
 #[storage(DenseVecStorage)]
 pub struct Friction(pub f32);
 
 /// Whether to apply drag to this entity.
-#[derive(Component, PartialEq, Clone, Debug, Default)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, Default)]
 #[storage(DenseVecStorage)]
 pub struct Drag(pub f32);
 
@@ -138,27 +138,27 @@ impl BitStore for Position {
     }
 }
 
-impl Predictable for Position {
+impl repl::Component for Position {
     fn distance(&self, other: &Position) -> f32 {
         let d = self.0 - other.0;
         d.x.max(d.y)
     }
 }
 
-impl Predictable for Velocity {
+impl repl::Component for Velocity {
     fn distance(&self, other: &Velocity) -> f32 {
         let d = self.0 - other.0;
         d.x.max(d.y)
     }
 }
 
-impl Predictable for Orientation {
+impl repl::Component for Orientation {
     fn distance(&self, other: &Orientation) -> f32 {
         (self.0 - other.0).abs()
     }
 }
 
-impl Predictable for AngularVelocity {
+impl repl::Component for AngularVelocity {
     fn distance(&self, other: &AngularVelocity) -> f32 {
         (self.0 - other.0).abs()
     }

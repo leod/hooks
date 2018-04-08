@@ -23,7 +23,7 @@ impl From<bit_manager::Error> for Error {
 
 /// Trait implemented by the EntitySnapshot struct in the `snapshot!` macro. An EntitySnapshot
 /// stores the state of a set of components of one entity.
-pub trait EntitySnapshot: Clone + PartialEq + 'static {
+pub trait EntitySnapshot: Clone + Copy + PartialEq + 'static {
     /// Identifier for types of components possibly held in a snapshot.
     type ComponentType: ComponentType<EntitySnapshot = Self>;
 
@@ -85,7 +85,7 @@ impl<T: ComponentType> EntityClasses<T> {
 /// Snapshot of a set of entities at one point in time. In addition to the EntitySnapshot, we store
 /// the entities' meta-information here as well, so that we know which components should be
 /// replicated.
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct WorldSnapshot<T: EntitySnapshot>(pub BTreeMap<EntityId, (Meta, T)>);
 
 impl<T: EntitySnapshot> WorldSnapshot<T> {
@@ -365,7 +365,7 @@ macro_rules! snapshot {
 
             /// Complete replicated state of one entity. Note that not every component needs to be
             /// given for every entity.
-            #[derive(Clone, PartialEq)]
+            #[derive(PartialEq, Clone, Copy, Debug)]
             pub struct EntitySnapshot {
                 $(
                     pub $field_name: Option<$field_type>,
@@ -404,7 +404,12 @@ macro_rules! snapshot {
                                     match (self.$field_name.as_ref(), cur.$field_name.as_ref()) {
                                         (Some(left), Some(right)) => {
                                             // Only write the component if it has changed
-                                            let changed: bool = left != right;
+                                            let changed =
+                                                if <$field_type as repl::Component>::STATIC {
+                                                    false
+                                                } else {
+                                                    left != right
+                                                };
                                             writer.write_bit(changed)?;
                                             if changed {
                                                 writer.write(right)?;
@@ -477,7 +482,7 @@ macro_rules! snapshot {
                     $(
                         match (&self.$field_name, &other.$field_name) {
                             (&Some(ref a), &Some(ref b)) => {
-                                let dist = repl::Predictable::distance(a, b);
+                                let dist = repl::Component::distance(a, b);
                                 if dist > 0.0 {
                                     //debug!("{}: {}", stringify!($field_name), dist);
                                 }
