@@ -85,12 +85,12 @@ const MOVE_LEFT_KEY: usize = 2;
 const MOVE_RIGHT_KEY: usize = 3;
 const NUM_TAP_KEYS: usize = 4;
 
-#[derive(PartialEq, Clone, Debug, Default, BitStore)]
+#[derive(PartialEq, Clone, Copy, Debug, Default, BitStore)]
 struct TapState {
     secs_left: f32,
 }
 
-#[derive(Component, PartialEq, Clone, Debug, Default, BitStore)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, Default, BitStore)]
 #[storage(BTreeStorage)]
 pub struct InputState {
     previous_shoot_one: bool,
@@ -99,30 +99,32 @@ pub struct InputState {
     tap_state: [TapState; NUM_TAP_KEYS],
 }
 
-impl repl::Predictable for InputState {}
+impl repl::Component for InputState {}
 
-#[derive(Component, PartialEq, Clone, Debug, BitStore)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, BitStore)]
 #[storage(BTreeStorage)]
 pub struct Player {
     pub hooks: [EntityId; NUM_HOOKS],
 }
 
-impl repl::Predictable for Player {}
+impl repl::Component for Player {
+    const STATIC: bool = true;
+}
 
-#[derive(PartialEq, Clone, Debug, BitStore)]
+#[derive(PartialEq, Clone, Copy, Debug, BitStore)]
 pub struct DashState {
     pub direction: [f32; 2],
     pub secs_left: f32,
 }
 
-#[derive(Component, PartialEq, Clone, Debug, Default, BitStore)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, Default, BitStore)]
 #[storage(BTreeStorage)]
 pub struct State {
     pub dash_cooldown_secs: f32,
     pub dash_state: Option<DashState>,
 }
 
-impl repl::Predictable for State {}
+impl repl::Component for State {}
 
 impl State {
     pub fn dash(&mut self, direction: Vector2<f32>) {

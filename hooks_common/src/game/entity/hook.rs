@@ -128,9 +128,7 @@ impl Event for FixedEvent {
 ///       `EntityId` also contains the `PlayerId` of the entity owner. As we assume that every hook
 ///       belongs to exactly one player, this means we are sending redundant information. However,
 ///       the increased ease of use wins here for now.
-/// TODO: Could save some comparisons by allowing to declare components as constant during an
-///       entity's lifetime.
-#[derive(Component, PartialEq, Clone, Debug, BitStore)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, BitStore)]
 pub struct Def {
     /// Different hook colors for drawing.
     pub index: u32,
@@ -145,16 +143,20 @@ pub struct Def {
     pub segments: [EntityId; NUM_SEGMENTS],
 }
 
-impl repl::Predictable for Def {}
+impl repl::Component for Def {
+    const STATIC: bool = true;
+}
 
 /// Definition of a hook segment. Again, this should not change in the entity's lifetime.
-#[derive(Component, PartialEq, Clone, Debug, BitStore)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, BitStore)]
 pub struct SegmentDef {
     /// Every hook segment belongs to one hook.
     pub hook: EntityId,
 }
 
-impl repl::Predictable for SegmentDef {}
+impl repl::Component for SegmentDef {
+    const STATIC: bool = true;
+}
 
 /// Hook mode.
 #[derive(PartialEq, Eq, Clone, Copy, Debug, BitStore)]
@@ -164,7 +166,7 @@ pub enum Mode {
 }
 
 /// The dynamic state of an active hook. This is replicated and expected to change frequently.
-#[derive(PartialEq, Clone, Debug, BitStore)]
+#[derive(PartialEq, Clone, Copy, Debug, BitStore)]
 pub struct ActiveState {
     /// Hook mode.
     pub mode: Mode,
@@ -185,10 +187,10 @@ pub struct ActiveState {
 }
 
 /// The dynamic state of a hook.
-#[derive(Component, PartialEq, Clone, Debug, BitStore)]
+#[derive(Component, PartialEq, Clone, Copy, Debug, BitStore)]
 pub struct State(pub Option<ActiveState>);
 
-impl repl::Predictable for State {
+impl repl::Component for State {
     fn distance(&self, other: &State) -> f32 {
         // TODO: ActiveState distance
         if self != other {

@@ -9,11 +9,15 @@ pub mod tick;
 mod tests;
 
 use std::collections::BTreeMap;
+use std::fmt::Debug;
 use std::intrinsics::type_name;
 use std::ops::{Deref, DerefMut};
 
+use bit_manager::data::BitStore;
+
+use specs;
 use specs::join::JoinIter;
-use specs::prelude::{Component, Entities, Entity, Join, Storage, VecStorage, World};
+use specs::prelude::{Entities, Entity, Join, Storage, VecStorage, World};
 use specs::storage::MaskedStorage;
 
 use defs::{EntityClassId, EntityId, PlayerId};
@@ -28,7 +32,13 @@ pub fn register(reg: &mut Registry) {
 }
 
 /// Trait that needs to be implemented by components that want to be replicated.
-pub trait Predictable {
+pub trait Component:
+    specs::prelude::Component + Clone + Copy + PartialEq + BitStore + Debug
+{
+    /// Does this component change during its lifetime?
+    const STATIC: bool = false;
+
+    /// Difference between two instances of the component. We use this to detect prediction errors.
     fn distance(&self, _other: &Self) -> f32 {
         0.0
     }
@@ -76,7 +86,7 @@ pub fn is_entity(world: &World, id: EntityId) -> bool {
 
 pub fn try_component<'a, T, D>(storage: &'a Storage<T, D>, entity: Entity) -> Result<&'a T, Error>
 where
-    T: Component,
+    T: specs::prelude::Component,
     D: Deref<Target = MaskedStorage<T>>,
 {
     storage
@@ -91,7 +101,7 @@ pub fn try_component_mut<'a, T, D>(
     entity: Entity,
 ) -> Result<&'a mut T, Error>
 where
-    T: Component,
+    T: specs::prelude::Component,
     D: DerefMut<Target = MaskedStorage<T>>,
 {
     storage

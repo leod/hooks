@@ -23,7 +23,7 @@ fn main() {
 
     let timeout_ms = 5000;
 
-    let quit_prob = 0.1;
+    let quit_prob = 0.0;
     let shoot_prob = 0.01;
     let move_prob = 0.95;
     let rot_speed = 0.1;
@@ -47,7 +47,7 @@ fn main() {
             let update_duration = update_stopwatch.get_reset();
             quit_timer += update_duration;
 
-            if quit_timer.trigger() && rng.gen::<f64>() <= quit_prob {
+            if quit_timer.trigger() && rng.gen::<f64>() < quit_prob {
                 break;
             }
 
@@ -57,7 +57,7 @@ fn main() {
             if rng.gen::<f64>() <= shoot_prob {
                 player_input.shoot_two = !player_input.shoot_two;
             }
-            player_input.move_forward = (rng.gen::<f64>() <= move_prob);
+            player_input.move_forward = rng.gen::<f64>() <= move_prob;
             if rng.gen::<bool>() {
                 player_input.rot_angle += rng.gen::<f32>() * rot_speed;
             } else {
