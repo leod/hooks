@@ -16,9 +16,10 @@ use registry::Registry;
 use repl;
 
 pub fn register(reg: &mut Registry) {
-    reg.component::<Player>();
     reg.component::<InputState>();
     reg.component::<CurrentInput>();
+    reg.component::<Player>();
+    reg.component::<State>();
 
     repl::entity::register_class(
         reg,
@@ -39,6 +40,18 @@ pub fn register(reg: &mut Registry) {
         reg,
         "player",
         "wall",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        None,
+    );
+
+    // FIXME: Due to a bug in physics sim, other player also gets moved
+    interaction::set(
+        reg,
+        "player",
+        "player",
         Some(interaction::Action::PreventOverlap {
             rotate_a: false,
             rotate_b: false,
@@ -91,6 +104,12 @@ pub struct Player {
 }
 
 impl repl::Predictable for Player {}
+
+#[derive(Component, PartialEq, Clone, Debug, Default, BitStore)]
+#[storage(BTreeStorage)]
+pub struct State {}
+
+impl repl::Predictable for State {}
 
 pub fn run_input(
     world: &mut World,
@@ -185,7 +204,11 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER]);
-    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER_ENTITY]);
+    groups.set_whitelist(&[
+        collision::GROUP_PLAYER,
+        collision::GROUP_WALL,
+        collision::GROUP_PLAYER_ENTITY,
+    ]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
@@ -201,6 +224,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
         .with(InputState::default())
+        .with(State::default())
 }
 
 #[derive(SystemData)]

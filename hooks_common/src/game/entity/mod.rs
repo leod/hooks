@@ -9,6 +9,7 @@ use registry::Registry;
 pub type HookDef = hook::Def;
 pub type HookSegmentDef = hook::SegmentDef;
 pub type HookState = hook::State;
+pub type PlayerState = player::State;
 pub type PlayerInputState = player::InputState;
 
 fn register(reg: &mut Registry) {
