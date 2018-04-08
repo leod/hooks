@@ -262,7 +262,11 @@ fn main() {
 
     // Initialize ggez
     let ctx = &mut ContextBuilder::new("hooks-frenzy", "leod")
-        .window_mode(conf::WindowMode::default().dimensions(1600, 900))
+        .window_mode(
+            conf::WindowMode::default()
+                .dimensions(1600, 900)
+                .vsync(true),
+        )
         .build()
         .unwrap();
 

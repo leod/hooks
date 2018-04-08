@@ -502,14 +502,14 @@ macro_rules! snapshot {
             /// System data for loading an entity snapshot
             pub type LoadData<'a> = (
                 $(
-                    ReadStorage<'a, $field_type>,
+                    WriteStorage<'a, $field_type>,
                 )+
             );
 
             /// System data for storing an entity snapshot
             pub type StoreData<'a> = (
                 $(
-                    WriteStorage<'a, $field_type>,
+                    ReadStorage<'a, $field_type>,
                 )+
             );
 
@@ -525,7 +525,7 @@ macro_rules! snapshot {
                     Entities<'a>,
                     ReadStorage<'a, repl::Id>,
                     ReadStorage<'a, Meta>,
-                    LoadData<'a>,
+                    StoreData<'a>,
                 );
 
                 fn run(
@@ -570,7 +570,7 @@ macro_rules! snapshot {
             impl<'a> System<'a> for LoadSnapshotSys<'a> {
                 type SystemData = (
                     Fetch<'a, repl::EntityMap>,
-                    StoreData<'a>,
+                    LoadData<'a>,
                 );
 
                 fn run(&mut self, (entity_map, ($(mut $field_name,)+)): Self::SystemData) {
