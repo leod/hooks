@@ -70,6 +70,7 @@ const SNAP_ANGLE: f32 = f32::consts::PI / 12.0;
 const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
 const TAP_SECS: f32 = 0.25;
 const DASH_SECS: f32 = 0.5;
+const DASH_COOLDOWN_SECS: f32 = 2.0;
 const DASH_ACCEL: f32 = 5000.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
@@ -108,14 +109,52 @@ pub struct Player {
 
 impl repl::Predictable for Player {}
 
+#[derive(PartialEq, Clone, Debug, BitStore)]
+pub struct DashState {
+    pub direction: [f32; 2],
+    pub secs_left: f32,
+}
+
 #[derive(Component, PartialEq, Clone, Debug, Default, BitStore)]
 #[storage(BTreeStorage)]
 pub struct State {
     pub dash_cooldown_secs: f32,
-    pub dash_secs: f32,
+    pub dash_state: Option<DashState>,
 }
 
 impl repl::Predictable for State {}
+
+impl State {
+    pub fn dash(&mut self, direction: Vector2<f32>) {
+        if self.dash_cooldown_secs == 0.0 {
+            self.dash_cooldown_secs = DASH_COOLDOWN_SECS;
+            self.dash_state = Some(DashState {
+                direction: [direction.x, direction.y],
+                secs_left: DASH_SECS,
+            });
+        }
+    }
+
+    pub fn update_dash(&mut self, dt: f32) {
+        self.dash_cooldown_secs -= dt;
+        if self.dash_cooldown_secs < 0.0 {
+            self.dash_cooldown_secs = 0.0;
+        }
+
+        self.dash_state = self.dash_state.as_ref().and_then(|dash_state| {
+            let secs_left = dash_state.secs_left - dt;
+
+            if secs_left <= 0.0 {
+                None
+            } else {
+                Some(DashState {
+                    secs_left,
+                    ..dash_state.clone()
+                })
+            }
+        });
+    }
+}
 
 pub fn run_input(
     world: &mut World,
@@ -291,19 +330,28 @@ impl<'a> System<'a> for InputSys {
             &mut data.state,
         ).join()
         {
+            // Dashing
+            let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
+            let right = Vector2::new(-forward.y, forward.x);
+
             if tapped_keys[MOVE_FORWARD_KEY] {
-                if state.dash_cooldown_secs == 0.0 {
-                    state.dash_secs = DASH_SECS;
-                }
+                state.dash(forward);
+            }
+            if tapped_keys[MOVE_BACKWARD_KEY] {
+                state.dash(-forward);
+            }
+            if tapped_keys[MOVE_RIGHT_KEY] {
+                state.dash(right);
+            }
+            if tapped_keys[MOVE_LEFT_KEY] {
+                state.dash(-right);
             }
 
-            if state.dash_secs > 0.0 {
-                state.dash_secs -= dt;
+            state.update_dash(dt);
 
-                let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
-                velocity.0 += forward * DASH_ACCEL * dt;
-
-                continue;
+            if let Some(dash_state) = state.dash_state.as_ref() {
+                velocity.0 += Vector2::new(dash_state.direction[0], dash_state.direction[1]) *
+                    DASH_ACCEL * dt;
             }
 
             /*if input.0.rot_angle != orientation.0 {
