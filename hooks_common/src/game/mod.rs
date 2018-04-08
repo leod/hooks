@@ -47,6 +47,7 @@ snapshot! {
     use game::entity::HookState;
 
     use game::entity::player::Player;
+    use game::entity::PlayerState;
     use game::entity::PlayerInputState;
 
     mod snapshot {
@@ -61,6 +62,7 @@ snapshot! {
         hook_state: HookState,
 
         player: Player,
+        player_state: PlayerState,
         player_input_state: PlayerInputState,
     }
 }
