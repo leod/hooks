@@ -11,7 +11,7 @@ use repl;
 pub fn register(reg: &mut Registry) {
     reg.component::<Size>();
 
-    repl::entity::register_class_nosync::<game::EntitySnapshot>(reg, "wall", |builder| builder);
+    repl::entity::register_class_nosync::<game::ComponentType>(reg, "wall", |builder| builder);
 }
 
 #[derive(Component)]

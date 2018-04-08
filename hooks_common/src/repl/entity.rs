@@ -12,7 +12,7 @@ pub use entity::Meta;
 pub use repl::snapshot::{ComponentType, EntityClass, EntityClasses, EntitySnapshot, WorldSnapshot};
 
 fn register<T: EntitySnapshot>(reg: &mut Registry) {
-    reg.resource(EntityClasses::<T>(BTreeMap::new()));
+    reg.resource(EntityClasses::<T::ComponentType>(BTreeMap::new()));
 
     reg.event::<RemoveOrder>();
 
@@ -48,12 +48,12 @@ pub fn register_class<T: ComponentType>(
 
 /// Register a new entity class that should not be included in tick snapshots. This can be used for
 /// implicitly replicated entities that require a `repl::Id`.
-pub fn register_class_nosync<T: EntitySnapshot>(
+pub fn register_class_nosync<T: ComponentType>(
     reg: &mut Registry,
     name: &str,
     ctor: entity::Ctor,
 ) -> EntityClassId {
-    register_class_internal::<T::ComponentType>(reg, name, &[], ctor, false)
+    register_class_internal::<T>(reg, name, &[], ctor, false)
 }
 
 fn register_class_internal<T: ComponentType>(
@@ -70,10 +70,9 @@ fn register_class_internal<T: ComponentType>(
         name, class_id, repl_components,
     );
 
-    let mut classes = reg.world()
-        .write_resource::<EntityClasses<T::EntitySnapshot>>();
+    let mut classes = reg.world().write_resource::<EntityClasses<T>>();
 
-    let class = EntityClass::<T::EntitySnapshot> {
+    let class = EntityClass::<T> {
         components: repl_components.to_vec(),
         sync,
     };

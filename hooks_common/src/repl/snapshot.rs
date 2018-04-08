@@ -54,17 +54,17 @@ pub trait HasComponent<T> {
 }
 
 /// Trait implemented by the component type enum associated with an EntitySnapshot.
-pub trait ComponentType: Debug + Clone + Sync + Send + Sized {
+pub trait ComponentType: Debug + Clone + Sync + Send + Sized + 'static {
     type EntitySnapshot: EntitySnapshot<ComponentType = Self>;
 }
 
 /// Meta information about replicated entity types.
-pub struct EntityClass<T: EntitySnapshot> {
+pub struct EntityClass<T: ComponentType> {
     /// Which components are to be replicated for this entity type. We use this knowledge to create
     /// a smaller representation of the entity delta snapshot in the bitstreams. This means that
     /// the set of components which are replicated for one entity can not change during its
     /// lifetime.
-    pub components: Vec<T::ComponentType>,
+    pub components: Vec<T>,
 
     /// Are entities of this class to be replicated? Setting this to `false` can make sense for
     /// entities that are replicated implicitly, such as the neutral entities in the initial state
@@ -74,9 +74,9 @@ pub struct EntityClass<T: EntitySnapshot> {
 
 /// All possible replicated entity types. Every replicated entity has a `entity::Meta` component,
 /// storing an index into this map.
-pub struct EntityClasses<T: EntitySnapshot>(pub BTreeMap<EntityClassId, EntityClass<T>>);
+pub struct EntityClasses<T: ComponentType>(pub BTreeMap<EntityClassId, EntityClass<T>>);
 
-impl<T: EntitySnapshot> EntityClasses<T> {
+impl<T: ComponentType> EntityClasses<T> {
     pub fn new() -> Self {
         EntityClasses(BTreeMap::new())
     }
@@ -100,7 +100,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
     pub fn delta_write<W: BitWrite>(
         &self,
         cur: &Self,
-        classes: &EntityClasses<T>,
+        classes: &EntityClasses<T::ComponentType>,
         _recv_player_id: PlayerId,
         writer: &mut W,
     ) -> Result<(), bit_manager::Error> {
@@ -159,7 +159,7 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
     /// second element is the `WorldSnapshot`.
     pub fn delta_read<R: BitRead>(
         &self,
-        classes: &EntityClasses<T>,
+        classes: &EntityClasses<T::ComponentType>,
         reader: &mut R,
     ) -> Result<(Vec<EntityId>, WorldSnapshot<T>), Error> {
         let mut new_entities = Vec::new();
@@ -501,7 +501,7 @@ macro_rules! snapshot {
             }
 
             pub type EntityClass = snapshot::EntityClass<EntitySnapshot>;
-            pub type EntityClasses = snapshot::EntityClasses<EntitySnapshot>;
+            pub type EntityClasses = snapshot::EntityClasses<ComponentType>;
             pub type WorldSnapshot = snapshot::WorldSnapshot<EntitySnapshot>;
 
             /// System data for loading an entity snapshot
