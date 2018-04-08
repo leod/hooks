@@ -64,7 +64,7 @@ impl GameInfo {
     }
 }
 
-#[derive(Debug, Clone, Default, BitStore)]
+#[derive(Debug, Clone, PartialEq, Default, BitStore)]
 pub struct PlayerInput {
     pub rot_angle: f32,
     pub move_forward: bool,

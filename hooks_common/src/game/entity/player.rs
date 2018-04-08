@@ -16,8 +16,9 @@ use registry::Registry;
 use repl;
 
 pub fn register(reg: &mut Registry) {
-    reg.component::<CurrentInput>();
     reg.component::<Player>();
+    reg.component::<InputState>();
+    reg.component::<CurrentInput>();
 
     repl::entity::register_class(
         reg,
@@ -29,6 +30,7 @@ pub fn register(reg: &mut Registry) {
             // TODO: Only send to owner
             ComponentType::Velocity,
             ComponentType::AngularVelocity,
+            ComponentType::PlayerInputState,
         ],
         build_player,
     );
@@ -58,6 +60,15 @@ const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
 #[storage(BTreeStorage)]
 pub struct CurrentInput(pub PlayerInput);
 
+#[derive(Component, PartialEq, Clone, Debug, Default, BitStore)]
+#[storage(BTreeStorage)]
+pub struct InputState {
+    previous_shoot_one: bool,
+    previous_shoot_two: bool,
+}
+
+impl repl::Predictable for InputState {}
+
 #[derive(Component, PartialEq, Clone, Debug, BitStore)]
 #[storage(BTreeStorage)]
 pub struct Player {
@@ -71,17 +82,6 @@ pub fn run_input(
     entity: Entity,
     input: &PlayerInput,
 ) -> Result<(), repl::Error> {
-    // Update player
-    {
-        world
-            .write::<CurrentInput>()
-            .insert(entity, CurrentInput(input.clone()));
-
-        InputSys.run_now(&world.res);
-
-        world.write::<CurrentInput>().clear();
-    }
-
     // Update hooks
     {
         let player = world
@@ -89,6 +89,13 @@ pub fn run_input(
             .get(entity)
             .ok_or_else(|| {
                 repl::Error::Replication("player entity without Player component".to_string())
+            })?
+            .clone();
+        let input_state = world
+            .read::<InputState>()
+            .get(entity)
+            .ok_or_else(|| {
+                repl::Error::Replication("player entity without InputState component".to_string())
             })?
             .clone();
 
@@ -104,6 +111,11 @@ pub fn run_input(
                     } else {
                         input.shoot_two
                     },
+                    previous_shoot: if i == 0 {
+                        input_state.previous_shoot_one
+                    } else {
+                        input_state.previous_shoot_two
+                    },
                     pull: if i == 0 {
                         input.pull_one
                     } else {
@@ -113,9 +125,20 @@ pub fn run_input(
             );
         }
 
-        hook::run_input_sys(&world)?;
+        hook::run_input(&world)?;
 
         world.write::<hook::CurrentInput>().clear();
+    }
+
+    // Update player
+    {
+        world
+            .write::<CurrentInput>()
+            .insert(entity, CurrentInput(input.clone()));
+
+        InputSys.run_now(&world.res);
+
+        world.write::<CurrentInput>().clear();
     }
 
     Ok(())
@@ -162,12 +185,15 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         .with(Drag(DRAG))
         .with(collision::Shape(ShapeHandle::new(shape)))
         .with(collision::Object { groups, query_type })
+        .with(InputState::default())
 }
 
 #[derive(SystemData)]
 struct InputData<'a> {
     game_info: Fetch<'a, GameInfo>,
     input: ReadStorage<'a, CurrentInput>,
+
+    input_state: WriteStorage<'a, InputState>,
     orientation: WriteStorage<'a, Orientation>,
     velocity: WriteStorage<'a, Velocity>,
     angular_velocity: WriteStorage<'a, AngularVelocity>,
@@ -237,6 +263,12 @@ impl<'a> System<'a> for InputSys {
             if direction_norm > 0.0 {
                 velocity.0 += direction / direction_norm * MOVE_ACCEL * dt;
             }
+        }
+
+        // Update input state
+        for (input, input_state) in (&data.input, &mut data.input_state).join() {
+            input_state.previous_shoot_one = input.0.shoot_one;
+            input_state.previous_shoot_two = input.0.shoot_two;
         }
     }
 }
