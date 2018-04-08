@@ -32,6 +32,7 @@ pub fn register(reg: &mut Registry) {
             ComponentType::Velocity,
             ComponentType::AngularVelocity,
             ComponentType::PlayerInputState,
+            ComponentType::PlayerState,
         ],
         build_player,
     );
@@ -67,7 +68,9 @@ const MASS: f32 = 50.0;
 const DRAG: f32 = 2.0;
 const SNAP_ANGLE: f32 = f32::consts::PI / 12.0;
 const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
-const TAP_TIME_SECS: f32 = 0.25;
+const TAP_SECS: f32 = 0.25;
+const DASH_SECS: f32 = 0.5;
+const DASH_ACCEL: f32 = 5000.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
@@ -107,7 +110,10 @@ impl repl::Predictable for Player {}
 
 #[derive(Component, PartialEq, Clone, Debug, Default, BitStore)]
 #[storage(BTreeStorage)]
-pub struct State {}
+pub struct State {
+    pub dash_cooldown_secs: f32,
+    pub dash_secs: f32,
+}
 
 impl repl::Predictable for State {}
 
@@ -232,10 +238,11 @@ struct InputData<'a> {
     game_info: Fetch<'a, GameInfo>,
     input: ReadStorage<'a, CurrentInput>,
 
-    input_state: WriteStorage<'a, InputState>,
     orientation: WriteStorage<'a, Orientation>,
     velocity: WriteStorage<'a, Velocity>,
     angular_velocity: WriteStorage<'a, AngularVelocity>,
+    state: WriteStorage<'a, State>,
+    input_state: WriteStorage<'a, InputState>,
 }
 
 struct InputSys;
@@ -262,7 +269,7 @@ impl<'a> System<'a> for InputSys {
                         tapped_keys[i] = true;
                         input_state.tap_state[i].secs_left = 0.0;
                     } else {
-                        input_state.tap_state[i].secs_left = TAP_TIME_SECS;
+                        input_state.tap_state[i].secs_left = TAP_SECS;
                     }
                 }
 
@@ -276,15 +283,27 @@ impl<'a> System<'a> for InputSys {
         }
 
         // Movement
-        for (input, orientation, velocity, angular_velocity) in (
+        for (input, orientation, velocity, angular_velocity, state) in (
             &data.input,
             &mut data.orientation,
             &mut data.velocity,
             &mut data.angular_velocity,
+            &mut data.state,
         ).join()
         {
             if tapped_keys[MOVE_FORWARD_KEY] {
-                debug!("tapped it");
+                if state.dash_cooldown_secs == 0.0 {
+                    state.dash_secs = DASH_SECS;
+                }
+            }
+
+            if state.dash_secs > 0.0 {
+                state.dash_secs -= dt;
+
+                let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
+                velocity.0 += forward * DASH_ACCEL * dt;
+
+                continue;
             }
 
             /*if input.0.rot_angle != orientation.0 {
