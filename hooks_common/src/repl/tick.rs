@@ -111,7 +111,7 @@ impl<T: EntitySnapshot> History<T> {
         &self,
         prev_num: Option<TickNum>,
         cur_num: TickNum,
-        classes: &EntityClasses<T>,
+        classes: &EntityClasses<T::ComponentType>,
         writer: &mut event::Writer,
     ) -> Result<(), bit_manager::Error> {
         writer.write(&cur_num)?;
@@ -199,7 +199,7 @@ impl<T: EntitySnapshot> History<T> {
     /// element is the reference tick num and the second element is the new tick num.
     pub fn delta_read_tick(
         &mut self,
-        classes: &EntityClasses<T>,
+        classes: &EntityClasses<T::ComponentType>,
         reader: &mut event::Reader,
     ) -> Result<Option<(Option<TickNum>, TickNum)>, Error> {
         let cur_num = reader.read::<TickNum>()?;
