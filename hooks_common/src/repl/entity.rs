@@ -43,6 +43,26 @@ pub fn register_class<T: ComponentType>(
     repl_components: &[T],
     ctor: entity::Ctor,
 ) -> EntityClassId {
+    register_class_internal(reg, name, repl_components, ctor, true)
+}
+
+/// Register a new entity class that should not be included in tick snapshots. This can be used for
+/// implicitly replicated entities that require a `repl::Id`.
+pub fn register_class_nosync<T: EntitySnapshot>(
+    reg: &mut Registry,
+    name: &str,
+    ctor: entity::Ctor,
+) -> EntityClassId {
+    register_class_internal::<T::ComponentType>(reg, name, &[], ctor, false)
+}
+
+fn register_class_internal<T: ComponentType>(
+    reg: &mut Registry,
+    name: &str,
+    repl_components: &[T],
+    ctor: entity::Ctor,
+    sync: bool,
+) -> EntityClassId {
     let class_id = entity::register_class(reg, name, ctor);
 
     info!(
@@ -55,6 +75,7 @@ pub fn register_class<T: ComponentType>(
 
     let class = EntityClass::<T::EntitySnapshot> {
         components: repl_components.to_vec(),
+        sync,
     };
 
     classes.0.insert(class_id, class);

@@ -65,6 +65,11 @@ pub struct EntityClass<T: EntitySnapshot> {
     /// the set of components which are replicated for one entity can not change during its
     /// lifetime.
     pub components: Vec<T::ComponentType>,
+
+    /// Are entities of this class to be replicated? Setting this to `false` can make sense for
+    /// entities that are replicated implicitly, such as the neutral entities in the initial state
+    /// of a map.
+    pub sync: bool,
 }
 
 /// All possible replicated entity types. Every replicated entity has a `entity::Meta` component,
@@ -542,10 +547,14 @@ macro_rules! snapshot {
                             }
                         }
 
-                        let components = &classes.0.get(&meta.class_id).unwrap().components;
+                        let class = &classes.0.get(&meta.class_id).unwrap();
+
+                        if !class.sync {
+                            continue;
+                        }
 
                         let mut entity_snapshot: EntitySnapshot = snapshot::EntitySnapshot::none();
-                        for component in components {
+                        for component in &class.components {
                             match *component {
                                 $(
                                     ComponentType::$field_type => entity_snapshot.$field_name =
