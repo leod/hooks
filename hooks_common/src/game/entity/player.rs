@@ -356,6 +356,7 @@ impl<'a> System<'a> for InputSys {
             if let Some(dash_state) = state.dash_state.as_ref() {
                 velocity.0 += Vector2::new(dash_state.direction[0], dash_state.direction[1]) *
                     DASH_ACCEL * dt;
+                continue;
             }
 
             /*if input.0.rot_angle != orientation.0 {

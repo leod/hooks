@@ -14,7 +14,7 @@ use hooks_common::physics::{Orientation, Position};
 use hooks_common::repl::EntityMap;
 use hooks_common::game::entity::hook;
 
-use {Input, Output, Registry};
+use {Input, Output, Registry, with_transform};
 
 /// Draw joints for debugging.
 pub fn register_show(reg: &mut Registry) {
@@ -100,9 +100,6 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 );
                 let matrix = isometry.to_homogeneous() * scaling;
 
-                let curr_transform = graphics::get_transform(ctx);
-                graphics::push_transform(ctx, Some(curr_transform * matrix));
-                graphics::apply_transformations(ctx)?;
                 let color = if hook_def.index == 0 {
                     graphics::Color {
                         r: 0.0,
@@ -119,8 +116,10 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                     }
                 };
                 graphics::set_color(ctx, color)?;
-                input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
-                graphics::pop_transform(ctx);
+
+                with_transform(ctx, matrix, |ctx| {
+                    input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)
+                })?;
             }
 
             // Draw end point squares
@@ -139,9 +138,6 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 );
                 let matrix = isometry.to_homogeneous() * scaling;
 
-                let curr_transform = graphics::get_transform(ctx);
-                graphics::push_transform(ctx, Some(curr_transform * matrix));
-                graphics::apply_transformations(ctx)?;
                 let color = if i == 0 && fixed.is_some() {
                     graphics::Color {
                         r: 1.0,
@@ -165,8 +161,10 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                     }
                 };
                 graphics::set_color(ctx, color)?;
-                input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)?;
-                graphics::pop_transform(ctx);
+
+                with_transform(ctx, matrix, |ctx| {
+                    input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)
+                })?;
             }
         }
     }

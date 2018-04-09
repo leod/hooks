@@ -22,7 +22,7 @@ mod player;
 mod entity;
 pub mod debug;
 
-use nalgebra::Point2;
+use nalgebra::{Point2, Matrix4};
 
 use specs::prelude::{Entity, World};
 
@@ -124,6 +124,25 @@ impl Registry {
     pub fn draw_fn(&mut self, f: DrawFn) {
         self.draw_fns.push(f);
     }
+}
+
+pub fn with_transform<F, T>(
+    ctx: &mut ggez::Context,
+    transform: Matrix4<f32>,
+    f: F
+) -> ggez::error::GameResult<T>
+where
+    F: FnOnce(&mut ggez::Context) -> ggez::error::GameResult<T>
+{
+    let current_transform = graphics::get_transform(ctx);
+    graphics::push_transform(ctx, Some(current_transform * transform));
+    graphics::apply_transformations(ctx)?;
+
+    let result = f(ctx);
+
+    graphics::pop_transform(ctx);
+
+    result
 }
 
 pub struct Show {
