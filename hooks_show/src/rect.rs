@@ -10,7 +10,7 @@ use hooks_common::repl;
 use hooks_common::entity::Active;
 use hooks_common::physics::{Orientation, Position};
 
-use {Input, Registry};
+use {Input, Registry, with_transform};
 
 pub fn register(reg: &mut hooks_common::Registry) {
     reg.component::<Draw>();
@@ -53,10 +53,6 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
         );
         let matrix = isometry.to_homogeneous() * scaling;
 
-        let curr_transform = graphics::get_transform(ctx);
-        graphics::push_transform(ctx, Some(curr_transform * matrix));
-        graphics::apply_transformations(ctx)?;
-
         let color = if (repl_id.0).0 == input.my_player_id {
             graphics::Color {
                 r: 0.0,
@@ -74,9 +70,9 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
         };
         graphics::set_color(ctx, color)?;
 
-        input.assets.rect_line.draw(ctx, Point2::origin(), 0.0)?;
-
-        graphics::pop_transform(ctx);
+        with_transform(ctx, matrix, |ctx| {
+            input.assets.rect_line.draw(ctx, Point2::origin(), 0.0)
+        })?;
     }
 
     graphics::set_color(ctx, graphics::WHITE)?;
