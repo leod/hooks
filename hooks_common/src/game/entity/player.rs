@@ -64,16 +64,16 @@ pub fn register(reg: &mut Registry) {
 pub const NUM_HOOKS: usize = 2;
 pub const WIDTH: f32 = 40.0;
 pub const HEIGHT: f32 = 40.0;
-const MOVE_ACCEL: f32 = 800.0;
-const ROT_ACCEL: f32 = 200.0;
-const MASS: f32 = 50.0;
-const DRAG: f32 = 2.0;
-const SNAP_ANGLE: f32 = f32::consts::PI / 12.0;
-const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
-const TAP_SECS: f32 = 0.25;
-const DASH_SECS: f32 = 0.5;
-const DASH_COOLDOWN_SECS: f32 = 2.0;
-const DASH_ACCEL: f32 = 5000.0;
+pub const MOVE_ACCEL: f32 = 800.0;
+pub const ROT_ACCEL: f32 = 200.0;
+pub const MASS: f32 = 50.0;
+pub const DRAG: f32 = 2.0;
+pub const SNAP_ANGLE: f32 = f32::consts::PI / 12.0;
+pub const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
+pub const TAP_SECS: f32 = 0.25;
+pub const DASH_SECS: f32 = 0.5;
+pub const DASH_COOLDOWN_SECS: f32 = 2.0;
+pub const DASH_ACCEL: f32 = 5000.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]

@@ -81,6 +81,10 @@ impl Component for Orientation {
     type Storage = FlaggedStorage<Self, VecStorage<Self>>;
 }
 
+impl Orientation {
+    pub fn rotate(&self, pos: Point2<f32>) {}
+}
+
 /// Angular velocity.
 #[derive(Component, PartialEq, Clone, Copy, Debug, BitStore)]
 #[storage(VecStorage)]
