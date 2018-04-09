@@ -501,7 +501,7 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                         let cur_distance = norm(&(last_attach_pos - owner_pos.0));
 
                         if cur_distance < LUNCH_RADIUS &&
-                            (!input.pull || active_state.fixed.is_none())
+                            (input.pull || active_state.fixed.is_none())
                         {
                             active_state.lunch_timer = 0.0;
                             active_state.num_active_segments -= 1;

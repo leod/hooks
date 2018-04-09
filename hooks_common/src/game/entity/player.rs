@@ -62,6 +62,8 @@ pub fn register(reg: &mut Registry) {
 }
 
 pub const NUM_HOOKS: usize = 2;
+pub const WIDTH: f32 = 40.0;
+pub const HEIGHT: f32 = 40.0;
 const MOVE_ACCEL: f32 = 800.0;
 const ROT_ACCEL: f32 = 200.0;
 const MASS: f32 = 50.0;
@@ -247,7 +249,7 @@ pub mod auth {
 }
 
 fn build_player(builder: EntityBuilder) -> EntityBuilder {
-    let shape = Cuboid::new(Vector2::new(20.0, 20.0));
+    let shape = Cuboid::new(Vector2::new(WIDTH / 2.0, HEIGHT / 2.0));
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER]);

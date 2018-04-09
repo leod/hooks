@@ -18,6 +18,7 @@ mod camera;
 mod rect;
 mod wall;
 mod hook;
+mod player;
 mod entity;
 pub mod debug;
 
@@ -42,12 +43,14 @@ pub fn register(reg: &mut hooks_common::Registry) {
 pub fn register_show(reg: &mut Registry) {
     wall::register_show(reg);
     hook::register_show(reg);
+    player::register_show(reg);
     rect::register_show(reg);
 }
 
 pub struct Assets {
     pub rect_fill: Mesh,
     pub rect_line: Mesh,
+    pub rect_towards_x_fill: Mesh,
 }
 
 pub struct Input {
@@ -62,7 +65,6 @@ pub struct Output {
 
 impl Assets {
     pub fn new(ctx: &mut ggez::Context) -> ggez::error::GameResult<Assets> {
-        // TODO: Better place to put this
         let rect_fill = Mesh::new_polygon(
             ctx,
             DrawMode::Fill,
@@ -83,10 +85,21 @@ impl Assets {
                 Point2::new(-0.5, 0.5),
             ],
         )?;
+        let rect_towards_x_fill = Mesh::new_polygon(
+            ctx,
+            DrawMode::Fill,
+            &[
+                Point2::new(0.0, -0.5),
+                Point2::new(1.0, -0.5),
+                Point2::new(1.0, 0.5),
+                Point2::new(0.0, 0.5),
+            ],
+        )?;
 
         Ok(Assets {
             rect_fill,
             rect_line,
+            rect_towards_x_fill,
         })
     }
 }
