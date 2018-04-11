@@ -87,7 +87,14 @@ pub fn register(reg: &mut Registry) {
     interaction::set(
         reg,
         "first_hook_segment",
-        "player",
+        "test",
+        None,
+        Some(first_segment_interaction),
+    );
+    interaction::set(
+        reg,
+        "first_hook_segment",
+        "hook_segment",
         None,
         Some(first_segment_interaction),
     );
@@ -217,7 +224,7 @@ fn build_segment(builder: EntityBuilder) -> EntityBuilder {
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
-    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER]);
+    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER, collision::GROUP_NEUTRAL]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 

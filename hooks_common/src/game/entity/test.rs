@@ -1,10 +1,10 @@
-use nalgebra::Point2;
+use nalgebra::Vector2;
 
+use defs::GameInfo;
 use entity;
 use game::ComponentType;
-use physics::constraint::{self, Constraint};
-use physics::sim::Constraints;
-use physics::{Dynamic, InvAngularMass, InvMass, Orientation};
+use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
+use physics::{Dynamic, InvAngularMass, InvMass, Orientation, Position, Velocity, AngularVelocity};
 use registry::Registry;
 use repl;
 
@@ -13,7 +13,22 @@ pub fn register(reg: &mut Registry) {
         reg,
         "test",
         &[ComponentType::Position, ComponentType::Orientation],
-        |builder| builder,
+        |builder| {
+            let shape = Cuboid::new(Vector2::new(15.0, 15.0)); 
+
+            let mut groups = CollisionGroups::new();
+            groups.set_membership(&[collision::GROUP_NEUTRAL]);
+            groups.set_whitelist(&[
+                collision::GROUP_PLAYER,
+                collision::GROUP_PLAYER_ENTITY,
+            ]);
+
+            let query_type = GeometricQueryType::Contacts(0.0, 0.0);
+
+            builder
+                .with(collision::Shape(ShapeHandle::new(shape)))
+                .with(collision::Object { groups, query_type })
+        },
     );
 }
 
@@ -32,7 +47,6 @@ pub mod auth {
         entity::add_ctor(reg, "test", |builder| {
             builder
                 .with(Orientation(0.0))
-                .with(Test(0.0))
                 .with(Dynamic)
                 .with(InvMass(1.0))
                 .with(InvAngularMass(1.0))
@@ -41,42 +55,39 @@ pub mod auth {
 
     #[derive(Component)]
     #[storage(BTreeStorage)]
-    struct Test(f64);
+    pub struct Test(pub f32, pub f32);
 
     struct TickSys;
 
-    impl<'a> System<'a> for TickSys {
-        type SystemData = (
-            Entities<'a>,
-            FetchMut<'a, Constraints>,
-            ReadStorage<'a, Test>,
-        );
+    #[derive(SystemData)]
+    struct TickData<'a> {
+        game_info: Fetch<'a, GameInfo>,
+        test: WriteStorage<'a, Test>,
+        position: WriteStorage<'a, Position>,
+        orientation: WriteStorage<'a, Orientation>,
+        velocity: WriteStorage<'a, Velocity>,
+        angular_velocity: WriteStorage<'a, AngularVelocity>,
+    }
 
-        fn run(&mut self, (entities, mut constraints, test): Self::SystemData) {
-            let test_entities = (&*entities, &test)
-                .join()
-                .map(|(e, _)| e)
-                .collect::<Vec<_>>();
-            for (&a, &b) in test_entities.iter().zip(test_entities.iter().skip(1)) {
-                let constraint = Constraint {
-                    def: constraint::Def::Joint {
-                        distance: 300.0,
-                        object_pos_a: Point2::origin(),
-                        object_pos_b: Point2::origin(),
-                    },
-                    stiffness: 1.0,
-                    entity_a: a,
-                    entity_b: b,
-                    vars_a: constraint::Vars {
-                        pos: true,
-                        angle: false,
-                    },
-                    vars_b: constraint::Vars {
-                        pos: true,
-                        angle: false,
-                    },
-                };
-                constraints.add(constraint);
+    impl<'a> System<'a> for TickSys {
+        type SystemData = TickData<'a>;
+
+        fn run(&mut self, mut data: Self::SystemData) {
+            let dt = data.game_info.tick_duration_secs();
+
+            for (test, position, orientation, velocity, angular_velocity) in 
+                (&mut data.test, &mut data.position, &mut data.orientation,
+                 &mut data.velocity, &mut data.angular_velocity).join()
+            {
+                test.0 += dt;
+                if test.0 >= test.1 {
+                    test.0 = 0.0;
+                    velocity.0 = -velocity.0;
+                    angular_velocity.0 = -angular_velocity.0;
+                }
+
+                position.0 += velocity.0 * dt;
+                orientation.0 += angular_velocity.0 * dt;
             }
         }
     }

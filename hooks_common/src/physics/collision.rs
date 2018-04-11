@@ -43,6 +43,7 @@ pub type CollisionWorld = CollisionWorld2<f32, Entity>;
 pub const GROUP_WALL: usize = 0;
 pub const GROUP_PLAYER: usize = 1;
 pub const GROUP_PLAYER_ENTITY: usize = 2;
+pub const GROUP_NEUTRAL: usize = 3;
 
 /// Collision shape.
 /// For now, we assume that an object's shape will not change in its lifetime.

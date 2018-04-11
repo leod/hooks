@@ -1,6 +1,6 @@
 pub mod hook;
 pub mod player;
-mod test;
+pub mod test;
 pub mod wall;
 
 use registry::Registry;
