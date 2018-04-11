@@ -84,7 +84,7 @@ pub fn is_entity(world: &World, id: EntityId) -> bool {
     world.read_resource::<EntityMap>().is_entity(id)
 }
 
-pub fn try_component<'a, T, D>(storage: &'a Storage<T, D>, entity: Entity) -> Result<&'a T, Error>
+pub fn try<'a, T, D>(storage: &'a Storage<T, D>, entity: Entity) -> Result<&'a T, Error>
 where
     T: specs::prelude::Component,
     D: Deref<Target = MaskedStorage<T>>,
@@ -96,10 +96,7 @@ where
         }))
 }
 
-pub fn try_component_mut<'a, T, D>(
-    storage: &'a mut Storage<T, D>,
-    entity: Entity,
-) -> Result<&'a mut T, Error>
+pub fn try_mut<'a, T, D>(storage: &'a mut Storage<T, D>, entity: Entity) -> Result<&'a mut T, Error>
 where
     T: specs::prelude::Component,
     D: DerefMut<Target = MaskedStorage<T>>,

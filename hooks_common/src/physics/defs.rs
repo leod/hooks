@@ -82,7 +82,15 @@ impl Component for Orientation {
 }
 
 impl Orientation {
-    pub fn rotate(&self, pos: Point2<f32>) {}
+    pub fn rotate(&self, pos: Point2<f32>) -> Vector2<f32> {
+        // TODO: We might want to cache some of these calculations in the future.
+        //       Two possibilities:
+        //       1. Calculate sin/cos whenever an orientation is set.
+        //          Disadvantage: might calculate even if never used.
+        //       2. Calculate sin/cos lazily, storing the result in an Option.
+        //          Disadvantage: rotate() needs mutable access
+        Rotation2::new(self.0).matrix() * pos.coords
+    }
 }
 
 /// Angular velocity.
@@ -101,11 +109,12 @@ pub struct Friction(pub f32);
 pub struct Drag(pub f32);
 
 /// Transform from object-space to world-space.
-pub fn to_world_pos(pos: Point2<f32>, angle: f32, object_pos: Point2<f32>) -> Point2<f32> {
-    // TODO: We might want to cache some of these calculations in the future.
-    let rot = Rotation2::new(angle).matrix().clone();
-
-    pos + rot * object_pos.coords
+pub fn to_world_pos(
+    position: &Position,
+    orientation: &Orientation,
+    object_pos: Point2<f32>,
+) -> Point2<f32> {
+    position.0 + orientation.rotate(object_pos)
 }
 
 /*/// Some kind of joint thingy.
