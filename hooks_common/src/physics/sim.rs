@@ -525,7 +525,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
                 let (p_new_a, p_new_b) = {
                     // Set up input for constraint solving
                     let x = |entity| {
-                        constraint::Position {
+                        constraint::Pose {
                             pos: position.get(entity).unwrap().0,
                             angle: normalize_angle(orientation.get(entity).unwrap().0),
                         }

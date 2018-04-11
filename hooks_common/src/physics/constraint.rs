@@ -1,17 +1,43 @@
 // Two great resources for velocity constraints:
 //    http://myselph.de/gamePhysics/equalityConstraints.html
 //    http://myselph.de/gamePhysics/inequalityConstraints.html
+// (though the following are position-based constraints)
 
 use std::f32;
+use std::ops::Deref;
 
-use specs::prelude::Entity;
+use specs::prelude::*;
+use specs::storage::MaskedStorage;
 
 use nalgebra::{dot, norm, Matrix2x6, Point2, Rotation2, RowVector6, Vector2};
 
+use physics::{Orientation, Position};
+use repl;
+
+/// A `Pose` described the physical state of one entity relevant to constraint solving.
 #[derive(Clone, Debug)]
-pub struct Position {
+pub struct Pose {
     pub pos: Point2<f32>,
     pub angle: f32,
+}
+
+impl Pose {
+    /// Convenience method for constructing a `Pose` from a replicated entity that may not have all
+    /// of the required components.
+    pub fn from_entity<D1, D2>(
+        positions: &Storage<Position, D1>,
+        orientation: &Storage<Orientation, D2>,
+        entity: Entity,
+    ) -> Result<Pose, repl::Error>
+    where
+        D1: Deref<Target = MaskedStorage<Position>>,
+        D2: Deref<Target = MaskedStorage<Orientation>>,
+    {
+        Ok(Pose {
+            pos: repl::try(positions, entity)?.0,
+            angle: repl::try(orientation, entity)?.0,
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -81,7 +107,8 @@ impl Mass {
 
 impl Def {
     /// Calculate the constraint value as well as the jacobian at some position.
-    pub fn calculate(&self, x_a: &Position, x_b: &Position) -> (f32, RowVector6<f32>) {
+    #[inline]
+    pub fn calculate(&self, x_a: &Pose, x_b: &Pose) -> (f32, RowVector6<f32>) {
         match self {
             &Def::Joint {
                 distance,
@@ -221,11 +248,11 @@ impl Def {
 pub fn solve_for_position(
     constraint: &Def,
     stiffness: f32,
-    x_a: &Position,
-    x_b: &Position,
+    x_a: &Pose,
+    x_b: &Pose,
     m_a: &Mass,
     m_b: &Mass,
-) -> (Position, Position) {
+) -> (Pose, Pose) {
     let inv_m = RowVector6::new(
         m_a.inv,
         m_a.inv,
@@ -253,11 +280,11 @@ pub fn solve_for_position(
     let delta = -lambda * stiffness * jacobian.component_mul(&inv_m).transpose();
 
     (
-        Position {
+        Pose {
             pos: x_a.pos + Vector2::new(delta.x, delta.y),
             angle: x_a.angle + delta.z,
         },
-        Position {
+        Pose {
             pos: x_b.pos + Vector2::new(delta.w, delta.a),
             angle: x_b.angle + delta.b,
         },
