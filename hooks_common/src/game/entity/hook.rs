@@ -10,7 +10,7 @@ use entity::Active;
 use event::{self, Event};
 use game::ComponentType;
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
-use physics::constraint::{self, Constraint};
+use physics::constraint::{self, Constraint, Pose};
 use physics::sim::Constraints;
 use physics::{self, interaction};
 use physics::{AngularVelocity, Dynamic, Friction, InvAngularMass, InvMass, Orientation, Position,
@@ -102,13 +102,14 @@ pub fn register(reg: &mut Registry) {
 
 pub const NUM_SEGMENTS: usize = 20;
 pub const SEGMENT_LENGTH: f32 = 35.0;
-const JOIN_MARGIN: f32 = 1.0;
+pub const JOIN_MARGIN: f32 = 1.0;
 //const MAX_SHOOT_TIME_SECS: f32 = 2.0;
-const SHOOT_SPEED: f32 = 1000.0;
-const LUNCH_TIME_SECS: f32 = 0.025;
-const LUNCH_RADIUS: f32 = 5.0;
-const ANGLE_STIFFNESS: f32 = 0.7;
-const OWNER_ANGLE_STIFFNESS: f32 = 1.0;
+pub const SHOOT_SPEED: f32 = 1000.0;
+pub const LUNCH_TIME_SECS: f32 = 0.025;
+pub const LUNCH_RADIUS: f32 = 5.0;
+pub const ANGLE_STIFFNESS: f32 = 0.7;
+pub const OWNER_ANGLE_STIFFNESS: f32 = 1.0;
+pub const FIX_MAX_DISTANCE: f32 = 30.0;
 
 pub fn segment_attach_pos_back() -> Point2<f32> {
     Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
@@ -423,11 +424,27 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
             // Fix first hook segment to the entity it has been attached to
             if let Some((fix_entity_id, fix_pos_object)) = active_state.fixed {
                 if let Some(fix_entity) = data.entity_map.get_id_to_entity(fix_entity_id) {
-                    data.constraints.add(fix_first_segment_constraint(
+                    let constraint = fix_first_segment_constraint(
                         segment_entities[0],
                         fix_entity,
                         fix_pos_object,
-                    ));
+                    );
+                    let distance = constraint
+                        .def
+                        .calculate(
+                            &Pose::from_entity(
+                                &data.position,
+                                &data.orientation,
+                                segment_entities[0],
+                            )?,
+                            &Pose::from_entity(&data.position, &data.orientation, fix_entity)?,
+                        )
+                        .0;
+                    if distance <= FIX_MAX_DISTANCE {
+                        data.constraints.add(constraint);
+                    } else {
+                        active_state.fixed = None;
+                    }
                 } else {
                     warn!("hook attached to dead entity {:?}", fix_entity_id);
                     active_state.fixed = None;
