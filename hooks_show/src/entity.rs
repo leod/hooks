@@ -9,8 +9,8 @@ pub fn register(reg: &mut hooks_common::Registry) {
 
     entity::add_ctor(reg, "test", |builder| {
         builder.with(rect::Draw {
-            width: 10.0,
-            height: 10.0,
+            width: 30.0,
+            height: 30.0,
         })
     });
 

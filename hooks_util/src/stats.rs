@@ -61,15 +61,15 @@ impl fmt::Debug for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "value {:.4}, recent μ={:.4} #={}, overall μ={:.4} #={}",
+            "value {:.2} μ={:.2}",
             self.recent_values
                 .back()
                 .map(|&(_, value)| value)
                 .unwrap_or(f32::NAN),
             self.recent_average(),
-            self.recent_values.len(),
+            /*self.recent_values.len(),
             self.average,
-            self.num_samples,
+            self.num_samples,*/
         )
     }
 }
