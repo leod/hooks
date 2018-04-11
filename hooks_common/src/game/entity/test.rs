@@ -4,7 +4,7 @@ use defs::GameInfo;
 use entity;
 use game::ComponentType;
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
-use physics::{Dynamic, InvAngularMass, InvMass, Orientation, Position, Velocity, AngularVelocity};
+use physics::{AngularVelocity, Dynamic, InvAngularMass, InvMass, Orientation, Position, Velocity};
 use registry::Registry;
 use repl;
 
@@ -14,14 +14,11 @@ pub fn register(reg: &mut Registry) {
         "test",
         &[ComponentType::Position, ComponentType::Orientation],
         |builder| {
-            let shape = Cuboid::new(Vector2::new(15.0, 15.0)); 
+            let shape = Cuboid::new(Vector2::new(15.0, 15.0));
 
             let mut groups = CollisionGroups::new();
             groups.set_membership(&[collision::GROUP_NEUTRAL]);
-            groups.set_whitelist(&[
-                collision::GROUP_PLAYER,
-                collision::GROUP_PLAYER_ENTITY,
-            ]);
+            groups.set_whitelist(&[collision::GROUP_PLAYER, collision::GROUP_PLAYER_ENTITY]);
 
             let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
@@ -75,9 +72,13 @@ pub mod auth {
         fn run(&mut self, mut data: Self::SystemData) {
             let dt = data.game_info.tick_duration_secs();
 
-            for (test, position, orientation, velocity, angular_velocity) in 
-                (&mut data.test, &mut data.position, &mut data.orientation,
-                 &mut data.velocity, &mut data.angular_velocity).join()
+            for (test, position, orientation, velocity, angular_velocity) in (
+                &mut data.test,
+                &mut data.position,
+                &mut data.orientation,
+                &mut data.velocity,
+                &mut data.angular_velocity,
+            ).join()
             {
                 test.0 += dt;
                 if test.0 >= test.1 {

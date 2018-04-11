@@ -224,7 +224,11 @@ fn build_segment(builder: EntityBuilder) -> EntityBuilder {
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_PLAYER_ENTITY]);
-    groups.set_whitelist(&[collision::GROUP_WALL, collision::GROUP_PLAYER, collision::GROUP_NEUTRAL]);
+    groups.set_whitelist(&[
+        collision::GROUP_WALL,
+        collision::GROUP_PLAYER,
+        collision::GROUP_NEUTRAL,
+    ]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);
 
@@ -319,7 +323,7 @@ fn first_segment_interaction(
     }
 
     // Get the hook entity to which this segment belongs
-    let hook_id = repl::try_component(&data.segment_def, segment_info.entity)?.hook;
+    let hook_id = repl::try(&data.segment_def, segment_info.entity)?.hook;
     let hook_entity = data.entity_map.try_id_to_entity(hook_id)?;
 
     if other_id.0 == hook_id.0 {
@@ -327,7 +331,7 @@ fn first_segment_interaction(
         return Ok(());
     }
 
-    let state = repl::try_component_mut(&mut data.hook_state, hook_entity)?;
+    let state = repl::try_mut(&mut data.hook_state, hook_entity)?;
 
     let active_state = state
         .0
@@ -350,7 +354,7 @@ fn first_segment_interaction(
 
     // If the hook is long enough, emit event for showing to the users that we attached
     if active_state.num_active_segments > 3 {
-        let hook_def = repl::try_component(&data.hook_def, hook_entity)?;
+        let hook_def = repl::try(&data.hook_def, hook_entity)?;
         data.events.push(FixedEvent {
             hook_index: hook_def.index,
             pos: pos.coords.into(),
@@ -389,8 +393,8 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
     {
         // Need to know the position of our owner entity
         let owner_entity = data.entity_map.try_id_to_entity(hook_def.owner)?;
-        let owner_pos = repl::try_component(&data.position, owner_entity)?.clone();
-        let owner_velocity = repl::try_component(&data.velocity, owner_entity)?.clone();
+        let owner_pos = repl::try(&data.position, owner_entity)?.clone();
+        let owner_velocity = repl::try(&data.velocity, owner_entity)?.clone();
 
         // Look up the segment entities of this hook
         let mut segment_entities = [owner_entity; NUM_SEGMENTS];
@@ -431,7 +435,7 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                         let activate_next = num_active_segments == 0 || {
                             // Activate next segment when the last one is far enough from us
                             let last_entity = segment_entities[num_active_segments - 1];
-                            let last_pos = repl::try_component(&data.position, last_entity)?.0;
+                            let last_pos = repl::try(&data.position, last_entity)?.0;
                             let distance = norm(&(last_pos - owner_pos.0));
                             distance >= SEGMENT_LENGTH * 1.5
                         };
@@ -443,7 +447,7 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                                 input.rot_angle
                             } else {
                                 let previous_entity = segment_entities[num_active_segments - 1];
-                                repl::try_component(&data.orientation, previous_entity)?.0
+                                repl::try(&data.orientation, previous_entity)?.0
                             };
                             let direction = Vector2::new(angle.cos(), angle.sin());
                             let velocity = owner_velocity.0 + direction * SHOOT_SPEED;
@@ -460,8 +464,8 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
 
                     // Join player with last hook segment if it gets too far away
                         /*let last_entity = segment_entities[active_state.num_active_segments as usize - 1];
-                        let last_pos = repl::try_component(&data.position, last_entity)?.0;
-                        let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
+                        let last_pos = repl::try(&data.position, last_entity)?.0;
+                        let last_angle = repl::try(&data.orientation, last_entity)?.0;
                         let last_attach_pos = physics::to_world_pos(
                             last_pos,
                             last_angle,
@@ -498,14 +502,12 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                         // Eat up the last segment if it comes close enough to our mouth.
                         let last_index = num_active_segments as usize - 1;
                         let last_entity = segment_entities[last_index];
-                        let last_pos = repl::try_component(&data.position, last_entity)?.0;
-                        let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
-                        let last_attach_pos = physics::to_world_pos(
-                            last_pos,
-                            last_angle,
+                        let attach_pos = physics::to_world_pos(
+                            repl::try(&data.position, last_entity)?,
+                            repl::try(&data.orientation, last_entity)?,
                             Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
                         );
-                        let cur_distance = norm(&(last_attach_pos - owner_pos.0));
+                        let cur_distance = norm(&(attach_pos - owner_pos.0));
 
                         if cur_distance < LUNCH_RADIUS &&
                             (input.pull || active_state.fixed.is_none())
@@ -518,14 +520,12 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                             // Constrain ourself to the last segment, getting closer over time
                             let last_index = active_state.num_active_segments as usize - 1;
                             let last_entity = segment_entities[last_index];
-                            let last_pos = repl::try_component(&data.position, last_entity)?.0;
-                            let last_angle = repl::try_component(&data.orientation, last_entity)?.0;
-                            let last_attach_pos = physics::to_world_pos(
-                                last_pos,
-                                last_angle,
+                            let attach_pos = physics::to_world_pos(
+                                repl::try(&data.position, last_entity)?,
+                                repl::try(&data.orientation, last_entity)?,
                                 Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0),
                             );
-                            let cur_distance = norm(&(last_attach_pos - owner_pos.0));
+                            let cur_distance = norm(&(attach_pos - owner_pos.0));
 
                             let target_distance =
                                 (1.0 - active_state.lunch_timer / LUNCH_TIME_SECS) * SEGMENT_LENGTH;

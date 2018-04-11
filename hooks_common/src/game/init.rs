@@ -4,10 +4,10 @@ use nalgebra::{Point2, Vector2};
 use rand::{IsaacRng, Rng};
 use specs::prelude::World;
 
-use repl;
-use physics::{Position, Velocity, AngularVelocity};
-use game::entity::wall;
 use game::entity::test;
+use game::entity::wall;
+use physics::{AngularVelocity, Position, Velocity};
+use repl;
 
 fn create_state(world: &mut World) {
     let n_walls = 200;

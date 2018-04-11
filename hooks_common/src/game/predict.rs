@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use specs::prelude::{RunNow, World};
 
+use hooks_util::stats;
+
 use defs::{PlayerId, PlayerInput, TickNum};
 use event;
 use game::{self, input};
@@ -89,9 +91,7 @@ impl Log {
                     )));
                 };
 
-                if distance > 0.0 {
-                    debug!("prediction error: {}", distance);
-                }
+                stats::record("prediction error", distance);
 
                 let replay = true;
 
