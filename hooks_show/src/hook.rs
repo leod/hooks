@@ -73,14 +73,14 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
 
     for (hook_def, hook_state) in (&hook_def, &hook_state).join() {
         if let &Some(hook::ActiveState {
-            num_active_segments,
+            num_active,
             ref fixed,
             ..
         }) = &hook_state.0
         {
             // Look up our segments
             let mut segments = Vec::new();
-            for i in 0..num_active_segments as usize {
+            for i in 0..num_active as usize {
                 // TODO: repl unwrap
                 // TODO: num_active_segments could be out of bounds
                 segments.push(entity_map.try_id_to_entity(hook_def.segments[i]).unwrap());
