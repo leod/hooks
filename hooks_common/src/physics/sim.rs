@@ -434,7 +434,7 @@ impl<'a> System<'a> for HandleContactsSys {
 
                 // Let's not have a player's entities collide with each other just yet
                 match (repl_id.get(entity_a), repl_id.get(entity_b)) {
-                    (Some(repl::Id((owner_a, _))), Some(repl::Id((owner_b, _))))
+                    (Some(&repl::Id((owner_a, _))), Some(&repl::Id((owner_b, _))))
                         if owner_a == owner_b => continue,
                     _ => {},
                 }
