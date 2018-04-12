@@ -400,6 +400,7 @@ impl<'a> System<'a> for HandleContactsSys {
         FetchMut<'a, Constraints>,
         Filter<'a>,
         ReadStorage<'a, entity::Meta>,
+        ReadStorage<'a, repl::Id>,
         ReadStorage<'a, Velocity>,
     );
 
@@ -413,6 +414,7 @@ impl<'a> System<'a> for HandleContactsSys {
             mut constraints,
             filter,
             meta,
+            repl_id,
             velocity,
         ): Self::SystemData
     ) {
@@ -428,6 +430,13 @@ impl<'a> System<'a> for HandleContactsSys {
                 // FIXME: We should be able to get this with an ncollide filter!
                 if !filter.filter(entity_a) && !filter.filter(entity_b) {
                     continue;
+                }
+
+                // Let's not have a player's entities collide with each other just yet
+                match (repl_id.get(entity_a), repl_id.get(entity_b)) {
+                    (Some(repl::Id((owner_a, _))), Some(repl::Id((owner_b, _))))
+                        if owner_a == owner_b => continue,
+                    _ => {},
                 }
 
                 let action = interaction::get_action(
