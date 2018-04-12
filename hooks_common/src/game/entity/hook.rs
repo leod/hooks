@@ -118,6 +118,26 @@ pub fn register(reg: &mut Registry) {
         }),
         None,
     );
+    interaction::set(
+        reg,
+        "hook_segment",
+        "hook_segment",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        None,
+    );
+    interaction::set(
+        reg,
+        "first_hook_segment",
+        "first_hook_segment",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        None,
+    );
 }
 
 pub const NUM_SEGMENTS: usize = 20;
@@ -256,6 +276,7 @@ fn build_segment(builder: EntityBuilder) -> EntityBuilder {
     groups.set_whitelist(&[
         collision::GROUP_WALL,
         collision::GROUP_PLAYER,
+        //collision::GROUP_PLAYER_ENTITY,
         collision::GROUP_NEUTRAL,
     ]);
 

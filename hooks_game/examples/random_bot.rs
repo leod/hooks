@@ -23,7 +23,7 @@ fn main() {
 
     let timeout_ms = 5000;
 
-    let quit_prob = 0.0;
+    let quit_prob = 0.3;
     let shoot_prob = 0.01;
     let move_prob = 0.95;
     let rot_speed = 0.1;
