@@ -1,12 +1,11 @@
-use std::collections::BTreeMap;
-use std::collections::VecDeque;
-use std::collections::btree_map;
+use std::collections::{btree_map, BTreeMap, VecDeque};
+use std::time::Duration;
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
-                                  CHANNEL_GAME, NUM_CHANNELS};
-use hooks_common::net::transport;
+                                  CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
+use hooks_common::net::{self, transport};
 use hooks_common::{GameInfo, LeaveReason, PlayerId, INVALID_PLAYER_ID};
 
 use client::{self, Client};
@@ -17,8 +16,15 @@ pub enum Error {
     ConnectedTwice,
     NotConnected,
     InvalidReady,
+    Time(net::time::Error),
     Transport(transport::Error),
     BitManager(bit_manager::Error),
+}
+
+impl From<net::time::Error> for Error {
+    fn from(error: net::time::Error) -> Error {
+        Error::Time(error)
+    }
 }
 
 impl From<transport::Error> for Error {
@@ -107,6 +113,13 @@ impl Host {
         Ok(())
     }
 
+    pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
+        for client in self.clients.values_mut() {
+            client.net_time.update(&client.peer, delta)?;
+        }
+        Ok(())
+    }
+
     pub fn service(&mut self) -> Result<Option<Event>, Error> {
         // If we have some queued events, use them first. Currently, these are queued only if a
         // player has been forcefully disconnected.
@@ -162,15 +175,9 @@ impl Host {
         }
     }
 
-    pub fn send_game(&self, receiver_id: PlayerId, data: &[u8]) -> Result<(), Error> {
-        assert!(self.clients[&receiver_id].ingame());
-
-        let packet = transport::Packet::create(data, transport::PacketFlag::Unreliable)?;
-
-        self.clients[&receiver_id]
-            .peer
-            .send(CHANNEL_GAME, packet)
-            .map_err(|error| Error::Transport(error))
+    pub fn flush(&self) -> Result<(), Error> {
+        self.host.flush();
+        Ok(())
     }
 
     fn send_comm(&self, receiver_id: PlayerId, msg: ServerCommMsg) -> Result<(), Error> {
@@ -185,6 +192,17 @@ impl Host {
         self.clients[&receiver_id]
             .peer
             .send(CHANNEL_COMM, packet)
+            .map_err(|error| Error::Transport(error))
+    }
+
+    pub fn send_game(&self, receiver_id: PlayerId, data: &[u8]) -> Result<(), Error> {
+        assert!(self.clients[&receiver_id].ingame());
+
+        let packet = transport::Packet::create(data, transport::PacketFlag::Unsequenced)?;
+
+        self.clients[&receiver_id]
+            .peer
+            .send(CHANNEL_GAME, packet)
             .map_err(|error| Error::Transport(error))
     }
 
@@ -241,24 +259,29 @@ impl Host {
                     }
                 }
             }
+        } else if channel == CHANNEL_TIME {
+            if let Some(client) = self.clients.get_mut(&player_id) {
+                client.net_time.receive(&client.peer, packet)?;
+            }
+            Ok(None)
         } else if channel == CHANNEL_GAME {
             // Game messages are relayed as events
-            match self.clients.get(&player_id) {
-                Some(client) => {
-                    if client.ingame() {
-                        let msg = {
-                            let mut reader = BitReader::new(packet.data());
-                            reader.read::<ClientGameMsg>()?
-                        };
+            if let Some(client) = self.clients.get(&player_id) {
+                if client.ingame() {
+                    let msg = {
+                        let mut reader = BitReader::new(packet.data());
+                        reader.read::<ClientGameMsg>()?
+                    };
 
-                        Ok(Some(Event::ClientGameMsg(player_id, msg)))
-                    } else {
-                        // Just discard game messages from players who are not ready
-                        // (i.e. ingame) yet
-                        Ok(None)
-                    }
+                    Ok(Some(Event::ClientGameMsg(player_id, msg)))
+                } else {
+                    // Just discard game messages from players who are not ready
+                    // (i.e. ingame) yet
+                    Ok(None)
                 }
-                None => Ok(None),
+            } else {
+                // We have not accepted this player's connection wish yet, ignore game messages
+                Ok(None)
             }
         } else {
             Err(Error::InvalidChannel)

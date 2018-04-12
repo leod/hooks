@@ -29,6 +29,10 @@ impl Timer {
         }
     }
 
+    pub fn from_hz(hz: f32) -> Timer {
+        Timer::new(secs_to_duration(1.0 / hz))
+    }
+
     pub fn period(&self) -> Duration {
         self.period
     }

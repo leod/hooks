@@ -1,8 +1,10 @@
+use std::time::Duration;
+
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
-                                  CHANNEL_GAME, NUM_CHANNELS};
-use hooks_common::net::transport;
+                                  CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
+use hooks_common::net::{self, transport};
 use hooks_common::{GameInfo, LeaveReason, PlayerId};
 
 #[derive(Debug)]
@@ -11,8 +13,15 @@ pub enum Error {
     InvalidChannel(u8),
     UnexpectedConnect,
     UnexpectedCommMsg,
+    Time(net::time::Error),
     Transport(transport::Error),
     BitManager(bit_manager::Error),
+}
+
+impl From<net::time::Error> for Error {
+    fn from(error: net::time::Error) -> Error {
+        Error::Time(error)
+    }
 }
 
 impl From<transport::Error> for Error {
@@ -33,6 +42,7 @@ pub struct Client {
     my_player_id: PlayerId,
     game_info: GameInfo,
     ready: bool,
+    net_time: net::time::Time,
 }
 
 pub enum Event {
@@ -82,6 +92,7 @@ impl Client {
                             my_player_id,
                             game_info,
                             ready: false,
+                            net_time: net::time::Time::new(),
                         })
                     }
                     reply => Err(Error::FailedToConnect(format!(
@@ -116,13 +127,18 @@ impl Client {
         Self::send_comm(&self.peer, ClientCommMsg::Ready)
     }
 
+    pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
+        self.net_time.update(&self.peer, delta)?;
+        Ok(())
+    }
+
     pub fn service(&mut self) -> Result<Option<Event>, Error> {
         assert!(self.ready, "must be ready to service");
 
         if let Some(event) = self.host.service(0)? {
             match event {
                 transport::Event::Connect(_peer) => Err(Error::UnexpectedConnect),
-                transport::Event::Receive(_peer, channel, packet) => {
+                transport::Event::Receive(peer, channel, packet) => {
                     if channel == CHANNEL_COMM {
                         // Communication messages are handled here
                         let msg = Self::read_comm(packet)?;
@@ -130,6 +146,9 @@ impl Client {
                         match msg {
                             ServerCommMsg::AcceptConnect { .. } => Err(Error::UnexpectedCommMsg),
                         }
+                    } else if channel == CHANNEL_TIME {
+                        self.net_time.receive(&peer, packet)?;
+                        Ok(None)
                     } else if channel == CHANNEL_GAME {
                         // Game messages are relayed
                         Ok(Some(Event::ServerGameMsg(packet.data().to_vec())))
@@ -145,16 +164,9 @@ impl Client {
         }
     }
 
-    pub fn send_game(&self, msg: ClientGameMsg) -> Result<(), Error> {
-        let data = {
-            let mut writer = BitWriter::new(Vec::new());
-            writer.write(&msg)?;
-            writer.into_inner()?
-        };
-
-        let packet = transport::Packet::create(&data, transport::PacketFlag::Unreliable)?;
-
-        Ok(self.peer.send(CHANNEL_GAME, packet)?)
+    pub fn flush(&self) -> Result<(), Error> {
+        self.host.flush();
+        Ok(())
     }
 
     fn send_comm(peer: &transport::Peer, msg: ClientCommMsg) -> Result<(), Error> {
@@ -164,9 +176,21 @@ impl Client {
             writer.into_inner()?
         };
 
-        let packet = transport::Packet::create(&data, transport::PacketFlag::Reliable)?;
+        let packet = transport::Packet::create(&data, transport::PacketFlag::Unsequenced)?;
 
         Ok(peer.send(CHANNEL_COMM, packet)?)
+    }
+
+    pub fn send_game(&self, msg: ClientGameMsg) -> Result<(), Error> {
+        let data = {
+            let mut writer = BitWriter::new(Vec::new());
+            writer.write(&msg)?;
+            writer.into_inner()?
+        };
+
+        let packet = transport::Packet::create(&data, transport::PacketFlag::Unsequenced)?;
+
+        Ok(self.peer.send(CHANNEL_GAME, packet)?)
     }
 
     fn read_comm(packet: transport::ReceivedPacket) -> Result<ServerCommMsg, bit_manager::Error> {

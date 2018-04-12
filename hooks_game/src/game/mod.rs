@@ -97,6 +97,8 @@ pub enum Event {
     TickStarted(Vec<Box<event::Event>>),
 }
 
+pub const TARGET_LAG_SNAPSHOTS: TickNum = 2;
+
 impl Game {
     pub fn new(reg: Registry, my_player_id: PlayerId, game_info: &GameInfo, predict: bool) -> Game {
         let mut game_state = game::State::from_registry(reg);
@@ -108,7 +110,7 @@ impl Game {
 
         Game {
             game_info: game_info.clone(),
-            target_lag_ticks: 2 * game_info.ticks_per_snapshot,
+            target_lag_ticks: TARGET_LAG_SNAPSHOTS * game_info.ticks_per_snapshot,
             my_player_id,
             game_state,
             game_runner,
@@ -145,7 +147,14 @@ impl Game {
         let tick_nums = self.tick_history
             .delta_read_tick(&entity_classes, &mut reader)?;
 
-        if let Some((old_tick_num, new_tick_num)) = tick_nums {
+        if let Some((old_tick_num, new_tick_num, last_input_num)) = tick_nums {
+            if let Some(last_input_num) = last_input_num {
+                stats::record(
+                    "input delay ticks",
+                    new_tick_num as f32 - last_input_num as f32,
+                );
+            }
+
             //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
             assert!(self.tick_history.max_num() == Some(new_tick_num));
 
@@ -237,6 +246,8 @@ impl Game {
         {
             profile!("service");
 
+            client.update(delta)?;
+
             while let Some(event) = client.service()? {
                 match event {
                     client::Event::Disconnected => {
@@ -247,6 +258,8 @@ impl Game {
                     }
                 }
             }
+
+            client.flush()?;
         }
 
         // Remove ticks from our history that:
