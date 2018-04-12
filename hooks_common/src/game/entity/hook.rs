@@ -98,6 +98,26 @@ pub fn register(reg: &mut Registry) {
         None,
         Some(first_segment_interaction),
     );
+    interaction::set(
+        reg,
+        "first_hook_segment",
+        "player",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        Some(first_segment_interaction),
+    );
+    interaction::set(
+        reg,
+        "hook_segment",
+        "player",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        None,
+    );
 }
 
 pub const NUM_SEGMENTS: usize = 20;
