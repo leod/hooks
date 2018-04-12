@@ -64,10 +64,10 @@ pub fn register(reg: &mut Registry) {
 pub const NUM_HOOKS: usize = 2;
 pub const WIDTH: f32 = 40.0;
 pub const HEIGHT: f32 = 40.0;
-pub const MOVE_ACCEL: f32 = 800.0;
+pub const MOVE_ACCEL: f32 = 3000.0;
 pub const ROT_ACCEL: f32 = 200.0;
 pub const MASS: f32 = 50.0;
-pub const DRAG: f32 = 2.0;
+pub const DRAG: f32 = 4.0;
 pub const SNAP_ANGLE: f32 = f32::consts::PI / 12.0;
 pub const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
 pub const TAP_SECS: f32 = 0.25;
@@ -406,6 +406,7 @@ impl<'a> System<'a> for InputSys {
             let direction_norm = norm(&direction);
             if direction_norm > 0.0 {
                 velocity.0 += direction / direction_norm * MOVE_ACCEL * dt;
+                //velocity.0 += direction / direction_norm * 25.0;
             }
         }
 

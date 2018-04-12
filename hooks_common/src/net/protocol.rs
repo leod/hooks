@@ -1,9 +1,9 @@
 use defs::{GameInfo, LeaveReason, PlayerId, PlayerInput, TickNum};
 
 pub const CHANNEL_COMM: u8 = 0;
-pub const CHANNEL_GAME: u8 = 1;
-pub const CHANNEL_TIME: u8 = 2;
-pub const NUM_CHANNELS: usize = 2;
+pub const CHANNEL_TIME: u8 = 1;
+pub const CHANNEL_GAME: u8 = 2;
+pub const NUM_CHANNELS: usize = 3;
 
 pub fn leave_reason_to_u32(reason: LeaveReason) -> u32 {
     match reason {
@@ -38,6 +38,12 @@ pub enum ServerCommMsg {
         your_id: PlayerId,
         game_info: GameInfo,
     },
+}
+
+#[derive(Debug, Clone, BitStore)]
+pub enum TimeMsg {
+    Ping { send_time: f32 },
+    Pong { ping_send_time: f32 },
 }
 
 #[derive(Debug, Clone, BitStore)]

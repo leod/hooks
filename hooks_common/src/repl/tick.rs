@@ -195,13 +195,14 @@ impl<T: EntitySnapshot> History<T> {
         Ok(())
     }
 
-    /// Decode tick data. If the tick was new to us, returns a pair of tick nums, where the first
-    /// element is the reference tick num and the second element is the new tick num.
+    /// Decode tick data. If the tick was new to us, returns a triplet of tick nums, where the first
+    /// element is the reference tick num, the second element is the new tick num, and the third
+    /// element is the number of the last of our inputs executed on the server.
     pub fn delta_read_tick(
         &mut self,
         classes: &EntityClasses<T::ComponentType>,
         reader: &mut event::Reader,
-    ) -> Result<Option<(Option<TickNum>, TickNum)>, Error> {
+    ) -> Result<Option<(Option<TickNum>, TickNum, Option<TickNum>)>, Error> {
         let cur_num = reader.read::<TickNum>()?;
 
         if self.max_num().is_some() && cur_num < self.max_num().unwrap() {
@@ -348,7 +349,7 @@ impl<T: EntitySnapshot> History<T> {
         cur_data.snapshot = Some(cur_snapshot);
         cur_data.last_input_num = last_input_num;
 
-        Ok(Some((prev_num, cur_num)))
+        Ok(Some((prev_num, cur_num, last_input_num)))
     }
 
     fn write_events(

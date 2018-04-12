@@ -112,11 +112,10 @@ impl Game {
     }
 
     pub fn update(&mut self, host: &mut Host) -> Result<(), host::Error> {
-        // 1. Advance timers
-        {
-            let duration = self.update_stopwatch.get_reset();
-            self.tick_timer += duration;
-        }
+        // 1. Advance tick timer
+        let update_duration = self.update_stopwatch.get_reset();
+
+        self.tick_timer += update_duration;
 
         // 2. Detect players that are lagged too far behind
         for (&player_id, player) in self.players.iter() {
@@ -145,6 +144,8 @@ impl Game {
         }
 
         // 3. Handle network events and create resulting game events
+        host.update(update_duration)?;
+
         while let Some(event) = host.service()? {
             match event {
                 host::Event::PlayerJoined(player_id, name) => {
@@ -281,6 +282,8 @@ impl Game {
                 }
             }
         }
+
+        host.flush()?;
 
         // 4. Run a tick periodically
         if self.tick_timer.trigger() {

@@ -98,6 +98,8 @@ impl AuthRunner {
     ) -> Result<Vec<Box<Event>>, repl::Error> {
         self.common.run_pre_tick(state)?;
 
+        //println!("num inputs: {}", inputs.len());
+
         // TODO: For now, just run everyone's input here. This might need to get refined!
         for (player_id, input) in inputs {
             // Replication error on the server side is a bug, so unwrap
