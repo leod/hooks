@@ -10,7 +10,6 @@ extern crate log;
 extern crate rand;
 extern crate shred;
 
-mod client;
 mod game;
 mod host;
 mod server;
