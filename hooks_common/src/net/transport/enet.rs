@@ -61,7 +61,7 @@ impl transport::Peer for Peer {
         };
 
         // NOTE: `enet_packet_create` copies the given data, so we don't need to make sure that the
-        //       data lives as long as the returned `Packet`.
+        //       data lives as long as the created package.
         let packet =
             unsafe { enet_packet_create(data.as_ptr() as *const c_void, data.len(), flags) };
         if packet == ptr::null_mut() {
@@ -238,7 +238,7 @@ impl transport::Host for Host {
             }
             ENetEventType::ENET_EVENT_TYPE_RECEIVE => {
                 let id = transport::Peer::id(&Peer(event.peer));
-                if event.peer != ptr::null_mut() && self.peers.contains_key(&id) {
+                if event.peer != ptr::null_mut() {
                     if let Some(_) = self.get_peer(id) {
                         let packet = Packet(event.packet);
                         Ok(Some(Event::Receive(id, event.channelID, packet)))

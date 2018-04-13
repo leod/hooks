@@ -147,6 +147,7 @@ impl Host {
     }
 
     pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
+        return;
         for (&peer_id, client) in self.clients.iter_mut() {
             let peer = self.host.get_peer(peer_id).unwrap();
             client.net_time.update(peer, delta)?;
