@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use hooks_util::timer;
 
-pub type PlayerId = u32;
+use net::transport::PeerId;
+
+pub type PlayerId = PeerId;
 pub type EntityIndex = u32;
 
 /// Global Ids for entities shared between server and clients.

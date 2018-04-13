@@ -6,25 +6,19 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 use hooks_util::timer::{duration_to_secs, Timer};
 
 use net::protocol::{TimeMsg, CHANNEL_TIME};
-use net::transport::{self, Peer, ReceivedPacket};
+use net::transport::{PacketFlag, Peer, Transport};
 
 pub const SEND_PING_HZ: f32 = 0.5;
 pub const NUM_PING_SAMPLES: usize = 20;
 
 #[derive(Debug)]
-pub enum Error {
-    Transport(transport::Error),
+pub enum Error<T: Transport> {
+    Transport(T::Error),
     BitManager(bit_manager::Error),
 }
 
-impl From<transport::Error> for Error {
-    fn from(error: transport::Error) -> Error {
-        Error::Transport(error)
-    }
-}
-
-impl From<bit_manager::Error> for Error {
-    fn from(error: bit_manager::Error) -> Error {
+impl<T: Transport> From<bit_manager::Error> for Error<T> {
+    fn from(error: bit_manager::Error) -> Error<T> {
         Error::BitManager(error)
     }
 }
@@ -44,13 +38,17 @@ impl Time {
         }
     }
 
-    pub fn receive(&mut self, peer: &Peer, packet: ReceivedPacket) -> Result<(), Error> {
-        let mut reader = BitReader::new(packet.data());
+    pub fn receive<P: Peer>(
+        &mut self,
+        peer: &mut P,
+        data: &[u8],
+    ) -> Result<(), Error<P::Transport>> {
+        let mut reader = BitReader::new(data);
         let msg = reader.read::<TimeMsg>()?;
 
         match msg {
             TimeMsg::Ping { send_time } => {
-                Self::send(
+                Time::send(
                     peer,
                     TimeMsg::Pong {
                         ping_send_time: send_time,
@@ -76,12 +74,16 @@ impl Time {
         Ok(())
     }
 
-    pub fn update(&mut self, peer: &Peer, delta: Duration) -> Result<(), Error> {
+    pub fn update<P: Peer>(
+        &mut self,
+        peer: &mut P,
+        delta: Duration,
+    ) -> Result<(), Error<P::Transport>> {
         self.local_time += duration_to_secs(delta);
         self.send_ping_timer += delta;
 
         if self.send_ping_timer.trigger_reset() {
-            Self::send(
+            Time::send(
                 peer,
                 TimeMsg::Ping {
                     send_time: self.local_time,
@@ -92,7 +94,7 @@ impl Time {
         Ok(())
     }
 
-    fn send(peer: &Peer, msg: TimeMsg) -> Result<(), Error> {
+    fn send<P: Peer>(peer: &mut P, msg: TimeMsg) -> Result<(), Error<P::Transport>> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
             writer.write(&msg)?;
@@ -101,9 +103,7 @@ impl Time {
 
         // We send as unsequenced, unreliable packets so that we get the same delivery times as for
         // the CHANNEL_GAME messages
-        let packet = transport::Packet::create(&data, transport::PacketFlag::Unsequenced)?;
-
-        peer.send(CHANNEL_TIME, packet)
+        peer.send(CHANNEL_TIME, PacketFlag::Unsequenced, &data)
             .map_err(|error| Error::Transport(error))
     }
 }

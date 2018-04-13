@@ -5,10 +5,12 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
-use hooks_common::net::{self, transport};
+use hooks_common::net::transport::{self, enet, ChannelId, Host as _Host, Packet, PacketFlag, Peer,
+                                   PeerId, Transport};
+use hooks_common::net::{self, DefaultTransport};
 use hooks_common::{GameInfo, LeaveReason, PlayerId, INVALID_PLAYER_ID};
 
-use client::{self, Client};
+type MyTransport = DefaultTransport;
 
 #[derive(Debug)]
 pub enum Error {
@@ -16,19 +18,19 @@ pub enum Error {
     ConnectedTwice,
     NotConnected,
     InvalidReady,
-    Time(net::time::Error),
-    Transport(transport::Error),
+    Time(net::time::Error<MyTransport>),
+    Transport(<MyTransport as Transport>::Error),
     BitManager(bit_manager::Error),
 }
 
-impl From<net::time::Error> for Error {
-    fn from(error: net::time::Error) -> Error {
+impl From<net::time::Error<MyTransport>> for Error {
+    fn from(error: net::time::Error<MyTransport>) -> Error {
         Error::Time(error)
     }
 }
 
-impl From<transport::Error> for Error {
-    fn from(error: transport::Error) -> Error {
+impl From<enet::Error> for Error {
+    fn from(error: <MyTransport as Transport>::Error) -> Error {
         Error::Transport(error)
     }
 }
@@ -39,10 +41,41 @@ impl From<bit_manager::Error> for Error {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum ClientState {
+    /// We have acknowledged the connection and sent game info.
+    Connected,
+
+    /// The client has received the game info and is ready to receive ticks.
+    Ready,
+}
+
+pub struct Client {
+    pub name: String,
+    pub state: ClientState,
+    pub net_time: net::time::Time,
+}
+
+impl Client {
+    pub fn new(name: String) -> Client {
+        Client {
+            name,
+            state: ClientState::Connected,
+            net_time: net::time::Time::new(),
+        }
+    }
+
+    pub fn ingame(&self) -> bool {
+        match self.state {
+            ClientState::Connected => false,
+            ClientState::Ready => true,
+        }
+    }
+}
+
 pub struct Host {
-    host: transport::Host,
+    host: <MyTransport as Transport>::Host,
     game_info: GameInfo,
-    next_player_id: PlayerId,
     clients: BTreeMap<PlayerId, Client>,
     queued_events: VecDeque<Event>,
 }
@@ -58,25 +91,24 @@ pub enum Event {
 pub const PEER_COUNT: usize = 64;
 
 impl Host {
-    pub fn create(port: u16, game_info: GameInfo) -> Result<Host, transport::Error> {
-        let host = transport::Host::create_server(port, PEER_COUNT, NUM_CHANNELS, 0, 0)?;
+    pub fn create(
+        port: u16,
+        game_info: GameInfo,
+    ) -> Result<Host, <MyTransport as Transport>::Error> {
+        let host = enet::Host::create_server(port, PEER_COUNT, NUM_CHANNELS, 0, 0)?;
 
         Ok(Host {
             host,
             game_info,
-            next_player_id: INVALID_PLAYER_ID + 1,
             clients: BTreeMap::new(),
             queued_events: VecDeque::new(),
         })
     }
 
-    fn on_disconnect(&mut self, peer: &transport::Peer, reason: LeaveReason) -> Option<Event> {
-        let player_id = peer.data() as PlayerId;
+    fn on_disconnect(&mut self, id: PlayerId, reason: LeaveReason) -> Option<Event> {
+        if let btree_map::Entry::Occupied(entry) = self.clients.entry(id) {
+            debug!("Disconnecting peer {}", id);
 
-        // This allows us to identify that the peer has been disconnected
-        peer.set_data(INVALID_PLAYER_ID as usize);
-
-        if let btree_map::Entry::Occupied(entry) = self.clients.entry(player_id) {
             // We have accepted this client. Does the game logic know of it?
             let ingame = entry.get().ingame();
 
@@ -84,13 +116,13 @@ impl Host {
 
             if ingame {
                 // The player is already known to the game logic
-                Some(Event::PlayerLeft(player_id, reason))
+                Some(Event::PlayerLeft(id, reason))
             } else {
                 None
             }
         } else {
-            // Player is unknown to game logic
-            info!("No event for disconnect from player {}", player_id);
+            // Player is not fully connected
+            info!("No event for disconnect from player {}", id);
 
             None
         }
@@ -101,11 +133,12 @@ impl Host {
         player_id: PlayerId,
         reason: LeaveReason,
     ) -> Result<(), Error> {
-        let peer = self.clients[&player_id].peer.clone();
+        {
+            let peer = self.host.get_peer(player_id).unwrap();
+            peer.disconnect(protocol::leave_reason_to_u32(reason));
+        }
 
-        peer.disconnect(protocol::leave_reason_to_u32(reason));
-
-        if let Some(event) = self.on_disconnect(&peer, reason) {
+        if let Some(event) = self.on_disconnect(player_id, reason) {
             // Let game logic handle this `PlayerLeft` event with the next `service` calls
             self.queued_events.push_back(event.clone());
         }
@@ -114,8 +147,9 @@ impl Host {
     }
 
     pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
-        for client in self.clients.values_mut() {
-            client.net_time.update(&client.peer, delta)?;
+        for (&peer_id, client) in self.clients.iter_mut() {
+            let peer = self.host.get_peer(peer_id).unwrap();
+            client.net_time.update(peer, delta)?;
         }
         Ok(())
     }
@@ -129,44 +163,35 @@ impl Host {
 
         if let Some(event) = self.host.service(0)? {
             match event {
-                transport::Event::Connect(peer) => {
-                    let player_id = self.next_player_id;
-                    self.next_player_id += 1;
-
-                    assert!(player_id != INVALID_PLAYER_ID);
-                    assert!(!self.clients.contains_key(&player_id));
-
-                    peer.set_data(player_id as usize);
+                transport::Event::Connect(peer_id) => {
+                    assert!(peer_id != INVALID_PLAYER_ID);
+                    assert!(!self.clients.contains_key(&peer_id));
 
                     Ok(None)
                 }
-                transport::Event::Receive(peer, channel, packet) => {
-                    let player_id = peer.data() as PlayerId;
+                transport::Event::Receive(peer_id, channel, packet) => {
+                    assert!(peer_id != INVALID_PLAYER_ID);
 
-                    if player_id == INVALID_PLAYER_ID {
-                        info!("Player {} is disconnected, ignoring packet", player_id);
-                        Ok(None)
-                    } else {
-                        match self.handle_receive(&peer, channel, packet) {
-                            Ok(event) => Ok(event),
-                            Err(error) => {
-                                warn!(
-                                    "Error while handling received packet from player {}: {:?}.\
-                                     Disconnecting.",
-                                    player_id, error
-                                );
+                    match self.handle_receive(peer_id, channel, packet.data()) {
+                        Ok(event) => Ok(event),
+                        Err(error) => {
+                            warn!(
+                                "Error while handling received packet from player {}: {:?}.\
+                                 Disconnecting.",
+                                peer_id, error
+                            );
 
-                                peer.disconnect(protocol::leave_reason_to_u32(
-                                    LeaveReason::InvalidMsg,
-                                ));
+                            self.host
+                                .get_peer(peer_id)
+                                .unwrap()
+                                .disconnect(protocol::leave_reason_to_u32(LeaveReason::InvalidMsg));
 
-                                Ok(self.on_disconnect(&peer, LeaveReason::InvalidMsg))
-                            }
+                            Ok(self.on_disconnect(peer_id, LeaveReason::InvalidMsg))
                         }
                     }
                 }
-                transport::Event::Disconnect(peer) => {
-                    Ok(self.on_disconnect(&peer, LeaveReason::Disconnected))
+                transport::Event::Disconnect(peer_id) => {
+                    Ok(self.on_disconnect(peer_id, LeaveReason::Disconnected))
                 }
             }
         } else {
@@ -175,71 +200,63 @@ impl Host {
         }
     }
 
-    pub fn flush(&self) -> Result<(), Error> {
+    pub fn flush(&mut self) -> Result<(), Error> {
         self.host.flush();
         Ok(())
     }
 
-    fn send_comm(&self, receiver_id: PlayerId, msg: ServerCommMsg) -> Result<(), Error> {
+    fn send_comm(&mut self, receiver_id: PlayerId, msg: ServerCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
             writer.write(&msg)?;
             writer.into_inner()?
         };
 
-        let packet = transport::Packet::create(&data, transport::PacketFlag::Reliable)?;
-
-        self.clients[&receiver_id]
-            .peer
-            .send(CHANNEL_COMM, packet)
+        self.host
+            .send(receiver_id, CHANNEL_COMM, PacketFlag::Reliable, &data)
             .map_err(|error| Error::Transport(error))
     }
 
-    pub fn send_game(&self, receiver_id: PlayerId, data: &[u8]) -> Result<(), Error> {
+    pub fn send_game(&mut self, receiver_id: PlayerId, data: &[u8]) -> Result<(), Error> {
         assert!(self.clients[&receiver_id].ingame());
 
-        let packet = transport::Packet::create(data, transport::PacketFlag::Unsequenced)?;
-
-        self.clients[&receiver_id]
-            .peer
-            .send(CHANNEL_GAME, packet)
+        self.host
+            .send(receiver_id, CHANNEL_GAME, PacketFlag::Unsequenced, data)
             .map_err(|error| Error::Transport(error))
     }
 
     fn handle_receive(
         &mut self,
-        peer: &transport::Peer,
-        channel: u8,
-        packet: transport::ReceivedPacket,
+        peer_id: PeerId,
+        channel: ChannelId,
+        data: &[u8],
     ) -> Result<Option<Event>, Error> {
-        let player_id = peer.data() as PlayerId;
-        assert!(player_id != INVALID_PLAYER_ID);
+        assert!(peer_id != INVALID_PLAYER_ID);
 
         if channel == CHANNEL_COMM {
             // Communication messages are handled here
             let msg = {
-                let mut reader = BitReader::new(packet.data());
+                let mut reader = BitReader::new(data);
                 reader.read::<ClientCommMsg>()?
             };
 
             match msg {
                 ClientCommMsg::WishConnect { name } => {
-                    if !self.clients.contains_key(&player_id) {
+                    if !self.clients.contains_key(&peer_id) {
                         info!(
                             "Player {} with name {} wishes to connect, accepting",
-                            player_id, name
+                            peer_id, name
                         );
 
                         // Ok, first connection wish
-                        self.clients
-                            .insert(player_id, Client::new(peer.clone(), name.clone()));
+                        self.clients.insert(peer_id, Client::new(name.clone()));
 
                         // Inform the client
                         let reply = ServerCommMsg::AcceptConnect {
-                            your_id: player_id,
+                            your_id: peer_id,
                             game_info: self.game_info.clone(),
                         };
-                        self.send_comm(player_id, reply)?;
+                        self.send_comm(peer_id, reply)?;
 
                         Ok(None)
                     } else {
@@ -247,10 +264,10 @@ impl Host {
                     }
                 }
                 ClientCommMsg::Ready => {
-                    if let Some(client) = self.clients.get_mut(&player_id) {
-                        if client.state == client::State::Connected {
-                            client.state = client::State::Ready;
-                            Ok(Some(Event::PlayerJoined(player_id, client.name.clone())))
+                    if let Some(client) = self.clients.get_mut(&peer_id) {
+                        if client.state == ClientState::Connected {
+                            client.state = ClientState::Ready;
+                            Ok(Some(Event::PlayerJoined(peer_id, client.name.clone())))
                         } else {
                             Err(Error::InvalidReady)
                         }
@@ -260,20 +277,21 @@ impl Host {
                 }
             }
         } else if channel == CHANNEL_TIME {
-            if let Some(client) = self.clients.get_mut(&player_id) {
-                client.net_time.receive(&client.peer, packet)?;
+            if let Some(client) = self.clients.get_mut(&peer_id) {
+                let peer = self.host.get_peer(peer_id).unwrap();
+                client.net_time.receive(peer, data)?;
             }
             Ok(None)
         } else if channel == CHANNEL_GAME {
             // Game messages are relayed as events
-            if let Some(client) = self.clients.get(&player_id) {
+            if let Some(client) = self.clients.get(&peer_id) {
                 if client.ingame() {
                     let msg = {
-                        let mut reader = BitReader::new(packet.data());
+                        let mut reader = BitReader::new(data);
                         reader.read::<ClientGameMsg>()?
                     };
 
-                    Ok(Some(Event::ClientGameMsg(player_id, msg)))
+                    Ok(Some(Event::ClientGameMsg(peer_id, msg)))
                 } else {
                     // Just discard game messages from players who are not ready
                     // (i.e. ingame) yet
