@@ -43,6 +43,8 @@ impl Time {
         peer: &mut P,
         data: &[u8],
     ) -> Result<(), Error<P::Transport>> {
+        //return Ok(());
+
         let mut reader = BitReader::new(data);
         let msg = reader.read::<TimeMsg>()?;
 
@@ -79,6 +81,8 @@ impl Time {
         peer: &mut P,
         delta: Duration,
     ) -> Result<(), Error<P::Transport>> {
+        //return Ok(());
+
         self.local_time += duration_to_secs(delta);
         self.send_ping_timer += delta;
 

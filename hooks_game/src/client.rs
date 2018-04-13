@@ -131,6 +131,7 @@ impl Client {
     }
 
     pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
+        return Ok(());
         self.net_time
             .update(self.host.get_peer(self.peer_id).unwrap(), delta)?;
         Ok(())

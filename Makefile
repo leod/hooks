@@ -1,5 +1,5 @@
 TARGET="target/"
-N_STRESS=10
+N_STRESS=20
 
 all: build
 
