@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bit_manager::{BitRead, BitReader, BitWrite, BitWriter};
 
@@ -14,16 +14,16 @@ pub const NUM_PING_SAMPLES: usize = 20;
 
 #[derive(Debug)]
 pub struct Time {
+    start_instant: Instant,
     send_ping_timer: Timer,
-    local_time: f32,
     ping_samples: VecDeque<f32>,
 }
 
 impl Default for Time {
     fn default() -> Time {
         Time {
+            start_instant: Instant::now(),
             send_ping_timer: Timer::from_hz(SEND_PING_HZ),
-            local_time: 0.0,
             ping_samples: VecDeque::new(),
         }
     }
@@ -65,11 +65,15 @@ impl PeerData for Time {
                     )?;
                 }
                 TimeMsg::Pong { ping_send_time } => {
-                    if ping_send_time <= self.local_time {
+                    let now = Instant::now();
+                    let pong_receive_time =
+                        duration_to_secs(now.duration_since(self.start_instant));
+
+                    if ping_send_time <= pong_receive_time {
                         // TODO: Might want to do some more sanity checking here, since otherwise peers
                         //       can fake their pings. For example, use sequence numbers instead of
                         //       sending the send times.
-                        let ping = self.local_time - ping_send_time;
+                        let ping = pong_receive_time - ping_send_time;
                         println!("ping: {:.2}ms", ping * 1000.0);
                         self.ping_samples.push_back(ping);
 
@@ -94,17 +98,13 @@ impl Time {
         peer_id: PeerId,
         delta: Duration,
     ) -> Result<(), H::Error> {
-        self.local_time += duration_to_secs(delta);
         self.send_ping_timer += delta;
 
-        if self.send_ping_timer.trigger_reset() {
-            Time::send(
-                host,
-                peer_id,
-                TimeMsg::Ping {
-                    send_time: self.local_time,
-                },
-            )?;
+        let now = Instant::now();
+        let send_time = duration_to_secs(now.duration_since(self.start_instant));
+
+        while self.send_ping_timer.trigger() {
+            Time::send(host, peer_id, TimeMsg::Ping { send_time })?;
         }
 
         Ok(())

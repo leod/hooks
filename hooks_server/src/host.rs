@@ -6,11 +6,11 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 use hooks_common::net;
 use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, async, enet, ChannelId, Host as _Host, Packet,
-                                   PacketFlag, PeerId};
+use hooks_common::net::transport::{self, async, enet, lag_loss};
+use hooks_common::net::transport::{ChannelId, Host as _Host, Packet, PacketFlag, PeerId};
 use hooks_common::{GameInfo, LeaveReason, PlayerId, INVALID_PLAYER_ID};
 
-type MyHost = async::Host<enet::Host, net::time::Time>;
+type MyHost = async::Host<lag_loss::Host<enet::Host>, net::time::Time>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -91,6 +91,13 @@ pub const PEER_COUNT: usize = 64;
 impl Host {
     pub fn create(port: u16, game_info: GameInfo) -> Result<Host, Error> {
         let host = enet::Host::create_server(port, PEER_COUNT, NUM_CHANNELS, 0, 0)?;
+        let host = lag_loss::Host::new(
+            host,
+            lag_loss::Config {
+                lag: Duration::from_millis(50),
+                loss: 0.0,
+            },
+        );
         let host = async::Host::spawn(host);
 
         Ok(Host {

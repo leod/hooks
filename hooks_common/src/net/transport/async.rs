@@ -1,3 +1,5 @@
+//! Transport wrapper for reading and writing in a background thread.
+
 use std::collections::BTreeMap;
 use std::mem;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender, TryRecvError};

@@ -107,8 +107,10 @@ impl transport::Host for Host {
         Ok(())
     }
 
-    fn disconnect(&mut self, id: PeerId, data: u32) -> Result<(), Error> {
-        let peer = self.peers.get(&id).ok_or(Error::InvalidPeerId(id))?;
+    fn disconnect(&mut self, peer_id: PeerId, data: u32) -> Result<(), Error> {
+        let peer = self.peers
+            .get(&peer_id)
+            .ok_or(Error::InvalidPeerId(peer_id))?;
 
         unsafe {
             enet_peer_disconnect(peer.0, data);
@@ -119,12 +121,14 @@ impl transport::Host for Host {
 
     fn send(
         &mut self,
-        id: PeerId,
+        peer_id: PeerId,
         channel_id: ChannelId,
         flag: PacketFlag,
         data: &[u8],
     ) -> Result<(), Error> {
-        let peer = self.peers.get(&id).ok_or(Error::InvalidPeerId(id))?;
+        let peer = self.peers
+            .get(&peer_id)
+            .ok_or(Error::InvalidPeerId(peer_id))?;
         peer.send(channel_id, flag, data)
     }
 }
