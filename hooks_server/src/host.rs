@@ -6,11 +6,11 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
 use hooks_common::net::transport::{self, enet, ChannelId, Host as _Host, Packet, PacketFlag, Peer,
-                                   PeerId, Transport};
-use hooks_common::net::{self, DefaultTransport};
+                                   PeerId};
+use hooks_common::net::{self, DefaultHost};
 use hooks_common::{GameInfo, LeaveReason, PlayerId, INVALID_PLAYER_ID};
 
-type MyTransport = DefaultTransport;
+type MyHost = DefaultHost;
 
 #[derive(Debug)]
 pub enum Error {
@@ -18,19 +18,19 @@ pub enum Error {
     ConnectedTwice,
     NotConnected,
     InvalidReady,
-    Time(net::time::Error<MyTransport>),
-    Transport(<MyTransport as Transport>::Error),
+    Time(net::time::Error<<MyHost as transport::Host>::Error>),
+    Transport(<MyHost as transport::Host>::Error),
     BitManager(bit_manager::Error),
 }
 
-impl From<net::time::Error<MyTransport>> for Error {
-    fn from(error: net::time::Error<MyTransport>) -> Error {
+impl From<net::time::Error<<MyHost as transport::Host>::Error>> for Error {
+    fn from(error: net::time::Error<<MyHost as transport::Host>::Error>) -> Error {
         Error::Time(error)
     }
 }
 
 impl From<enet::Error> for Error {
-    fn from(error: <MyTransport as Transport>::Error) -> Error {
+    fn from(error: <MyHost as transport::Host>::Error) -> Error {
         Error::Transport(error)
     }
 }
@@ -74,7 +74,7 @@ impl Client {
 }
 
 pub struct Host {
-    host: <MyTransport as Transport>::Host,
+    host: MyHost,
     game_info: GameInfo,
     clients: BTreeMap<PlayerId, Client>,
     queued_events: VecDeque<Event>,
@@ -94,7 +94,7 @@ impl Host {
     pub fn create(
         port: u16,
         game_info: GameInfo,
-    ) -> Result<Host, <MyTransport as Transport>::Error> {
+    ) -> Result<Host, <MyHost as transport::Host>::Error> {
         let host = enet::Host::create_server(port, PEER_COUNT, NUM_CHANNELS, 0, 0)?;
 
         Ok(Host {

@@ -1,4 +1,5 @@
 pub mod enet;
+//pub mod async;
 
 pub use std::fmt::Debug;
 
@@ -12,31 +13,20 @@ pub enum PacketFlag {
     Unsequenced,
 }
 
-pub enum Event<T: Transport> {
+pub enum Event<P: Packet> {
     Connect(PeerId),
-    Receive(PeerId, ChannelId, T::Packet),
+    Receive(PeerId, ChannelId, P),
     Disconnect(PeerId),
 }
 
-pub trait Transport: Sized + Debug {
+pub trait Host {
     type Error: Debug;
-    type Host: Host<Transport = Self>;
-    type Peer: Peer<Transport = Self>;
+    type Peer: Peer<Error = Self::Error>;
     type Packet: Packet;
-}
 
-pub trait Host: Sized {
-    type Transport: Transport<Host = Self>;
+    fn get_peer<'a>(&'a mut self, id: PeerId) -> Option<&'a mut Self::Peer>;
 
-    fn get_peer<'a>(
-        &'a mut self,
-        id: PeerId,
-    ) -> Option<&'a mut <Self::Transport as Transport>::Peer>;
-
-    fn service(
-        &mut self,
-        timeout_ms: u32,
-    ) -> Result<Option<Event<Self::Transport>>, <Self::Transport as Transport>::Error>;
+    fn service(&mut self, timeout_ms: u32) -> Result<Option<Event<Self::Packet>>, Self::Error>;
 
     fn flush(&mut self);
 
@@ -46,13 +36,13 @@ pub trait Host: Sized {
         channel_id: ChannelId,
         flag: PacketFlag,
         data: &[u8],
-    ) -> Result<(), <Self::Transport as Transport>::Error> {
+    ) -> Result<(), Self::Error> {
         self.get_peer(id).unwrap().send(channel_id, flag, data)
     }
 }
 
-pub trait Peer: Sized {
-    type Transport: Transport<Peer = Self> + ?Sized;
+pub trait Peer {
+    type Error: Debug;
 
     fn id(&self) -> PeerId;
     fn send(
@@ -60,7 +50,7 @@ pub trait Peer: Sized {
         channel_id: ChannelId,
         flag: PacketFlag,
         data: &[u8],
-    ) -> Result<(), <Self::Transport as Transport>::Error>;
+    ) -> Result<(), Self::Error>;
     fn disconnect(&mut self, data: u32);
 }
 

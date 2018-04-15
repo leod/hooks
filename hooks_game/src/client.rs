@@ -4,11 +4,11 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, enet, Host, Packet, PacketFlag, Peer, PeerId, Transport};
-use hooks_common::net::{self, protocol, DefaultTransport};
+use hooks_common::net::transport::{self, enet, Host, Packet, PacketFlag, Peer, PeerId};
+use hooks_common::net::{self, protocol, DefaultHost};
 use hooks_common::{GameInfo, LeaveReason, PlayerId};
 
-type MyTransport = DefaultTransport;
+type MyHost = DefaultHost;
 
 #[derive(Debug)]
 pub enum Error {
@@ -16,19 +16,19 @@ pub enum Error {
     InvalidChannel(u8),
     UnexpectedConnect,
     UnexpectedCommMsg,
-    Time(net::time::Error<MyTransport>),
-    Transport(<MyTransport as Transport>::Error),
+    Time(net::time::Error<<MyHost as Host>::Error>),
+    Transport(<MyHost as Host>::Error),
     BitManager(bit_manager::Error),
 }
 
-impl From<net::time::Error<MyTransport>> for Error {
-    fn from(error: net::time::Error<MyTransport>) -> Error {
+impl From<net::time::Error<<MyHost as Host>::Error>> for Error {
+    fn from(error: net::time::Error<<MyHost as Host>::Error>) -> Error {
         Error::Time(error)
     }
 }
 
 impl From<enet::Error> for Error {
-    fn from(error: <MyTransport as Transport>::Error) -> Error {
+    fn from(error: <MyHost as Host>::Error) -> Error {
         Error::Transport(error)
     }
 }
@@ -40,7 +40,7 @@ impl From<bit_manager::Error> for Error {
 }
 
 pub struct Client {
-    host: <MyTransport as Transport>::Host,
+    host: MyHost,
     peer_id: PeerId,
     my_player_id: PlayerId,
     game_info: GameInfo,
@@ -174,11 +174,7 @@ impl Client {
         Ok(())
     }
 
-    fn send_comm(
-        host: &mut <MyTransport as Transport>::Host,
-        peer_id: PeerId,
-        msg: ClientCommMsg,
-    ) -> Result<(), Error> {
+    fn send_comm(host: &mut MyHost, peer_id: PeerId, msg: ClientCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
             writer.write(&msg)?;
