@@ -26,7 +26,7 @@ use hooks_show::{Assets, Show};
 use hooks_util::debug::{self, Inspect};
 use hooks_util::profile::{self, PROFILER};
 use hooks_util::stats;
-use hooks_util::timer;
+use hooks_util::timer::{duration_to_secs, Stopwatch};
 
 fn register(reg: &mut Registry, game_info: &GameInfo) {
     // Game state
@@ -47,6 +47,7 @@ struct MainState {
     game: Game,
 
     next_player_input: PlayerInput,
+    update_stopwatch: Stopwatch,
 
     show: Show,
     font: Font,
@@ -62,17 +63,18 @@ impl MainState {
         profile!("update");
 
         self.fps = ggez::timer::get_fps(ctx);
-        let mut delta = ggez::timer::get_delta(ctx);
 
-        stats::update(timer::duration_to_secs(delta));
-        stats::record("dt", timer::duration_to_secs(delta));
+        let mut delta = self.update_stopwatch.get_reset();
+
+        stats::update(duration_to_secs(delta));
+        stats::record("dt", duration_to_secs(delta));
 
         while let Some(event) = self.game
             .update(&mut self.client, &self.next_player_input, delta)
             .unwrap()
+        // TODO: This is where actual error handling will need to happen
         {
-            // TODO: Hmmm...
-            delta = Default::default();
+            delta = self.update_stopwatch.get_reset();
 
             match event {
                 hooks_game::game::Event::Disconnected => {
@@ -290,6 +292,7 @@ fn main() {
         client,
         game,
         next_player_input: PlayerInput::default(),
+        update_stopwatch: Stopwatch::new(),
         show,
         font,
         fps: 0.0,

@@ -4,11 +4,12 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, async, enet, Host, Packet, PacketFlag, PeerId};
+use hooks_common::net::transport::{self, async, enet, lag_loss};
+use hooks_common::net::transport::{Host, Packet, PacketFlag, PeerId};
 use hooks_common::net::{self, protocol};
 use hooks_common::{GameInfo, LeaveReason, PlayerId};
 
-type MyHost = async::Host<enet::Host, net::time::Time>;
+type MyHost = async::Host<lag_loss::Host<enet::Host>, net::time::Time>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -58,6 +59,14 @@ impl Client {
 
         let mut host = enet::Host::create_client(NUM_CHANNELS, 0, 0)?;
         host.connect(&address, NUM_CHANNELS)?;
+
+        let host = lag_loss::Host::new(
+            host,
+            lag_loss::Config {
+                lag: Duration::from_millis(50),
+                loss: 0.0,
+            },
+        );
 
         let mut host = async::Host::spawn(host);
 
