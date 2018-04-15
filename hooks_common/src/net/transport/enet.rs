@@ -15,6 +15,7 @@ use net::transport::{self, ChannelId, Event, PacketFlag, PeerId};
 
 #[derive(Debug)]
 pub enum Error {
+    InvalidPeerId(PeerId),
     InvalidEvent,
     HostNullPointer,
     ConnectNullPointer,
@@ -23,24 +24,22 @@ pub enum Error {
     ServiceFailure(i32),
     AddressFailure,
 }
-
-pub struct Address(ENetAddress);
-
+pub struct Packet(*mut ENetPacket);
 pub struct Host {
     handle: *mut ENetHost,
     next_peer_id: PeerId,
     peers: BTreeMap<PeerId, Peer>,
 }
-pub struct Peer(*mut ENetPeer);
-pub struct Packet(*mut ENetPacket);
+
+pub struct Address(ENetAddress);
+struct Peer(*mut ENetPeer);
 
 impl transport::Host for Host {
     type Error = Error;
-    type Peer = Peer;
     type Packet = Packet;
 
-    fn get_peer<'a>(&'a mut self, id: PeerId) -> Option<&'a mut Peer> {
-        self.peers.get_mut(&id)
+    fn is_peer(&self, id: PeerId) -> bool {
+        self.peers.contains_key(&id)
     }
 
     fn service(&mut self, timeout_ms: u32) -> Result<Option<Event<Packet>>, Error> {
@@ -61,16 +60,16 @@ impl transport::Host for Host {
         if event.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
             Ok(None)
         } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_CONNECT {
-            if event.peer != ptr::null_mut() {
+            if !event.peer.is_null() {
                 let id = self.register_peer(event.peer);
                 Ok(Some(Event::Connect(id)))
             } else {
                 Err(Error::InvalidEvent)
             }
         } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_RECEIVE {
-            let id = transport::Peer::id(&Peer(event.peer));
-            if event.peer != ptr::null_mut() {
-                if let Some(_) = self.get_peer(id) {
+            let id = Peer(event.peer).id();
+            if !event.peer.is_null() {
+                if let Some(_) = self.peers.get(&id) {
                     let packet = Packet(event.packet);
                     Ok(Some(Event::Receive(id, event.channelID, packet)))
                 } else {
@@ -81,7 +80,7 @@ impl transport::Host for Host {
             }
         } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_DISCONNECT {
             if event.peer != ptr::null_mut() {
-                let id = transport::Peer::id(&Peer(event.peer));
+                let id = Peer(event.peer).id();
                 match self.peers.entry(id) {
                     btree_map::Entry::Occupied(entry) => {
                         entry.remove();
@@ -97,21 +96,48 @@ impl transport::Host for Host {
         }
     }
 
-    fn flush(&mut self) {
+    fn flush(&mut self) -> Result<(), Error> {
         unsafe {
             enet_host_flush(self.handle);
         }
+
+        Ok(())
+    }
+
+    fn disconnect(&mut self, id: PeerId, data: u32) -> Result<(), Error> {
+        let peer = self.peers.get(&id).ok_or(Error::InvalidPeerId(id))?;
+
+        unsafe {
+            enet_peer_disconnect(peer.0, data);
+        }
+
+        Ok(())
+    }
+
+    fn send(
+        &mut self,
+        id: PeerId,
+        channel_id: ChannelId,
+        flag: PacketFlag,
+        data: &[u8],
+    ) -> Result<(), Error> {
+        let peer = self.peers.get(&id).ok_or(Error::InvalidPeerId(id))?;
+        peer.send(channel_id, flag, data)
     }
 }
 
-impl transport::Peer for Peer {
-    type Error = Error;
+impl Peer {
+    fn set_id(&mut self, id: PeerId) {
+        unsafe {
+            (*self.0).data = id as *mut c_void;
+        }
+    }
 
     fn id(&self) -> PeerId {
         unsafe { (*self.0).data as PeerId }
     }
 
-    fn send(&mut self, channel_id: ChannelId, flag: PacketFlag, data: &[u8]) -> Result<(), Error> {
+    fn send(&self, channel_id: ChannelId, flag: PacketFlag, data: &[u8]) -> Result<(), Error> {
         let flags = match flag {
             PacketFlag::Reliable => _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE as u32,
             PacketFlag::Unreliable => 0, // TODO: Check
@@ -146,20 +172,6 @@ impl transport::Peer for Peer {
         }
 
         Ok(())
-    }
-
-    fn disconnect(&mut self, data: u32) {
-        unsafe {
-            enet_peer_disconnect(self.0, data);
-        }
-    }
-}
-
-impl Peer {
-    fn set_id(&mut self, id: PeerId) {
-        unsafe {
-            (*self.0).data = id as *mut c_void;
-        }
     }
 }
 

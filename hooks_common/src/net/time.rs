@@ -7,7 +7,7 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 use hooks_util::timer::{duration_to_secs, Timer};
 
 use net::protocol::{TimeMsg, CHANNEL_TIME};
-use net::transport::{PacketFlag, Peer};
+use net::transport::{Host, PacketFlag, PeerId};
 
 pub const SEND_PING_HZ: f32 = 0.5;
 pub const NUM_PING_SAMPLES: usize = 20;
@@ -39,14 +39,20 @@ impl Time {
         }
     }
 
-    pub fn receive<P: Peer>(&mut self, peer: &mut P, data: &[u8]) -> Result<(), Error<P::Error>> {
+    pub fn receive<H: Host>(
+        &mut self,
+        host: &mut H,
+        peer_id: PeerId,
+        data: &[u8],
+    ) -> Result<(), Error<H::Error>> {
         let mut reader = BitReader::new(data);
         let msg = reader.read::<TimeMsg>()?;
 
         match msg {
             TimeMsg::Ping { send_time } => {
                 Time::send(
-                    peer,
+                    host,
+                    peer_id,
                     TimeMsg::Pong {
                         ping_send_time: send_time,
                     },
@@ -71,17 +77,19 @@ impl Time {
         Ok(())
     }
 
-    pub fn update<P: Peer>(
+    pub fn update<H: Host>(
         &mut self,
-        peer: &mut P,
+        host: &mut H,
+        peer_id: PeerId,
         delta: Duration,
-    ) -> Result<(), Error<P::Error>> {
+    ) -> Result<(), Error<H::Error>> {
         self.local_time += duration_to_secs(delta);
         self.send_ping_timer += delta;
 
         if self.send_ping_timer.trigger_reset() {
             Time::send(
-                peer,
+                host,
+                peer_id,
                 TimeMsg::Ping {
                     send_time: self.local_time,
                 },
@@ -91,7 +99,7 @@ impl Time {
         Ok(())
     }
 
-    fn send<P: Peer>(peer: &mut P, msg: TimeMsg) -> Result<(), Error<P::Error>> {
+    fn send<H: Host>(host: &mut H, peer_id: PeerId, msg: TimeMsg) -> Result<(), Error<H::Error>> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
             writer.write(&msg)?;
@@ -100,7 +108,7 @@ impl Time {
 
         // We send as unsequenced, unreliable packets so that we get the same delivery times as for
         // the CHANNEL_GAME messages
-        peer.send(CHANNEL_TIME, PacketFlag::Unsequenced, &data)
+        host.send(peer_id, CHANNEL_TIME, PacketFlag::Unsequenced, &data)
             .map_err(|error| Error::Transport(error))
     }
 }

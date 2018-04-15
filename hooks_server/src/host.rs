@@ -5,7 +5,7 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, enet, ChannelId, Host as _Host, Packet, PacketFlag, Peer,
+use hooks_common::net::transport::{self, enet, ChannelId, Host as _Host, Packet, PacketFlag,
                                    PeerId};
 use hooks_common::net::{self, DefaultHost};
 use hooks_common::{GameInfo, LeaveReason, PlayerId, INVALID_PLAYER_ID};
@@ -133,10 +133,10 @@ impl Host {
         player_id: PlayerId,
         reason: LeaveReason,
     ) -> Result<(), Error> {
-        {
-            let peer = self.host.get_peer(player_id).unwrap();
-            peer.disconnect(protocol::leave_reason_to_u32(reason));
-        }
+        assert!(self.host.is_peer(player_id));
+
+        self.host
+            .disconnect(player_id, protocol::leave_reason_to_u32(reason))?;
 
         if let Some(event) = self.on_disconnect(player_id, reason) {
             // Let game logic handle this `PlayerLeft` event with the next `service` calls
@@ -148,8 +148,7 @@ impl Host {
 
     pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
         for (&peer_id, client) in self.clients.iter_mut() {
-            let peer = self.host.get_peer(peer_id).unwrap();
-            client.net_time.update(peer, delta)?;
+            client.net_time.update(&mut self.host, peer_id, delta)?;
         }
         Ok(())
     }
@@ -181,10 +180,10 @@ impl Host {
                                 peer_id, error
                             );
 
-                            self.host
-                                .get_peer(peer_id)
-                                .unwrap()
-                                .disconnect(protocol::leave_reason_to_u32(LeaveReason::InvalidMsg));
+                            self.host.disconnect(
+                                peer_id,
+                                protocol::leave_reason_to_u32(LeaveReason::InvalidMsg),
+                            )?;
 
                             Ok(self.on_disconnect(peer_id, LeaveReason::InvalidMsg))
                         }
@@ -201,7 +200,7 @@ impl Host {
     }
 
     pub fn flush(&mut self) -> Result<(), Error> {
-        self.host.flush();
+        self.host.flush()?;
         Ok(())
     }
 
@@ -278,8 +277,7 @@ impl Host {
             }
         } else if channel == CHANNEL_TIME {
             if let Some(client) = self.clients.get_mut(&peer_id) {
-                let peer = self.host.get_peer(peer_id).unwrap();
-                client.net_time.receive(peer, data)?;
+                client.net_time.receive(&mut self.host, peer_id, data)?;
             }
             Ok(None)
         } else if channel == CHANNEL_GAME {

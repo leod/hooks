@@ -4,7 +4,7 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, enet, Host, Packet, PacketFlag, Peer, PeerId};
+use hooks_common::net::transport::{self, enet, Host, Packet, PacketFlag, PeerId};
 use hooks_common::net::{self, protocol, DefaultHost};
 use hooks_common::{GameInfo, LeaveReason, PlayerId};
 
@@ -131,8 +131,7 @@ impl Client {
     }
 
     pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
-        self.net_time
-            .update(self.host.get_peer(self.peer_id).unwrap(), delta)?;
+        self.net_time.update(&mut self.host, self.peer_id, delta)?;
         Ok(())
     }
 
@@ -142,7 +141,7 @@ impl Client {
         if let Some(event) = self.host.service(0)? {
             match event {
                 transport::Event::Connect(_peer_id) => Err(Error::UnexpectedConnect),
-                transport::Event::Receive(peer_id, channel, packet) => {
+                transport::Event::Receive(_peer_id, channel, packet) => {
                     if channel == CHANNEL_COMM {
                         // Communication messages are handled here
                         let msg = Self::read_comm(packet.data())?;
@@ -151,8 +150,9 @@ impl Client {
                             ServerCommMsg::AcceptConnect { .. } => Err(Error::UnexpectedCommMsg),
                         }
                     } else if channel == CHANNEL_TIME {
+                        // Time messages are handled here
                         self.net_time
-                            .receive(self.host.get_peer(peer_id).unwrap(), packet.data())?;
+                            .receive(&mut self.host, self.peer_id, packet.data())?;
                         Ok(None)
                     } else if channel == CHANNEL_GAME {
                         // Game messages are relayed
@@ -170,7 +170,7 @@ impl Client {
     }
 
     pub fn flush(&mut self) -> Result<(), Error> {
-        self.host.flush();
+        self.host.flush()?;
         Ok(())
     }
 
@@ -204,9 +204,14 @@ impl Client {
 impl Drop for Client {
     fn drop(&mut self) {
         // TODO: Should perhaps instead disconnect reliably in a separate function
-        if let Some(peer) = self.host.get_peer(self.peer_id) {
-            peer.disconnect(protocol::leave_reason_to_u32(LeaveReason::Disconnected));
+        if self.host.is_peer(self.peer_id) {
+            self.host
+                .disconnect(
+                    self.peer_id,
+                    protocol::leave_reason_to_u32(LeaveReason::Disconnected),
+                )
+                .unwrap();
         }
-        self.host.flush();
+        self.host.flush().unwrap();
     }
 }
