@@ -178,6 +178,8 @@ fn background_thread<H, D>(
     D: PeerData,
 {
     loop {
+        thread::yield_now();
+
         match receiver.try_recv() {
             Ok(Command::Send(peer_id, channel_id, packet_flag, data)) => {
                 if host.is_peer(peer_id) {
