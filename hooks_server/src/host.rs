@@ -3,14 +3,14 @@ use std::time::Duration;
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
+use hooks_common::net;
 use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
 use hooks_common::net::transport::{self, enet, ChannelId, Host as _Host, Packet, PacketFlag,
                                    PeerId};
-use hooks_common::net::{self, DefaultHost};
 use hooks_common::{GameInfo, LeaveReason, PlayerId, INVALID_PLAYER_ID};
 
-type MyHost = DefaultHost;
+type MyHost = enet::Host;
 
 #[derive(Debug)]
 pub enum Error {
@@ -133,8 +133,6 @@ impl Host {
         player_id: PlayerId,
         reason: LeaveReason,
     ) -> Result<(), Error> {
-        assert!(self.host.is_peer(player_id));
-
         self.host
             .disconnect(player_id, protocol::leave_reason_to_u32(reason))?;
 
@@ -242,7 +240,7 @@ impl Host {
             match msg {
                 ClientCommMsg::WishConnect { name } => {
                     if !self.clients.contains_key(&peer_id) {
-                        info!(
+                        debug!(
                             "Player {} with name {} wishes to connect, accepting",
                             peer_id, name
                         );

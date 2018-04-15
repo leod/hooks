@@ -4,11 +4,11 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, enet, Host, Packet, PacketFlag, PeerId};
-use hooks_common::net::{self, protocol, DefaultHost};
+use hooks_common::net::transport::{self, async, enet, Host, Packet, PacketFlag, PeerId};
+use hooks_common::net::{self, protocol};
 use hooks_common::{GameInfo, LeaveReason, PlayerId};
 
-type MyHost = DefaultHost;
+type MyHost = async::Host<enet::Host, ()>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -17,7 +17,8 @@ pub enum Error {
     UnexpectedConnect,
     UnexpectedCommMsg,
     Time(net::time::Error<<MyHost as Host>::Error>),
-    Transport(<MyHost as Host>::Error),
+    EnetTransport(enet::Error),
+    AsyncTransport(async::Error),
     BitManager(bit_manager::Error),
 }
 
@@ -28,8 +29,14 @@ impl From<net::time::Error<<MyHost as Host>::Error>> for Error {
 }
 
 impl From<enet::Error> for Error {
-    fn from(error: <MyHost as Host>::Error) -> Error {
-        Error::Transport(error)
+    fn from(error: enet::Error) -> Error {
+        Error::EnetTransport(error)
+    }
+}
+
+impl From<async::Error> for Error {
+    fn from(error: async::Error) -> Error {
+        Error::AsyncTransport(error)
     }
 }
 
@@ -56,8 +63,11 @@ pub enum Event {
 impl Client {
     pub fn connect(host: &str, port: u16, name: &str, timeout_ms: u32) -> Result<Client, Error> {
         let address = enet::Address::create(host, port)?;
+
         let mut host = enet::Host::create_client(NUM_CHANNELS, 0, 0)?;
         host.connect(&address, NUM_CHANNELS)?;
+
+        let mut host = async::Host::spawn(host);
 
         if let Some(transport::Event::Connect(peer_id)) = host.service(timeout_ms)? {
             // Send connection request
@@ -205,13 +215,15 @@ impl Drop for Client {
     fn drop(&mut self) {
         // TODO: Should perhaps instead disconnect reliably in a separate function
         if self.host.is_peer(self.peer_id) {
-            self.host
-                .disconnect(
-                    self.peer_id,
-                    protocol::leave_reason_to_u32(LeaveReason::Disconnected),
-                )
-                .unwrap();
+            if let Err(error) = self.host.disconnect(
+                self.peer_id,
+                protocol::leave_reason_to_u32(LeaveReason::Disconnected),
+            ) {
+                warn!("Failed to disconnect while dropping client: {:?}", error);
+            }
         }
-        self.host.flush().unwrap();
+        if let Err(error) = self.host.flush() {
+            warn!("Failed to flush host while dropping client: {:?}", error);
+        }
     }
 }

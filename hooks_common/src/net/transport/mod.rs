@@ -1,5 +1,5 @@
+pub mod async;
 pub mod enet;
-//pub mod async;
 
 pub use std::fmt::Debug;
 

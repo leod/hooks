@@ -4,9 +4,11 @@ N_STRESS=20
 all: build
 
 build-release:
+	mkdir -p log
 	cargo build -j8 --release
 
 build:
+	mkdir -p log
 	cargo build -j8 
 
 run: build
@@ -41,7 +43,7 @@ stress-release: build-release
 	tmux \
 		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_server | grep -v \"EPA did not converge\"; cat"' \; \
 		split-window -h 'bash -c "sleep 1; RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_game | grep -v \"EPA did not converge\"; cat"' \; \
-		split-window -h 'bash -c "sleep 1; for i in {1..'${N_STRESS}'}; do echo $i; target/release/examples/random_bot & done ; cat"' \; \
+		split-window -h 'bash -c "sleep 1; scripts/random_bots.sh '${N_STRESS}' release; cat"' \; \
 		select-layout even-horizontal
 
 stress: build
