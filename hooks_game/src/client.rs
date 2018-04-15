@@ -3,12 +3,12 @@ use std::time::Duration;
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
-                                  CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
+                                  CHANNEL_GAME, NUM_CHANNELS};
 use hooks_common::net::transport::{self, async, enet, Host, Packet, PacketFlag, PeerId};
 use hooks_common::net::{self, protocol};
 use hooks_common::{GameInfo, LeaveReason, PlayerId};
 
-type MyHost = async::Host<enet::Host, ()>;
+type MyHost = async::Host<enet::Host, net::time::Time>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -16,16 +16,9 @@ pub enum Error {
     InvalidChannel(u8),
     UnexpectedConnect,
     UnexpectedCommMsg,
-    Time(net::time::Error<<MyHost as Host>::Error>),
     EnetTransport(enet::Error),
     AsyncTransport(async::Error),
     BitManager(bit_manager::Error),
-}
-
-impl From<net::time::Error<<MyHost as Host>::Error>> for Error {
-    fn from(error: net::time::Error<<MyHost as Host>::Error>) -> Error {
-        Error::Time(error)
-    }
 }
 
 impl From<enet::Error> for Error {
@@ -52,7 +45,6 @@ pub struct Client {
     my_player_id: PlayerId,
     game_info: GameInfo,
     ready: bool,
-    net_time: net::time::Time,
 }
 
 pub enum Event {
@@ -105,7 +97,6 @@ impl Client {
                             my_player_id,
                             game_info,
                             ready: false,
-                            net_time: net::time::Time::new(),
                         })
                     }
                     reply => Err(Error::FailedToConnect(format!(
@@ -141,7 +132,11 @@ impl Client {
     }
 
     pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
-        self.net_time.update(&mut self.host, self.peer_id, delta)?;
+        let peers = self.host.peers();
+        let mut locked_peers = peers.lock().unwrap();
+        for (&peer_id, net_time) in locked_peers.iter_mut() {
+            net_time.update(&mut self.host, peer_id, delta)?;
+        }
         Ok(())
     }
 
@@ -159,11 +154,6 @@ impl Client {
                         match msg {
                             ServerCommMsg::AcceptConnect { .. } => Err(Error::UnexpectedCommMsg),
                         }
-                    } else if channel == CHANNEL_TIME {
-                        // Time messages are handled here
-                        self.net_time
-                            .receive(&mut self.host, self.peer_id, packet.data())?;
-                        Ok(None)
                     } else if channel == CHANNEL_GAME {
                         // Game messages are relayed
                         Ok(Some(Event::ServerGameMsg(packet.data().to_vec())))
