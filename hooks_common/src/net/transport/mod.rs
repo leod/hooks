@@ -21,37 +21,19 @@ pub enum Event<P: Packet> {
 
 pub trait Host {
     type Error: Debug;
-    type Peer: Peer<Error = Self::Error>;
     type Packet: Packet;
 
-    fn get_peer<'a>(&'a mut self, id: PeerId) -> Option<&'a mut Self::Peer>;
-
+    fn is_peer(&self, id: PeerId) -> bool;
     fn service(&mut self, timeout_ms: u32) -> Result<Option<Event<Self::Packet>>, Self::Error>;
-
-    fn flush(&mut self);
-
+    fn flush(&mut self) -> Result<(), Self::Error>;
+    fn disconnect(&mut self, id: PeerId, data: u32) -> Result<(), Self::Error>;
     fn send(
         &mut self,
         id: PeerId,
         channel_id: ChannelId,
         flag: PacketFlag,
         data: &[u8],
-    ) -> Result<(), Self::Error> {
-        self.get_peer(id).unwrap().send(channel_id, flag, data)
-    }
-}
-
-pub trait Peer {
-    type Error: Debug;
-
-    fn id(&self) -> PeerId;
-    fn send(
-        &mut self,
-        channel_id: ChannelId,
-        flag: PacketFlag,
-        data: &[u8],
     ) -> Result<(), Self::Error>;
-    fn disconnect(&mut self, data: u32);
 }
 
 pub trait Packet {
