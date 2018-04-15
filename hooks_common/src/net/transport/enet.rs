@@ -14,16 +14,6 @@ use enet_sys::{enet_address_set_host, enet_host_connect, enet_host_create, enet_
 use net::transport::{self, ChannelId, Event, PacketFlag, PeerId};
 
 #[derive(Debug)]
-pub struct Transport;
-
-impl transport::Transport for Transport {
-    type Error = Error;
-    type Host = Host;
-    type Peer = Peer;
-    type Packet = Packet;
-}
-
-#[derive(Debug)]
 pub enum Error {
     InvalidEvent,
     HostNullPointer,
@@ -41,13 +31,81 @@ pub struct Host {
     next_peer_id: PeerId,
     peers: BTreeMap<PeerId, Peer>,
 }
-
 pub struct Peer(*mut ENetPeer);
-
 pub struct Packet(*mut ENetPacket);
 
+impl transport::Host for Host {
+    type Error = Error;
+    type Peer = Peer;
+    type Packet = Packet;
+
+    fn get_peer<'a>(&'a mut self, id: PeerId) -> Option<&'a mut Peer> {
+        self.peers.get_mut(&id)
+    }
+
+    fn service(&mut self, timeout_ms: u32) -> Result<Option<Event<Packet>>, Error> {
+        let mut event: ENetEvent;
+
+        let result = unsafe {
+            event = mem::uninitialized();
+            enet_host_service(self.handle, &mut event, timeout_ms)
+        };
+
+        if result < 0 {
+            //return Err(Error::ServiceFailure(result));
+            // FIXME: Find out if this failure happens due to us using enet in the wrong way.
+            warn!("enet_host_service failure: {}. ignoring.", result);
+            return Ok(None);
+        }
+
+        if event.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
+            Ok(None)
+        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_CONNECT {
+            if event.peer != ptr::null_mut() {
+                let id = self.register_peer(event.peer);
+                Ok(Some(Event::Connect(id)))
+            } else {
+                Err(Error::InvalidEvent)
+            }
+        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_RECEIVE {
+            let id = transport::Peer::id(&Peer(event.peer));
+            if event.peer != ptr::null_mut() {
+                if let Some(_) = self.get_peer(id) {
+                    let packet = Packet(event.packet);
+                    Ok(Some(Event::Receive(id, event.channelID, packet)))
+                } else {
+                    Err(Error::InvalidEvent)
+                }
+            } else {
+                Err(Error::InvalidEvent)
+            }
+        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_DISCONNECT {
+            if event.peer != ptr::null_mut() {
+                let id = transport::Peer::id(&Peer(event.peer));
+                match self.peers.entry(id) {
+                    btree_map::Entry::Occupied(entry) => {
+                        entry.remove();
+                        Ok(Some(Event::Disconnect(id)))
+                    }
+                    btree_map::Entry::Vacant(_) => Err(Error::InvalidEvent),
+                }
+            } else {
+                Err(Error::InvalidEvent)
+            }
+        } else {
+            Err(Error::InvalidEvent)
+        }
+    }
+
+    fn flush(&mut self) {
+        unsafe {
+            enet_host_flush(self.handle);
+        }
+    }
+}
+
 impl transport::Peer for Peer {
-    type Transport = Transport;
+    type Error = Error;
 
     fn id(&self) -> PeerId {
         unsafe { (*self.0).data as PeerId }
@@ -212,74 +270,6 @@ impl Host {
         self.peers.insert(peer_id, peer);
 
         peer_id
-    }
-}
-
-impl transport::Host for Host {
-    type Transport = Transport;
-
-    fn get_peer<'a>(&'a mut self, id: PeerId) -> Option<&'a mut Peer> {
-        self.peers.get_mut(&id)
-    }
-
-    fn service(&mut self, timeout_ms: u32) -> Result<Option<Event<Transport>>, Error> {
-        let mut event: ENetEvent;
-
-        let result = unsafe {
-            event = mem::uninitialized();
-            enet_host_service(self.handle, &mut event, timeout_ms)
-        };
-
-        if result < 0 {
-            //return Err(Error::ServiceFailure(result));
-            // FIXME: Find out if this failure happens due to us using enet in the wrong way.
-            warn!("enet_host_service failure: {}. ignoring.", result);
-            return Ok(None);
-        }
-
-        if event.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
-            Ok(None)
-        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_CONNECT {
-            if event.peer != ptr::null_mut() {
-                let id = self.register_peer(event.peer);
-                Ok(Some(Event::Connect(id)))
-            } else {
-                Err(Error::InvalidEvent)
-            }
-        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_RECEIVE {
-            let id = transport::Peer::id(&Peer(event.peer));
-            if event.peer != ptr::null_mut() {
-                if let Some(_) = self.get_peer(id) {
-                    let packet = Packet(event.packet);
-                    Ok(Some(Event::Receive(id, event.channelID, packet)))
-                } else {
-                    Err(Error::InvalidEvent)
-                }
-            } else {
-                Err(Error::InvalidEvent)
-            }
-        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_DISCONNECT {
-            if event.peer != ptr::null_mut() {
-                let id = transport::Peer::id(&Peer(event.peer));
-                match self.peers.entry(id) {
-                    btree_map::Entry::Occupied(entry) => {
-                        entry.remove();
-                        Ok(Some(Event::Disconnect(id)))
-                    }
-                    btree_map::Entry::Vacant(_) => Err(Error::InvalidEvent),
-                }
-            } else {
-                Err(Error::InvalidEvent)
-            }
-        } else {
-            Err(Error::InvalidEvent)
-        }
-    }
-
-    fn flush(&mut self) {
-        unsafe {
-            enet_host_flush(self.handle);
-        }
     }
 }
 

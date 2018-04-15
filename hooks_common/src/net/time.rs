@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::time::Duration;
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
@@ -6,19 +7,19 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 use hooks_util::timer::{duration_to_secs, Timer};
 
 use net::protocol::{TimeMsg, CHANNEL_TIME};
-use net::transport::{PacketFlag, Peer, Transport};
+use net::transport::{PacketFlag, Peer};
 
 pub const SEND_PING_HZ: f32 = 0.5;
 pub const NUM_PING_SAMPLES: usize = 20;
 
 #[derive(Debug)]
-pub enum Error<T: Transport> {
-    Transport(T::Error),
+pub enum Error<E: Debug> {
+    Transport(E),
     BitManager(bit_manager::Error),
 }
 
-impl<T: Transport> From<bit_manager::Error> for Error<T> {
-    fn from(error: bit_manager::Error) -> Error<T> {
+impl<E: Debug> From<bit_manager::Error> for Error<E> {
+    fn from(error: bit_manager::Error) -> Error<E> {
         Error::BitManager(error)
     }
 }
@@ -38,11 +39,7 @@ impl Time {
         }
     }
 
-    pub fn receive<P: Peer>(
-        &mut self,
-        peer: &mut P,
-        data: &[u8],
-    ) -> Result<(), Error<P::Transport>> {
+    pub fn receive<P: Peer>(&mut self, peer: &mut P, data: &[u8]) -> Result<(), Error<P::Error>> {
         let mut reader = BitReader::new(data);
         let msg = reader.read::<TimeMsg>()?;
 
@@ -78,7 +75,7 @@ impl Time {
         &mut self,
         peer: &mut P,
         delta: Duration,
-    ) -> Result<(), Error<P::Transport>> {
+    ) -> Result<(), Error<P::Error>> {
         self.local_time += duration_to_secs(delta);
         self.send_ping_timer += delta;
 
@@ -94,7 +91,7 @@ impl Time {
         Ok(())
     }
 
-    fn send<P: Peer>(peer: &mut P, msg: TimeMsg) -> Result<(), Error<P::Transport>> {
+    fn send<P: Peer>(peer: &mut P, msg: TimeMsg) -> Result<(), Error<P::Error>> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
             writer.write(&msg)?;
