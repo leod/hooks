@@ -32,7 +32,7 @@ pub trait Host {
         peer_id: PeerId,
         channel_id: ChannelId,
         flag: PacketFlag,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), Self::Error>;
     fn disconnect(&mut self, peer_id: PeerId, data: u32) -> Result<(), Self::Error>;
 }

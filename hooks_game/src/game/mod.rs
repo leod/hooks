@@ -254,8 +254,6 @@ impl Game {
                     }
                 }
             }
-
-            client.flush()?;
         }
 
         // Remove ticks from our history that:

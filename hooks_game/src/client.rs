@@ -1,6 +1,9 @@
+use std::f32;
 use std::time::Duration;
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
+
+use hooks_util::stats;
 
 use hooks_common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, NUM_CHANNELS};
@@ -145,6 +148,8 @@ impl Client {
         let mut locked_peers = peers.lock().unwrap();
         for (&peer_id, net_time) in locked_peers.iter_mut() {
             net_time.update(&mut self.host, peer_id, delta)?;
+
+            stats::record("ping", net_time.last_ping().unwrap_or(f32::NAN));
         }
         Ok(())
     }
@@ -178,11 +183,6 @@ impl Client {
         }
     }
 
-    pub fn flush(&mut self) -> Result<(), Error> {
-        self.host.flush()?;
-        Ok(())
-    }
-
     fn send_comm(host: &mut MyHost, peer_id: PeerId, msg: ClientCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
@@ -190,7 +190,7 @@ impl Client {
             writer.into_inner()?
         };
 
-        Ok(host.send(peer_id, CHANNEL_COMM, PacketFlag::Unsequenced, &data)?)
+        Ok(host.send(peer_id, CHANNEL_COMM, PacketFlag::Unsequenced, data)?)
     }
 
     pub fn send_game(&mut self, msg: ClientGameMsg) -> Result<(), Error> {
@@ -201,7 +201,7 @@ impl Client {
         };
 
         Ok(self.host
-            .send(self.peer_id, CHANNEL_GAME, PacketFlag::Unsequenced, &data)?)
+            .send(self.peer_id, CHANNEL_GAME, PacketFlag::Unsequenced, data)?)
     }
 
     fn read_comm(data: &[u8]) -> Result<ServerCommMsg, bit_manager::Error> {

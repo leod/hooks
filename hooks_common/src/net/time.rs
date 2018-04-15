@@ -110,6 +110,10 @@ impl Time {
         Ok(())
     }
 
+    pub fn last_ping(&self) -> Option<f32> {
+        self.ping_samples.back().map(|t| *t)
+    }
+
     fn send<H: Host>(host: &mut H, peer_id: PeerId, msg: TimeMsg) -> Result<(), H::Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
@@ -119,6 +123,6 @@ impl Time {
 
         // We send as unsequenced, unreliable packets so that we get the same delivery times as for
         // the CHANNEL_GAME messages
-        host.send(peer_id, CHANNEL_TIME, PacketFlag::Unsequenced, &data)
+        host.send(peer_id, CHANNEL_TIME, PacketFlag::Unsequenced, data)
     }
 }

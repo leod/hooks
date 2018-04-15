@@ -151,6 +151,12 @@ impl Host {
         let peers = self.host.peers();
         let mut locked_peers = peers.lock().unwrap();
         for (&peer_id, net_time) in locked_peers.iter_mut() {
+            if !self.clients.contains_key(&peer_id) {
+                // Ignore clients that we have not acknowledged yet or that have already been
+                // removed from the game in calculating ping etc.
+                continue;
+            }
+
             net_time.update(&mut self.host, peer_id, delta)?;
         }
         Ok(())
@@ -202,11 +208,6 @@ impl Host {
         }
     }
 
-    pub fn flush(&mut self) -> Result<(), Error> {
-        self.host.flush()?;
-        Ok(())
-    }
-
     fn send_comm(&mut self, receiver_id: PlayerId, msg: ServerCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
@@ -215,10 +216,10 @@ impl Host {
         };
 
         Ok(self.host
-            .send(receiver_id, CHANNEL_COMM, PacketFlag::Reliable, &data)?)
+            .send(receiver_id, CHANNEL_COMM, PacketFlag::Reliable, data)?)
     }
 
-    pub fn send_game(&mut self, receiver_id: PlayerId, data: &[u8]) -> Result<(), Error> {
+    pub fn send_game(&mut self, receiver_id: PlayerId, data: Vec<u8>) -> Result<(), Error> {
         assert!(self.clients[&receiver_id].ingame());
 
         Ok(self.host

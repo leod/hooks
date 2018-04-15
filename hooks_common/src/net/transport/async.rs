@@ -102,10 +102,10 @@ where
         peer_id: PeerId,
         channel_id: ChannelId,
         flag: PacketFlag,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), Self::Error> {
         self.sender
-            .send(Command::Send(peer_id, channel_id, flag, data.to_vec()))
+            .send(Command::Send(peer_id, channel_id, flag, data))
             .map_err(|_| Error::SendError)
     }
 
@@ -184,7 +184,7 @@ fn background_thread<H, D>(
             Ok(Command::Send(peer_id, channel_id, packet_flag, data)) => {
                 if host.is_peer(peer_id) {
                     // FIXME: Propagate errors to main thread
-                    host.send(peer_id, channel_id, packet_flag, &data).unwrap();
+                    host.send(peer_id, channel_id, packet_flag, data).unwrap();
                 } else {
                     // The peer might already have been removed asynchronously
                     debug!("Ignoring send command to invalid peer_id {}", peer_id);
