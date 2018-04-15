@@ -13,8 +13,7 @@ specs = { git = "https://github.com/slide-rs/specs.git" }
 specs-derive = { git = "https://github.com/slide-rs/specs.git" }
 nalgebra = "0.14.0"
 ncollide = { git = "https://github.com/sebcrozet/ncollide.git" }
-libc = "0.2"
-enet-sys = "0.1.4"
+enet-sys = "0.2.0"
 mopa = "0.2.2"
 log = "0.4"
 rand = "0.4"

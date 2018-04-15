@@ -1,15 +1,20 @@
 use std::collections::{btree_map, BTreeMap};
 use std::ffi::CString;
 use std::{mem, ptr, slice};
+use std::os::raw::c_void;
 
-use libc::c_void;
-
-use enet_sys::address::{enet_address_set_host, ENetAddress};
-use enet_sys::host::{enet_host_connect, enet_host_create, enet_host_destroy, enet_host_flush,
-                     enet_host_service, ENetHost};
-use enet_sys::packet::{enet_packet_create, enet_packet_destroy, ENetPacket, ENetPacketFlag};
-use enet_sys::peer::{enet_peer_disconnect, enet_peer_send, ENetPeer};
-use enet_sys::{ENetEvent, ENetEventType, ENET_HOST_ANY};
+use enet_sys::{enet_address_set_host, ENetAddress};
+use enet_sys::{enet_host_connect, enet_host_create, enet_host_destroy, enet_host_flush,
+               enet_host_service, ENetHost, _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE,
+               _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED,
+_ENetEventType_ENET_EVENT_TYPE_DISCONNECT,
+_ENetEventType_ENET_EVENT_TYPE_CONNECT,
+_ENetEventType_ENET_EVENT_TYPE_NONE,
+_ENetEventType_ENET_EVENT_TYPE_RECEIVE,
+};
+use enet_sys::{enet_packet_create, enet_packet_destroy, ENetPacket};
+use enet_sys::{enet_peer_disconnect, enet_peer_send, ENetPeer};
+use enet_sys::{ENetEvent, ENET_HOST_ANY};
 
 use net::transport::{self, ChannelId, Event, PacketFlag, PeerId};
 
@@ -30,7 +35,7 @@ pub enum Error {
     ConnectNullPointer,
     PacketNullPointer,
     SendFailure(PeerId, ChannelId, PacketFlag, usize, i32),
-    ServiceFailure,
+    ServiceFailure(i32),
     AddressFailure,
 }
 
@@ -55,9 +60,9 @@ impl transport::Peer for Peer {
 
     fn send(&mut self, channel_id: ChannelId, flag: PacketFlag, data: &[u8]) -> Result<(), Error> {
         let flags = match flag {
-            PacketFlag::Reliable => ENetPacketFlag::ENET_PACKET_FLAG_RELIABLE as u32,
+            PacketFlag::Reliable => _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE as u32,
             PacketFlag::Unreliable => 0, // TODO: Check
-            PacketFlag::Unsequenced => ENetPacketFlag::ENET_PACKET_FLAG_UNSEQUENCED as u32,
+            PacketFlag::Unsequenced => _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED as u32,
         };
 
         // NOTE: `enet_packet_create` copies the given data, so we don't need to make sure that the
@@ -223,46 +228,45 @@ impl transport::Host for Host {
         };
 
         if result < 0 {
-            return Err(Error::ServiceFailure);
+            return Err(Error::ServiceFailure(result));
         }
 
-        match event._type {
-            ENetEventType::ENET_EVENT_TYPE_NONE => Ok(None),
-            ENetEventType::ENET_EVENT_TYPE_CONNECT => {
-                if event.peer != ptr::null_mut() {
-                    let id = self.register_peer(event.peer);
-                    Ok(Some(Event::Connect(id)))
+        if event.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
+            Ok(None)
+        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_CONNECT {
+            if event.peer != ptr::null_mut() {
+                let id = self.register_peer(event.peer);
+                Ok(Some(Event::Connect(id)))
+            } else {
+                Err(Error::InvalidEvent)
+            }
+        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_RECEIVE {
+            let id = transport::Peer::id(&Peer(event.peer));
+            if event.peer != ptr::null_mut() {
+                if let Some(_) = self.get_peer(id) {
+                    let packet = Packet(event.packet);
+                    Ok(Some(Event::Receive(id, event.channelID, packet)))
                 } else {
                     Err(Error::InvalidEvent)
                 }
+            } else {
+                Err(Error::InvalidEvent)
             }
-            ENetEventType::ENET_EVENT_TYPE_RECEIVE => {
+        } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_DISCONNECT {
+            if event.peer != ptr::null_mut() {
                 let id = transport::Peer::id(&Peer(event.peer));
-                if event.peer != ptr::null_mut() {
-                    if let Some(_) = self.get_peer(id) {
-                        let packet = Packet(event.packet);
-                        Ok(Some(Event::Receive(id, event.channelID, packet)))
-                    } else {
-                        Err(Error::InvalidEvent)
+                match self.peers.entry(id) {
+                    btree_map::Entry::Occupied(entry) => {
+                        entry.remove();
+                        Ok(Some(Event::Disconnect(id)))
                     }
-                } else {
-                    Err(Error::InvalidEvent)
+                    btree_map::Entry::Vacant(_) => Err(Error::InvalidEvent),
                 }
+            } else {
+                Err(Error::InvalidEvent)
             }
-            ENetEventType::ENET_EVENT_TYPE_DISCONNECT => {
-                if event.peer != ptr::null_mut() {
-                    let id = transport::Peer::id(&Peer(event.peer));
-                    match self.peers.entry(id) {
-                        btree_map::Entry::Occupied(entry) => {
-                            entry.remove();
-                            Ok(Some(Event::Disconnect(id)))
-                        }
-                        btree_map::Entry::Vacant(_) => Err(Error::InvalidEvent),
-                    }
-                } else {
-                    Err(Error::InvalidEvent)
-                }
-            }
+        } else {
+            Err(Error::InvalidEvent)
         }
     }
 
