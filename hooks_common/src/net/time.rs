@@ -74,7 +74,7 @@ impl PeerData for Time {
                         //       can fake their pings. For example, use sequence numbers instead of
                         //       sending the send times.
                         let ping = pong_receive_time - ping_send_time;
-                        println!("ping: {:.2}ms", ping * 1000.0);
+                        //println!("ping: {:.2}ms", ping * 1000.0);
                         self.ping_samples.push_back(ping);
 
                         if self.ping_samples.len() > NUM_PING_SAMPLES {
