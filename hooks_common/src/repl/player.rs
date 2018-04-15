@@ -66,6 +66,10 @@ impl Players {
     pub fn iter(&self) -> btree_map::Iter<PlayerId, Player> {
         self.0.iter()
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 pub fn get(world: &mut World, id: PlayerId) -> Option<Player> {
@@ -102,7 +106,7 @@ impl Event for LeftEvent {
 fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::Error> {
     match_event!(event:
         JoinedEvent => {
-            info!("Player {} with name {} joined", event.id, event.info.name);
+            debug!("Player {} with name {} joined", event.id, event.info.name);
 
             let mut players = world.write_resource::<Players>();
 
@@ -122,7 +126,7 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
                     return Err(repl::Error::InvalidPlayerId(event.id));
                 }
 
-                info!("Player {} with name {} left", event.id, players.0[&event.id].info.name);
+                debug!("Player {} with name {} left", event.id, players.0[&event.id].info.name);
             }
 
             // Remove all entities owned by the disconnected player

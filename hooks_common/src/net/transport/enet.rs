@@ -34,6 +34,9 @@ pub struct Host {
 pub struct Address(ENetAddress);
 struct Peer(*mut ENetPeer);
 
+unsafe impl Send for Host {}
+unsafe impl Send for Packet {}
+
 impl transport::Host for Host {
     type Error = Error;
     type Packet = Packet;
@@ -79,7 +82,7 @@ impl transport::Host for Host {
                 Err(Error::InvalidEvent)
             }
         } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_DISCONNECT {
-            if event.peer != ptr::null_mut() {
+            if !event.peer.is_null() {
                 let id = Peer(event.peer).id();
                 match self.peers.entry(id) {
                     btree_map::Entry::Occupied(entry) => {
@@ -225,7 +228,7 @@ impl Host {
             )
         };
 
-        if handle != ptr::null_mut() {
+        if !handle.is_null() {
             Ok(Host::new(handle))
         } else {
             Err(Error::HostNullPointer)
@@ -247,7 +250,7 @@ impl Host {
             )
         };
 
-        if handle != ptr::null_mut() {
+        if !handle.is_null() {
             Ok(Host::new(handle))
         } else {
             Err(Error::HostNullPointer)
@@ -257,7 +260,7 @@ impl Host {
     pub fn connect<'a>(&'a mut self, address: &Address, channel_count: usize) -> Result<(), Error> {
         let handle = unsafe { enet_host_connect(self.handle, &address.0, channel_count, 0) };
 
-        if handle != ptr::null_mut() {
+        if !handle.is_null() {
             Ok(())
         } else {
             Err(Error::ConnectNullPointer)

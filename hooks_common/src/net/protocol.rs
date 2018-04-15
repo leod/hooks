@@ -57,8 +57,3 @@ pub enum ClientGameMsg {
     /// Client started a tick.
     StartedTick(TickNum, PlayerInput),
 }
-
-#[derive(Debug, Clone, BitStore)]
-pub enum ServerGameMsg {
-    Dummy,
-}

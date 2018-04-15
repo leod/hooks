@@ -1,6 +1,6 @@
 use specs::prelude::{RunNow, World};
 
-use hooks_util::profile;
+use hooks_util::{profile, stats};
 
 use defs::{PlayerId, PlayerInput, TickNum};
 use entity;
@@ -66,6 +66,11 @@ impl CommonRunner {
         }
 
         self.perform_removals(state);
+
+        stats::record(
+            "#players",
+            state.world.read_resource::<repl::player::Players>().len() as f32,
+        );
 
         Ok(events)
     }
