@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use net::transport::{self, ChannelId, Event, PacketFlag, PeerId};
+use net::transport::{self, ChannelId, Event, Packet, PacketFlag, PeerId};
 
 #[derive(Debug)]
 pub enum Error {
@@ -13,11 +13,33 @@ pub enum Error {
     RecvError,
 }
 
-/*trait PeerData: Send + 'static {
-    fn receive(&mut self, host: peer_id: PeerId,
-}*/
+pub trait PeerData: Send + Default + 'static {
+    fn receive<H: transport::Host>(
+        &mut self,
+        host: &mut H,
+        peer_id: PeerId,
+        channel_id: ChannelId,
+        data: &[u8],
+    ) -> Result<bool, H::Error>;
+}
 
-pub struct Host<H: transport::Host, D> {
+impl PeerData for () {
+    fn receive<H: transport::Host>(
+        &mut self,
+        _: &mut H,
+        _: PeerId,
+        _: ChannelId,
+        _: &[u8],
+    ) -> Result<bool, H::Error> {
+        Ok(false)
+    }
+}
+
+pub struct Host<H, D>
+where
+    H: transport::Host,
+    D: PeerData,
+{
     sender: Sender<Command>,
     receiver: Receiver<Event<H::Packet>>,
     peers: Peers<D>,
@@ -32,7 +54,11 @@ enum Command {
 
 type Peers<D> = Arc<Mutex<BTreeMap<PeerId, D>>>;
 
-impl<H: transport::Host, D> transport::Host for Host<H, D> {
+impl<H: transport::Host, D> transport::Host for Host<H, D>
+where
+    H: transport::Host,
+    D: PeerData,
+{
     type Error = Error;
     type Packet = H::Packet;
 
@@ -88,7 +114,11 @@ impl<H: transport::Host, D> transport::Host for Host<H, D> {
     }
 }
 
-impl<H: transport::Host, D> Drop for Host<H, D> {
+impl<H, D> Drop for Host<H, D>
+where
+    H: transport::Host,
+    D: PeerData,
+{
     fn drop(&mut self) {
         let thread = mem::replace(&mut self.thread, None);
         if let Some(thread) = thread {
@@ -107,7 +137,7 @@ impl<H, D> Host<H, D>
 where
     H: transport::Host + Send + 'static,
     <H as transport::Host>::Packet: Send + 'static,
-    D: Default + Send + 'static,
+    D: PeerData,
 {
     pub fn spawn(host: H) -> Host<H, D> {
         let (sender_command, receiver_command) = channel();
@@ -126,9 +156,13 @@ where
         Host {
             sender: sender_command,
             receiver: receiver_event,
-            peers: peers.clone(),
+            peers: peers,
             thread: Some(thread),
         }
+    }
+
+    pub fn peers(&self) -> Peers<D> {
+        self.peers.clone()
     }
 }
 
@@ -139,7 +173,7 @@ fn background_thread<H, D>(
     mut host: H,
 ) where
     H: transport::Host,
-    D: Default,
+    D: PeerData,
 {
     loop {
         match receiver.try_recv() {
@@ -175,17 +209,33 @@ fn background_thread<H, D>(
 
         match host.service(0) {
             Ok(Some(event)) => {
-                match &event {
+                let no_send = match &event {
                     &Event::Connect(peer_id) => {
                         let mut peers = peers.lock().unwrap();
                         peers.insert(peer_id, Default::default());
+                        false
                     }
-                    _ => {}
-                }
+                    &Event::Receive(peer_id, channel_id, ref packet) => {
+                        // FIXME: Propagate errors to main thread
+                        let no_send = {
+                            let mut peers = peers.lock().unwrap();
+                            peers.get_mut(&peer_id).unwrap().receive(
+                                &mut host,
+                                peer_id,
+                                channel_id,
+                                packet.data(),
+                            )
+                        };
+                        no_send.expect("User data receive failed")
+                    }
+                    _ => false,
+                };
 
-                if let Err(_) = sender.send(event) {
-                    // This should only happen while faultily shutting down -- just ignore
-                    return;
+                if !no_send {
+                    if let Err(_) = sender.send(event) {
+                        // This should only happen while faultily shutting down -- just ignore
+                        return;
+                    }
                 }
             }
             Ok(None) => {

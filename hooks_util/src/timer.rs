@@ -16,6 +16,7 @@ pub fn secs_to_duration(t: f32) -> Duration {
 }
 
 /// A timer that can be used to trigger events that happen periodically.
+#[derive(Debug)]
 pub struct Timer {
     period: Duration,
     accum: Duration,
