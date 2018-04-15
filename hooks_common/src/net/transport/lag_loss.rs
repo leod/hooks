@@ -3,6 +3,7 @@
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::mem;
 use std::time::{Duration, Instant};
 
 use net::transport::{self, ChannelId, Event, PacketFlag, PeerId};
@@ -65,27 +66,11 @@ impl<H: transport::Host> transport::Host for Host<H> {
                 break;
             }
 
-            let payload = self.queue.pop().unwrap().command;
-
-            match payload {
-                Command::Send(peer_id, channel_id, packet_flag, data) => {
-                    if self.host.is_peer(peer_id) {
-                        self.host.send(peer_id, channel_id, packet_flag, &data)?;
-                    } else {
-                        // The peer might already have disconnected
-                        debug!("Ignoring send command to invalid peer_id {}", peer_id);
-                    }
-                }
-                Command::Disconnect(peer_id, data) => {
-                    if self.host.is_peer(peer_id) {
-                        self.host.disconnect(peer_id, data)?;
-                    } else {
-                        // The peer might already have disconnected
-                        debug!("Ignoring disconnect command to invalid peer_id {}", peer_id);
-                    }
-                }
-            }
+            let command = self.queue.pop().unwrap().command;
+            self.run_command(command)?;
         }
+
+        self.host.flush()?;
 
         Ok(())
     }
@@ -95,12 +80,12 @@ impl<H: transport::Host> transport::Host for Host<H> {
         peer_id: PeerId,
         channel_id: ChannelId,
         flag: PacketFlag,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), Self::Error> {
         let now = Instant::now();
         self.queue.push(Payload {
             time: now + self.config.lag,
-            command: Command::Send(peer_id, channel_id, flag, data.to_vec()),
+            command: Command::Send(peer_id, channel_id, flag, data),
         });
         Ok(())
     }
@@ -123,6 +108,42 @@ impl<H: transport::Host> Host<H> {
             host,
             config,
             queue: BinaryHeap::new(),
+        }
+    }
+
+    fn run_command(&mut self, command: Command) -> Result<(), H::Error> {
+        match command {
+            Command::Send(peer_id, channel_id, packet_flag, data) => {
+                if self.host.is_peer(peer_id) {
+                    self.host.send(peer_id, channel_id, packet_flag, data)?;
+                } else {
+                    // The peer might already have disconnected
+                    debug!("Ignoring send command to invalid peer_id {}", peer_id);
+                }
+            }
+            Command::Disconnect(peer_id, data) => {
+                if self.host.is_peer(peer_id) {
+                    self.host.disconnect(peer_id, data)?;
+                } else {
+                    // The peer might already have disconnected
+                    debug!("Ignoring disconnect command to invalid peer_id {}", peer_id);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<H: transport::Host> Drop for Host<H> {
+    fn drop(&mut self) {
+        let queue = mem::replace(&mut self.queue, BinaryHeap::new());
+        for payload in queue.into_iter() {
+            if let Err(error) = self.run_command(payload.command) {
+                warn!("Failed to run command while dropping host: {:?}", error);
+            }
+        }
+        if let Err(error) = self.host.flush() {
+            warn!("Failed to flush while dropping host: {:?}", error);
         }
     }
 }

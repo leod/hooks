@@ -165,7 +165,7 @@ impl Game {
 
                     // Send additional `JoinedEvent`s only for the new player, in the first tick
                     // that it receives
-                    self.send_player_list(&mut player);
+                    self.queue_player_list(&mut player);
 
                     self.players.insert(player_id, player);
                 }
@@ -283,8 +283,6 @@ impl Game {
             }
         }
 
-        host.flush()?;
-
         // 4. Run a tick periodically
         if self.tick_timer.trigger() {
             profile!("tick");
@@ -393,9 +391,9 @@ impl Game {
                     profile!("send");
 
                     let buffer = writer.into_inner()?;
-                    host.send_game(player_id, &buffer)?;
+                    host.send_game(player_id, buffer)?;
 
-                    mem::replace(&mut self.write_buffer, buffer);
+                    //mem::replace(&mut self.write_buffer, buffer);
                 }
             }
 
@@ -407,7 +405,7 @@ impl Game {
     }
 
     /// Send list of existing players to a new player in the next tick via events.
-    fn send_player_list(&mut self, new_player: &mut Player) {
+    fn queue_player_list(&mut self, new_player: &mut Player) {
         // Only consider those players that are already registered in the game logic. The new player
         // will get information about other new players (that have joined but whose PlayerJoined
         // events have not been processed in a tick yet) with the regular shared events.

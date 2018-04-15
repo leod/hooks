@@ -124,7 +124,7 @@ impl transport::Host for Host {
         peer_id: PeerId,
         channel_id: ChannelId,
         flag: PacketFlag,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), Error> {
         let peer = self.peers
             .get(&peer_id)
@@ -144,7 +144,7 @@ impl Peer {
         unsafe { (*self.0).data as PeerId }
     }
 
-    fn send(&self, channel_id: ChannelId, flag: PacketFlag, data: &[u8]) -> Result<(), Error> {
+    fn send(&self, channel_id: ChannelId, flag: PacketFlag, data: Vec<u8>) -> Result<(), Error> {
         let flags = match flag {
             PacketFlag::Reliable => _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE as u32,
             PacketFlag::Unreliable => 0, // TODO: Check
@@ -172,8 +172,12 @@ impl Peer {
             } else {
                 // FIXME: Find out if this failure happens due to us using enet in the wrong way.
                 warn!(
-                    "enet_peer_send failure: {}. ignoring for unreliable packet.",
-                    result
+                    "enet_peer_send failure: {} (peer_id {}, channel_id {}, flag {:?}). \
+                     ignoring for unreliable packet.",
+                    result,
+                    self.id(),
+                    channel_id,
+                    flag,
                 );
             }
         }
