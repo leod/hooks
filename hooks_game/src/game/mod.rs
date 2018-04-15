@@ -79,9 +79,6 @@ pub struct Game {
 
     /// Newest tick of which we know that the server knows that we have received it.
     server_recv_ack_tick: Option<TickNum>,
-
-    /// Estimated ping
-    ping: f32,
 }
 
 pub fn register(reg: &mut Registry, game_info: &GameInfo) {
@@ -126,7 +123,6 @@ impl Game {
             last_snapshot_tick: None,
             interp_tick: None,
             server_recv_ack_tick: None,
-            ping: 5.0,
         }
     }
 
