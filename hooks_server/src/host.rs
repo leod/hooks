@@ -6,11 +6,11 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 use hooks_common::net;
 use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
                                   CHANNEL_GAME, CHANNEL_TIME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, enet, ChannelId, Host as _Host, Packet, PacketFlag,
-                                   PeerId};
+use hooks_common::net::transport::{self, async, enet, ChannelId, Host as _Host, Packet,
+                                   PacketFlag, PeerId};
 use hooks_common::{GameInfo, LeaveReason, PlayerId, INVALID_PLAYER_ID};
 
-type MyHost = enet::Host;
+type MyHost = async::Host<enet::Host, ()>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -19,7 +19,8 @@ pub enum Error {
     NotConnected,
     InvalidReady,
     Time(net::time::Error<<MyHost as transport::Host>::Error>),
-    Transport(<MyHost as transport::Host>::Error),
+    EnetTransport(enet::Error),
+    AsyncTransport(async::Error),
     BitManager(bit_manager::Error),
 }
 
@@ -30,8 +31,14 @@ impl From<net::time::Error<<MyHost as transport::Host>::Error>> for Error {
 }
 
 impl From<enet::Error> for Error {
-    fn from(error: <MyHost as transport::Host>::Error) -> Error {
-        Error::Transport(error)
+    fn from(error: enet::Error) -> Error {
+        Error::EnetTransport(error)
+    }
+}
+
+impl From<async::Error> for Error {
+    fn from(error: async::Error) -> Error {
+        Error::AsyncTransport(error)
     }
 }
 
@@ -91,11 +98,9 @@ pub enum Event {
 pub const PEER_COUNT: usize = 64;
 
 impl Host {
-    pub fn create(
-        port: u16,
-        game_info: GameInfo,
-    ) -> Result<Host, <MyHost as transport::Host>::Error> {
+    pub fn create(port: u16, game_info: GameInfo) -> Result<Host, Error> {
         let host = enet::Host::create_server(port, PEER_COUNT, NUM_CHANNELS, 0, 0)?;
+        let host = async::Host::spawn(host);
 
         Ok(Host {
             host,
@@ -209,17 +214,15 @@ impl Host {
             writer.into_inner()?
         };
 
-        self.host
-            .send(receiver_id, CHANNEL_COMM, PacketFlag::Reliable, &data)
-            .map_err(|error| Error::Transport(error))
+        Ok(self.host
+            .send(receiver_id, CHANNEL_COMM, PacketFlag::Reliable, &data)?)
     }
 
     pub fn send_game(&mut self, receiver_id: PlayerId, data: &[u8]) -> Result<(), Error> {
         assert!(self.clients[&receiver_id].ingame());
 
-        self.host
-            .send(receiver_id, CHANNEL_GAME, PacketFlag::Unsequenced, data)
-            .map_err(|error| Error::Transport(error))
+        Ok(self.host
+            .send(receiver_id, CHANNEL_GAME, PacketFlag::Unsequenced, data)?)
     }
 
     fn handle_receive(
