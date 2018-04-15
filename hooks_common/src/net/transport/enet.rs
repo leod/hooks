@@ -1,6 +1,7 @@
 use std::collections::{btree_map, BTreeMap};
 use std::ffi::CString;
 use std::os::raw::c_void;
+use std::time::Instant;
 use std::{mem, ptr, slice};
 
 use enet_sys::{enet_address_set_host, enet_host_connect, enet_host_create, enet_host_destroy,
@@ -24,7 +25,7 @@ pub enum Error {
     ServiceFailure(i32),
     AddressFailure,
 }
-pub struct Packet(*mut ENetPacket);
+pub struct Packet(*mut ENetPacket, Instant);
 pub struct Host {
     handle: *mut ENetHost,
     next_peer_id: PeerId,
@@ -73,7 +74,7 @@ impl transport::Host for Host {
             let id = Peer(event.peer).id();
             if !event.peer.is_null() {
                 if let Some(_) = self.peers.get(&id) {
-                    let packet = Packet(event.packet);
+                    let packet = Packet(event.packet, Instant::now());
                     Ok(Some(Event::Receive(id, event.channelID, packet)))
                 } else {
                     Err(Error::InvalidEvent)
@@ -307,6 +308,10 @@ impl Drop for Host {
 impl transport::Packet for Packet {
     fn data(&self) -> &[u8] {
         unsafe { slice::from_raw_parts((*self.0).data, (*self.0).dataLength) }
+    }
+
+    fn instant(&self) -> Instant {
+        self.1
     }
 }
 

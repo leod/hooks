@@ -2,7 +2,9 @@ pub mod async;
 pub mod enet;
 pub mod lag_loss;
 
-pub use std::fmt::Debug;
+use std::time::Instant;
+
+use std::fmt::Debug;
 
 pub type ChannelId = u8;
 pub type PeerId = u32;
@@ -39,4 +41,5 @@ pub trait Host {
 
 pub trait Packet {
     fn data(&self) -> &[u8];
+    fn instant(&self) -> Instant;
 }
