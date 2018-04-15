@@ -1,20 +1,15 @@
 use std::collections::{btree_map, BTreeMap};
 use std::ffi::CString;
-use std::{mem, ptr, slice};
 use std::os::raw::c_void;
+use std::{mem, ptr, slice};
 
-use enet_sys::{enet_address_set_host, ENetAddress};
-use enet_sys::{enet_host_connect, enet_host_create, enet_host_destroy, enet_host_flush,
-               enet_host_service, ENetHost, _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE,
-               _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED,
-_ENetEventType_ENET_EVENT_TYPE_DISCONNECT,
-_ENetEventType_ENET_EVENT_TYPE_CONNECT,
-_ENetEventType_ENET_EVENT_TYPE_NONE,
-_ENetEventType_ENET_EVENT_TYPE_RECEIVE,
-};
-use enet_sys::{enet_packet_create, enet_packet_destroy, ENetPacket};
-use enet_sys::{enet_peer_disconnect, enet_peer_send, ENetPeer};
-use enet_sys::{ENetEvent, ENET_HOST_ANY};
+use enet_sys::{enet_address_set_host, enet_host_connect, enet_host_create, enet_host_destroy,
+               enet_host_flush, enet_host_service, enet_packet_create, enet_packet_destroy,
+               enet_peer_disconnect, enet_peer_send, ENetAddress, ENetEvent, ENetHost, ENetPacket,
+               ENetPeer, _ENetEventType_ENET_EVENT_TYPE_CONNECT,
+               _ENetEventType_ENET_EVENT_TYPE_DISCONNECT, _ENetEventType_ENET_EVENT_TYPE_NONE,
+               _ENetEventType_ENET_EVENT_TYPE_RECEIVE, _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE,
+               _ENetPacketFlag_ENET_PACKET_FLAG_UNSEQUENCED, ENET_HOST_ANY};
 
 use net::transport::{self, ChannelId, Event, PacketFlag, PeerId};
 
@@ -69,19 +64,27 @@ impl transport::Peer for Peer {
         //       data lives as long as the created package.
         let packet =
             unsafe { enet_packet_create(data.as_ptr() as *const c_void, data.len(), flags) };
-        if packet == ptr::null_mut() {
+        if packet.is_null() {
             return Err(Error::PacketNullPointer);
         }
 
         let result = unsafe { enet_peer_send(self.0, channel_id, packet) };
         if result != 0 {
-            return Err(Error::SendFailure(
-                self.id(),
-                channel_id,
-                flag,
-                data.len(),
-                result,
-            ));
+            if flag == PacketFlag::Reliable {
+                return Err(Error::SendFailure(
+                    self.id(),
+                    channel_id,
+                    flag,
+                    data.len(),
+                    result,
+                ));
+            } else {
+                // FIXME: Find out if this failure happens due to us using enet in the wrong way.
+                warn!(
+                    "enet_peer_send failure: {}. ignoring for unreliable packet.",
+                    result
+                );
+            }
         }
 
         Ok(())
@@ -228,7 +231,10 @@ impl transport::Host for Host {
         };
 
         if result < 0 {
-            return Err(Error::ServiceFailure(result));
+            //return Err(Error::ServiceFailure(result));
+            // FIXME: Find out if this failure happens due to us using enet in the wrong way.
+            warn!("enet_host_service failure: {}. ignoring.", result);
+            return Ok(None);
         }
 
         if event.type_ == _ENetEventType_ENET_EVENT_TYPE_NONE {
