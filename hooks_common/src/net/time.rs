@@ -11,6 +11,7 @@ use net::transport::{ChannelId, Host, PacketFlag, PeerId};
 
 pub const SEND_PING_HZ: f32 = 0.5;
 pub const NUM_PING_SAMPLES: usize = 20;
+pub const DEFAULT_PING_SECS: f32 = 0.05;
 
 #[derive(Debug)]
 pub struct Time {
@@ -110,8 +111,13 @@ impl Time {
         Ok(())
     }
 
-    pub fn last_ping(&self) -> Option<f32> {
+    pub fn last_ping_secs(&self) -> Option<f32> {
         self.ping_samples.back().map(|t| *t)
+    }
+
+    pub fn ping_secs(&self) -> f32 {
+        // TODO: Better ping estimate here
+        self.last_ping_secs().unwrap_or(DEFAULT_PING_SECS)
     }
 
     fn send<H: Host>(host: &mut H, peer_id: PeerId, msg: TimeMsg) -> Result<(), H::Error> {

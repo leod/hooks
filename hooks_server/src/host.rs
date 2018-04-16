@@ -1,5 +1,5 @@
 use std::collections::{btree_map, BTreeMap, VecDeque};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
@@ -82,7 +82,7 @@ pub struct Host {
 pub enum Event {
     PlayerJoined(PlayerId, String),
     PlayerLeft(PlayerId, LeaveReason),
-    ClientGameMsg(PlayerId, ClientGameMsg),
+    ClientGameMsg(PlayerId, ClientGameMsg, Instant),
 }
 
 // TODO: Transport peer count?
@@ -180,7 +180,7 @@ impl Host {
                 transport::Event::Receive(peer_id, channel, packet) => {
                     assert!(peer_id != INVALID_PLAYER_ID);
 
-                    match self.handle_receive(peer_id, channel, packet.data()) {
+                    match self.handle_receive(peer_id, channel, packet) {
                         Ok(event) => Ok(event),
                         Err(error) => {
                             warn!(
@@ -208,6 +208,13 @@ impl Host {
         }
     }
 
+    pub fn get_ping_secs(&self, player_id: PlayerId) -> Option<f32> {
+        let peers = self.host.peers();
+        let locked_peers = peers.lock().unwrap();
+
+        locked_peers.get(&player_id).map(|time| time.ping_secs())
+    }
+
     fn send_comm(&mut self, receiver_id: PlayerId, msg: ServerCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
@@ -230,14 +237,14 @@ impl Host {
         &mut self,
         peer_id: PeerId,
         channel: ChannelId,
-        data: &[u8],
+        packet: <MyHost as transport::Host>::Packet,
     ) -> Result<Option<Event>, Error> {
         assert!(peer_id != INVALID_PLAYER_ID);
 
         if channel == CHANNEL_COMM {
             // Communication messages are handled here
             let msg = {
-                let mut reader = BitReader::new(data);
+                let mut reader = BitReader::new(packet.data());
                 reader.read::<ClientCommMsg>()?
             };
 
@@ -282,11 +289,15 @@ impl Host {
             if let Some(client) = self.clients.get(&peer_id) {
                 if client.ingame() {
                     let msg = {
-                        let mut reader = BitReader::new(data);
+                        let mut reader = BitReader::new(packet.data());
                         reader.read::<ClientGameMsg>()?
                     };
 
-                    Ok(Some(Event::ClientGameMsg(peer_id, msg)))
+                    Ok(Some(Event::ClientGameMsg(
+                        peer_id,
+                        msg,
+                        packet.receive_instant(),
+                    )))
                 } else {
                     // Just discard game messages from players who are not ready
                     // (i.e. ingame) yet

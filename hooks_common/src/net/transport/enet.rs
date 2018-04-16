@@ -310,7 +310,7 @@ impl transport::Packet for Packet {
         unsafe { slice::from_raw_parts((*self.0).data, (*self.0).dataLength) }
     }
 
-    fn instant(&self) -> Instant {
+    fn receive_instant(&self) -> Instant {
         self.1
     }
 }

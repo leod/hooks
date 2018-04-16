@@ -149,7 +149,7 @@ impl Client {
         for (&peer_id, net_time) in locked_peers.iter_mut() {
             net_time.update(&mut self.host, peer_id, delta)?;
 
-            stats::record("ping", net_time.last_ping().unwrap_or(f32::NAN));
+            stats::record("ping", net_time.last_ping_secs().unwrap_or(f32::NAN));
         }
         Ok(())
     }

@@ -272,6 +272,7 @@ pub mod view {
 
     pub fn register<T: EntitySnapshot>(reg: &mut Registry) {
         super::register::<T>(reg);
+        // TODO: Register event handler for removing repl entities
     }
 
     /// Create entities that are new in this snapshot. Note that this doesn't mean that the entity
