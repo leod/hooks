@@ -41,5 +41,5 @@ pub trait Host {
 
 pub trait Packet {
     fn data(&self) -> &[u8];
-    fn instant(&self) -> Instant;
+    fn receive_instant(&self) -> Instant;
 }

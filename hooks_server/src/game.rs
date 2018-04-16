@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::mem;
-
-use rand::{self, Rng};
+use std::time::Instant;
 
 use bit_manager::BitWriter;
 
@@ -13,9 +12,15 @@ use hooks_common::repl::{player, tick};
 use hooks_common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
                    TickDeltaNum, TickNum};
 use hooks_util::profile;
-use hooks_util::timer::{Stopwatch, Timer};
+use hooks_util::timer::{duration_to_secs, Stopwatch, Timer};
 
 use host::{self, Host};
+
+#[derive(Clone, Debug)]
+struct TimedInput {
+    input: PlayerInput,
+    receive_instant: Instant,
+}
 
 struct Player {
     /// Tick in which this player joined the game.
@@ -36,10 +41,10 @@ struct Player {
     queued_events: event::Sink,
 
     /// Inputs received from the client.
-    queued_inputs: BTreeMap<TickNum, PlayerInput>,
+    queued_inputs: BTreeMap<TickNum, TimedInput>,
 
     /// Last input that has been executed from this client, if any.
-    last_input_num: Option<TickNum>,
+    last_input: Option<(TickNum, TimedInput)>,
 }
 
 impl Player {
@@ -51,7 +56,7 @@ impl Player {
             tick_history: tick::History::new(event_reg),
             queued_events: event::Sink::new(),
             queued_inputs: BTreeMap::new(),
-            last_input_num: None,
+            last_input: None,
         }
     }
 }
@@ -82,6 +87,8 @@ fn register(reg: &mut Registry, game_info: &GameInfo) {
     hooks_common::auth::register(reg, game_info);
 }
 
+const TARGET_LAG_INPUTS: TickNum = 2;
+
 impl Game {
     pub fn new(game_info: GameInfo) -> Game {
         let mut game_state = {
@@ -100,7 +107,7 @@ impl Game {
             game_runner,
             players: BTreeMap::new(),
             tick_timer: Timer::new(game_info.tick_duration()),
-            next_tick: 0,
+            next_tick: 1,
             update_stopwatch: Stopwatch::new(),
             queued_events: event::Sink::new(),
             write_buffer: Vec::new(),
@@ -112,12 +119,9 @@ impl Game {
     }
 
     pub fn update(&mut self, host: &mut Host) -> Result<(), host::Error> {
-        // 1. Advance tick timer
         let update_duration = self.update_stopwatch.get_reset();
 
-        self.tick_timer += update_duration;
-
-        // 2. Detect players that are lagged too far behind
+        // Detect players that are lagged too far behind
         for (&player_id, player) in self.players.iter() {
             let num_delta = if let Some(last_ack_tick) = player.last_ack_tick {
                 assert!(last_ack_tick < self.next_tick);
@@ -143,263 +147,292 @@ impl Game {
             }
         }
 
-        // 3. Handle network events and create resulting game events
+        // Handle network events and create resulting game events
         host.update(update_duration)?;
 
         while let Some(event) = host.service()? {
-            match event {
-                host::Event::PlayerJoined(player_id, name) => {
-                    assert!(!self.players.contains_key(&player_id));
+            self.handle_event(host, event)?;
+        }
 
-                    let player_info = PlayerInfo::new(name.clone());
+        // Run a tick periodically
+        self.tick_timer += update_duration;
+        if self.tick_timer.trigger() {
+            self.start_tick(host)?;
+        }
 
-                    // At the start of the next tick, all players will receive an event that a new
-                    // player has joined. This induces the repl player management on server and
-                    // clients --- including the newly connected client.
-                    self.queued_events.push(player::JoinedEvent {
-                        id: player_id,
-                        info: player_info,
-                    });
+        Ok(())
+    }
 
-                    let mut player = Player::new(self.next_tick, self.game_state.event_reg.clone());
+    fn handle_event(&mut self, host: &mut Host, event: host::Event) -> Result<(), host::Error> {
+        match event {
+            host::Event::PlayerJoined(player_id, name) => {
+                assert!(!self.players.contains_key(&player_id));
 
-                    // Send additional `JoinedEvent`s only for the new player, in the first tick
-                    // that it receives
-                    self.queue_player_list(&mut player);
+                let player_info = PlayerInfo::new(name.clone());
 
-                    self.players.insert(player_id, player);
-                }
-                host::Event::PlayerLeft(player_id, reason) => {
-                    assert!(self.players.contains_key(&player_id));
+                // At the start of the next tick, all players will receive an event that a new
+                // player has joined. This induces the repl player management on server and
+                // clients --- including the newly connected client.
+                self.queued_events.push(player::JoinedEvent {
+                    id: player_id,
+                    info: player_info,
+                });
 
-                    // Inform game state on server and clients of player leaving
-                    self.queued_events.push(player::LeftEvent {
-                        id: player_id,
-                        reason,
-                    });
+                let mut player = Player::new(self.next_tick, self.game_state.event_reg.clone());
 
-                    self.players.remove(&player_id);
-                }
-                host::Event::ClientGameMsg(player_id, msg) => {
-                    assert!(self.players.contains_key(&player_id));
+                // Send additional `JoinedEvent`s only for the new player, in the first tick
+                // that it receives
+                self.queue_player_list(&mut player);
 
-                    match msg {
-                        ClientGameMsg::PlayerInput(_input) => {
-                            panic!("not used right now");
+                self.players.insert(player_id, player);
+            }
+            host::Event::PlayerLeft(player_id, reason) => {
+                assert!(self.players.contains_key(&player_id));
+
+                // Inform game state on server and clients of player leaving
+                self.queued_events.push(player::LeftEvent {
+                    id: player_id,
+                    reason,
+                });
+
+                self.players.remove(&player_id);
+            }
+            host::Event::ClientGameMsg(player_id, msg, receive_instant) => {
+                assert!(self.players.contains_key(&player_id));
+
+                match msg {
+                    ClientGameMsg::PlayerInput(_input) => {
+                        panic!("not used right now");
+                    }
+                    ClientGameMsg::ReceivedTick(tick_num) => {
+                        // Client has acknowledged a tick
+                        let player = self.players.get_mut(&player_id).unwrap();
+
+                        if tick_num >= self.next_tick {
+                            // Invalid tick number! Forcefully disconnect the client.
+                            // NOTE: The corresponding `host::Event::PlayerLeft` event will be
+                            //       handled in the next iteration of the while loop.
+                            warn!(
+                                "Player {} says he received tick {}, but we will start\
+                                 tick {} next, disconnecting",
+                                player_id, tick_num, self.next_tick
+                            );
+
+                            return host.force_disconnect(player_id, LeaveReason::InvalidMsg);
                         }
-                        ClientGameMsg::ReceivedTick(tick_num) => {
-                            // Client has acknowledged a tick
-                            let player = self.players.get_mut(&player_id).unwrap();
 
-                            if tick_num >= self.next_tick {
-                                // Invalid tick number! Forcefully disconnect the client.
-                                // NOTE: The corresponding `host::Event::PlayerLeft` event will be
-                                //       handled in the next iteration of the while loop.
+                        // Since game messages are unreliable, it is possible that we receive
+                        // acknowledgements out of order
+                        if tick_num > player.last_ack_tick.unwrap_or(0) {
+                            player.last_ack_tick = Some(tick_num);
+
+                            // Now we do not need snapshots from ticks older than that anymore.
+                            // The server will always try to delta encode with respect to the
+                            // last tick acknowledged by the client.
+                            player.tick_history.prune_older_ticks(tick_num);
+
+                            // We should have data for every tick in
+                            // [player.last_ack_tick, self.next_tick - 1]
+                            assert!(player.tick_history.get(tick_num).is_some());
+
+                            if player
+                                .tick_history
+                                .get(tick_num)
+                                .as_ref()
+                                .unwrap()
+                                .snapshot
+                                .is_none()
+                            {
                                 warn!(
-                                    "Player {} says he received tick {}, but we will start\
-                                     tick {} next, disconnecting",
-                                    player_id, tick_num, self.next_tick
+                                    "Player {} has acknowledged the non-snapshot tick {},\
+                                     disconnecting",
+                                    player_id, tick_num
                                 );
 
-                                host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
-                                continue;
+                                return host.force_disconnect(player_id, LeaveReason::InvalidMsg);
                             }
+                        }
+                    }
+                    ClientGameMsg::StartedTick(started_tick, player_input) => {
+                        if started_tick >= self.next_tick {
+                            // Got input for a tick that we haven't even started yet!
+                            warn!(
+                                "Player {} says he started tick {}, but we will start\
+                                 tick {} next, disconnecting",
+                                player_id, started_tick, self.next_tick
+                            );
 
-                            // Since game messages are unreliable, it is possible that we receive
-                            // acknowledgements out of order
-                            if tick_num > player.last_ack_tick.unwrap_or(0) {
-                                player.last_ack_tick = Some(tick_num);
+                            return host.force_disconnect(player_id, LeaveReason::InvalidMsg);
+                        }
 
-                                // Now we do not need snapshots from ticks older than that anymore.
-                                // The server will always try to delta encode with respect to the
-                                // last tick acknowledged by the client.
-                                player.tick_history.prune_older_ticks(tick_num);
+                        let player = self.players.get_mut(&player_id).unwrap();
 
-                                // We should have data for every tick in
-                                // [player.last_ack_tick, self.next_tick - 1]
-                                assert!(player.tick_history.get(tick_num).is_some());
-
-                                if player
-                                    .tick_history
-                                    .get(tick_num)
-                                    .as_ref()
-                                    .unwrap()
-                                    .snapshot
-                                    .is_none()
-                                {
+                        let is_new_tick: bool = match player.last_started_tick {
+                            Some(last_started_tick) => {
+                                if last_started_tick == started_tick {
+                                    // Player started tick twice!
                                     warn!(
-                                        "Player {} has acknowledged the non-snapshot tick {},\
-                                         disconnecting",
-                                        player_id, tick_num
+                                        "Player {} started tick {} twice, disconnecting",
+                                        player_id, started_tick
                                     );
 
-                                    host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
-                                    continue;
+                                    return host.force_disconnect(
+                                        player_id,
+                                        LeaveReason::InvalidMsg,
+                                    );
                                 }
+
+                                // Input might have been received out of order, ignore older
+                                // TODO: Since we delay inputs anyway, consider keeping older
+                                //       inputs if they would not have been run yet anyway.
+                                started_tick > last_started_tick
                             }
-                        }
-                        ClientGameMsg::StartedTick(started_tick_num, player_input) => {
-                            if started_tick_num >= self.next_tick {
-                                // Got input for a tick that we haven't even started yet!
-                                warn!(
-                                    "Player {} says he started tick {}, but we will start\
-                                     tick {} next, disconnecting",
-                                    player_id, started_tick_num, self.next_tick
-                                );
+                            None => true,
+                        };
 
-                                host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
-                                continue;
-                            }
+                        if is_new_tick {
+                            player.last_started_tick = Some(started_tick);
 
-                            let player = self.players.get_mut(&player_id).unwrap();
-
-                            player.last_started_tick = Some(match player.last_started_tick {
-                                Some(last_started_tick) => {
-                                    if last_started_tick == started_tick_num {
-                                        // Player started tick twice!
-                                        warn!(
-                                            "Player {} started tick {} twice, disconnecting",
-                                            player_id, started_tick_num
-                                        );
-
-                                        host.force_disconnect(player_id, LeaveReason::InvalidMsg)?;
-                                        continue;
-                                    } else {
-                                        // Input might have been received out of order
-                                        last_started_tick.max(started_tick_num)
-                                    }
-                                }
-                                None => started_tick_num,
-                            });
-
-                            // TODO: Ignore player input that is too old
-
-                            player
-                                .queued_inputs
-                                .insert(started_tick_num, player_input.clone());
+                            let timed_input = TimedInput {
+                                input: player_input.clone(),
+                                receive_instant,
+                            };
+                            player.queued_inputs.insert(started_tick, timed_input);
                         }
                     }
                 }
             }
         }
+        Ok(())
+    }
 
-        // 4. Run a tick periodically
-        if self.tick_timer.trigger() {
-            profile!("tick");
+    fn start_tick(&mut self, host: &mut Host) -> Result<(), host::Error> {
+        profile!("tick");
 
-            // 4.1. Run tick
-            //debug!("Starting tick {}", self.next_tick);
+        // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
+        assert!(
+            self.game_state
+                .world
+                .read_resource::<event::Sink>()
+                .is_empty()
+        );
+        self.game_state.push_events(self.queued_events.clear());
 
-            // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
-            assert!(
-                self.game_state
-                    .world
-                    .read_resource::<event::Sink>()
-                    .is_empty()
-            );
-            self.game_state.push_events(self.queued_events.clear());
+        // Collect every player's queued inputs whose time has come
+        let tick_duration = duration_to_secs(self.game_info().tick_duration());
+        let next_tick = self.next_tick;
 
-            // For now, just run everyone's queued inputs. This will need to be refined!
-            let inputs = self.players
+        let mut inputs = Vec::new();
+        for (&player_id, player) in self.players.iter_mut() {
+            let ping_secs = host.get_ping_secs(player_id).unwrap();
+            let player_inputs = player
+                .queued_inputs
                 .iter()
-                .flat_map(|(&player_id, player)| {
-                    player
-                        .queued_inputs
-                        .iter()
-                        .map(|(_tick_num, input)| (player_id, input.clone()))
-                        .collect::<Vec<_>>()
+                .map(|(&tick, input)| {
+                    // NOTE: This map is monotonic in the tick
+                    let recv_delay_ticks = (ping_secs / tick_duration).ceil() as TickNum;
+                    let target_tick = tick + recv_delay_ticks + TARGET_LAG_INPUTS;
+                    (target_tick, (tick, input.clone()))
                 })
-                .collect();
-            for player in self.players.values_mut() {
-                // Remember the last input we run (i.e. the maximal number contained in the map)
-                let max_queued_num = player.queued_inputs.iter().next_back().map(|(&num, _)| num);
-                if let Some(max_queued_num) = max_queued_num {
-                    // This if here is important, since otherwise we forget the player's last input
-                    // num if we don't have a queued input for a tick.
-                    player.last_input_num = Some(max_queued_num);
+                .filter(|&(target_tick, _)| target_tick <= next_tick)
+                .collect::<Vec<_>>();
+
+            if let Some(&(_, ref last_input)) = player_inputs.last() {
+                // Remember the last input we run
+                player.last_input = Some(last_input.clone());
+
+                for &(_, (tick, _)) in player_inputs.iter() {
+                    player.queued_inputs.remove(&tick).unwrap();
                 }
 
-                player.queued_inputs.clear();
+                inputs.extend(player_inputs.iter().map(|&(target_tick, (_, ref input))| {
+                    (target_tick, (player_id, input.input.clone()))
+                }));
+            }
+        }
+
+        inputs
+            .sort_by(|&(target_tick_a, _), &(target_tick_b, _)| target_tick_a.cmp(&target_tick_b));
+
+        let inputs = inputs
+            .iter()
+            .map(|&(_, ref player_input)| player_input.clone())
+            .collect();
+
+        let tick_events = {
+            profile!("run");
+            self.game_runner.run_tick(&mut self.game_state, inputs)
+        };
+
+        // Can unwrap here, since replication errors should at most happen on the client-side
+        let tick_events = tick_events.unwrap();
+
+        // Record tick in history and send snapshots for every player
+        profile!("send");
+
+        let entity_classes = self.game_state.world.read_resource::<game::EntityClasses>();
+        let send_snapshot = self.next_tick % self.game_info().ticks_per_snapshot == 0;
+
+        let snapshot = if send_snapshot {
+            profile!("store");
+
+            // We don't do this yet, but here the snapshot will be filtered differently for
+            // every player.
+            let mut sys = game::StoreSnapshotSys {
+                snapshot: game::WorldSnapshot::new(),
+                only_player: None,
+            };
+            sys.run_now(&self.game_state.world.res);
+            Some(sys.snapshot)
+        } else {
+            None
+        };
+
+        for (&player_id, player) in self.players.iter_mut() {
+            // Events for this player are the special queued events as well as the shared
+            // events of this tick
+            let mut player_events = mem::replace(&mut player.queued_events, event::Sink::new());
+            for event in &tick_events {
+                player_events.push_box(event.clone_event());
             }
 
-            let tick_events = {
-                profile!("run");
-                self.game_runner.run_tick(&mut self.game_state, inputs)
-            };
-
-            // Can unwrap here, since replication errors should at most happen on the client-side
-            let tick_events = tick_events.unwrap();
-
-            // 4.2. Record tick in history and send snapshots for every player
-            profile!("send");
-
-            let entity_classes = self.game_state.world.read_resource::<game::EntityClasses>();
-            let send_snapshot = self.next_tick % self.game_info().ticks_per_snapshot == 0;
-
-            for (&player_id, player) in self.players.iter_mut() {
-                // Events for this player are the special queued events as well as the shared
-                // events of this tick
-                let mut player_events = mem::replace(&mut player.queued_events, event::Sink::new());
-                for event in &tick_events {
-                    player_events.push_box(event.clone_event());
-                }
-
-                let snapshot = if send_snapshot {
-                    profile!("store");
-
-                    // We don't do this yet, but here the snapshot will be filtered differently for
-                    // every player.
-                    let mut sys = game::StoreSnapshotSys {
-                        snapshot: game::WorldSnapshot::new(),
-                        only_player: None,
-                    };
-                    sys.run_now(&self.game_state.world.res);
-                    Some(sys.snapshot)
-                } else {
-                    None
-                };
+            {
+                profile!("data");
 
                 let tick_data = tick::Data {
                     events: player_events.into_vec(),
-                    snapshot: snapshot,
-                    last_input_num: player.last_input_num,
+                    snapshot: snapshot.clone(),
+                    last_input_num: player.last_input.as_ref().map(|input| input.0),
                 };
-
                 player.tick_history.push_tick(self.next_tick, tick_data);
-
-                if send_snapshot {
-                    if rand::thread_rng().gen() {
-                        // TMP: For testing delta encoding/decoding!
-                        //continue;
-                    }
-
-                    let mut buffer = mem::replace(&mut self.write_buffer, Vec::new());
-                    buffer.clear();
-
-                    let mut writer = BitWriter::new(buffer);
-
-                    {
-                        profile!("write");
-                        player.tick_history.delta_write_tick(
-                            player.last_ack_tick,
-                            self.next_tick,
-                            &entity_classes,
-                            &mut writer,
-                        )?;
-                    }
-
-                    profile!("send");
-
-                    let buffer = writer.into_inner()?;
-                    host.send_game(player_id, buffer)?;
-
-                    //mem::replace(&mut self.write_buffer, buffer);
-                }
             }
 
-            // 4.3. Advance counter
-            self.next_tick += 1;
+            if send_snapshot {
+                let mut buffer = mem::replace(&mut self.write_buffer, Vec::new());
+                buffer.clear();
+
+                let mut writer = BitWriter::new(buffer);
+
+                {
+                    profile!("write");
+                    player.tick_history.delta_write_tick(
+                        player.last_ack_tick,
+                        self.next_tick,
+                        &entity_classes,
+                        &mut writer,
+                    )?;
+                }
+
+                profile!("send");
+
+                let buffer = writer.into_inner()?;
+                host.send_game(player_id, buffer)?;
+
+                //mem::replace(&mut self.write_buffer, buffer);
+            }
         }
+
+        self.next_tick += 1;
 
         Ok(())
     }
