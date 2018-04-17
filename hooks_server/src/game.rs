@@ -416,8 +416,9 @@ impl Game {
                     );
 
                     player.last_ran_input = Some(LastRanInput {
-                        // This would've been the client's next input.
-                        client_tick: last_ran_input.client_tick + 1,
+                        /*// This would've been the client's next input.
+                        client_tick: last_ran_input.client_tick + 1,*/
+                        client_tick: last_ran_input.client_tick,
                         server_tick: next_tick,
                         input: last_ran_input.input.clone(),
                     });
