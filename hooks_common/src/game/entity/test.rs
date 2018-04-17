@@ -14,7 +14,7 @@ pub fn register(reg: &mut Registry) {
         "test",
         &[ComponentType::Position, ComponentType::Orientation],
         |builder| {
-            let shape = Cuboid::new(Vector2::new(15.0, 15.0));
+            let shape = Cuboid::new(Vector2::new(100.0, 100.0));
 
             let mut groups = CollisionGroups::new();
             groups.set_membership(&[collision::GROUP_NEUTRAL]);

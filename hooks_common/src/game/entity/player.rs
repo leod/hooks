@@ -48,6 +48,17 @@ pub fn register(reg: &mut Registry) {
         None,
     );
 
+    interaction::set(
+        reg,
+        "player",
+        "test",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        None,
+    );
+
     // FIXME: Due to a bug in physics sim, other player also gets moved
     interaction::set(
         reg,
@@ -254,6 +265,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
         collision::GROUP_PLAYER,
         collision::GROUP_WALL,
         collision::GROUP_PLAYER_ENTITY,
+        collision::GROUP_NEUTRAL,
     ]);
 
     let query_type = GeometricQueryType::Contacts(0.0, 0.0);

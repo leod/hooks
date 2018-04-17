@@ -90,21 +90,55 @@ pub fn register(reg: &mut Registry) {
     interaction::set(
         reg,
         "first_hook_segment",
+        "hook_segment",
+        None,
+        Some(first_segment_interaction),
+    );
+    interaction::set(
+        reg,
+        "first_hook_segment",
+        "player",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        Some(first_segment_interaction),
+    );
+    interaction::set(
+        reg,
+        "hook_segment",
+        "player",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        None,
+    );
+    interaction::set(
+        reg,
+        "hook_segment",
+        "hook_segment",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        None,
+    );
+    interaction::set(
+        reg,
+        "first_hook_segment",
+        "first_hook_segment",
+        Some(interaction::Action::PreventOverlap {
+            rotate_a: false,
+            rotate_b: false,
+        }),
+        None,
+    );
+
+    interaction::set(
+        reg,
+        "first_hook_segment",
         "test",
-        None,
-        Some(first_segment_interaction),
-    );
-    interaction::set(
-        reg,
-        "first_hook_segment",
-        "hook_segment",
-        None,
-        Some(first_segment_interaction),
-    );
-    interaction::set(
-        reg,
-        "first_hook_segment",
-        "player",
         Some(interaction::Action::PreventOverlap {
             rotate_a: false,
             rotate_b: false,
@@ -114,27 +148,7 @@ pub fn register(reg: &mut Registry) {
     interaction::set(
         reg,
         "hook_segment",
-        "player",
-        Some(interaction::Action::PreventOverlap {
-            rotate_a: false,
-            rotate_b: false,
-        }),
-        None,
-    );
-    interaction::set(
-        reg,
-        "hook_segment",
-        "hook_segment",
-        Some(interaction::Action::PreventOverlap {
-            rotate_a: false,
-            rotate_b: false,
-        }),
-        None,
-    );
-    interaction::set(
-        reg,
-        "first_hook_segment",
-        "first_hook_segment",
+        "test",
         Some(interaction::Action::PreventOverlap {
             rotate_a: false,
             rotate_b: false,
