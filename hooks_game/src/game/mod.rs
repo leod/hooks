@@ -2,7 +2,6 @@ use std::io::Cursor;
 use std::time::{Duration, Instant};
 
 use bit_manager::BitReader;
-use rand::{self, Rng};
 use specs::prelude::{RunNow, World};
 
 use hooks_common::net::protocol::ClientGameMsg;

@@ -22,6 +22,18 @@ struct TimedInput {
     receive_instant: Instant,
 }
 
+#[derive(Clone, Debug)]
+struct LastRanInput {
+    /// Tick in which the client executed the input.
+    client_tick: TickNum,
+
+    /// Tick in which the server executed the input.
+    /// This will always be larger than `client_tick` due to clients living in the past.
+    server_tick: TickNum,
+
+    input: TimedInput,
+}
+
 struct Player {
     /// Tick in which this player joined the game.
     join_tick: TickNum,
@@ -44,7 +56,7 @@ struct Player {
     queued_inputs: BTreeMap<TickNum, TimedInput>,
 
     /// Last input that has been executed from this client, if any.
-    last_input: Option<(TickNum, TimedInput)>,
+    last_ran_input: Option<LastRanInput>,
 }
 
 impl Player {
@@ -56,7 +68,7 @@ impl Player {
             tick_history: tick::History::new(event_reg),
             queued_events: event::Sink::new(),
             queued_inputs: BTreeMap::new(),
-            last_input: None,
+            last_ran_input: None,
         }
     }
 }
@@ -87,7 +99,7 @@ fn register(reg: &mut Registry, game_info: &GameInfo) {
     hooks_common::auth::register(reg, game_info);
 }
 
-const TARGET_LAG_INPUTS: TickNum = 4;
+const TARGET_LAG_INPUTS: TickNum = 1;
 const CLIENT_TARGET_LAG_SNAPSHOTS: TickNum = 2;
 
 impl Game {
@@ -284,8 +296,6 @@ impl Game {
                                 }
 
                                 // Input might have been received out of order, ignore older
-                                // TODO: Since we delay inputs anyway, consider keeping older
-                                //       inputs if they would not have been run yet anyway.
                                 started_tick > last_started_tick
                             }
                             None => true,
@@ -293,7 +303,19 @@ impl Game {
 
                         if is_new_tick {
                             player.last_started_tick = Some(started_tick);
+                        }
 
+                        /*// If we don't receive a player's inputs, we fill by repeating the
+                        // previous input to get smoother behaviour. If the tick of that input
+                        // does arrive later, we should ignore it here.
+                        let is_new_input: bool = match &player.last_ran_input {
+                            &Some(ref last_input) => started_tick > last_input.client_tick,
+                            &None => true,
+                        };*/
+
+                        let is_new_input: bool = true;
+
+                        if is_new_input {
                             let timed_input = TimedInput {
                                 input: player_input.clone(),
                                 receive_instant,
@@ -326,10 +348,11 @@ impl Game {
 
         let mut inputs = Vec::new();
         for (&player_id, player) in self.players.iter_mut() {
+            // TODO: Proper player input buffering
             let ping_secs = host.get_ping_secs(player_id).unwrap();
             let receive_delay_ticks = (ping_secs / (2.0 * tick_duration)).ceil() as TickNum;
             let delay_ticks = receive_delay_ticks + TARGET_LAG_INPUTS +
-                CLIENT_TARGET_LAG_SNAPSHOTS * ticks_per_snapshot;
+                (CLIENT_TARGET_LAG_SNAPSHOTS + 1) * ticks_per_snapshot;
 
             /*debug!(
                 "ping={}, next={}, delay={}",
@@ -341,9 +364,9 @@ impl Game {
             let player_inputs = player
                 .queued_inputs
                 .iter()
-                .map(|(&tick, input)| {
+                .map(|(&client_tick, input)| {
                     // NOTE: This map should be monotonic in the tick
-                    let target_tick = tick + delay_ticks;
+                    let target_tick = client_tick + delay_ticks;
 
                     /*debug!(
                         "\ttick={}, target={}",
@@ -351,23 +374,62 @@ impl Game {
                         target_tick,
                     );*/
 
-                    (target_tick, (tick, input.clone()))
-                    //(next_tick, (tick, input.clone()))
+                    (target_tick, client_tick, input.clone())
                 })
-                .filter(|&(target_tick, _)| target_tick <= next_tick)
+                .filter(|&(target_tick, _, _)| target_tick <= next_tick)
                 .collect::<Vec<_>>();
 
-            if let Some(&(_, ref last_input)) = player_inputs.last() {
-                // Remember the last input we run
-                player.last_input = Some(last_input.clone());
+            if player_inputs.len() > 1 {
+                debug!(
+                    "player {}: input jump of {} (tick {})",
+                    player_id,
+                    player_inputs.len(),
+                    next_tick,
+                );
+            }
 
-                for &(_, (tick, _)) in player_inputs.iter() {
-                    player.queued_inputs.remove(&tick).unwrap();
+            if let Some(&(_, client_tick, ref input)) = player_inputs.last() {
+                // Remember the last input we run
+                player.last_ran_input = Some(LastRanInput {
+                    client_tick,
+                    server_tick: next_tick,
+                    input: input.clone(),
+                });
+
+                for &(_, client_tick, _) in player_inputs.iter() {
+                    player.queued_inputs.remove(&client_tick).unwrap();
                 }
 
-                inputs.extend(player_inputs.iter().map(|&(target_tick, (_, ref input))| {
+                inputs.extend(player_inputs.iter().map(|&(target_tick, _, ref input)| {
                     (target_tick, (player_id, input.input.clone()))
                 }));
+            } else {
+                if let Some(last_ran_input) = player.last_ran_input.clone() {
+                    debug!(
+                        "player {}: no input (tick {}), filling (from tick {}) \
+                         with {} queued starting at {:?}",
+                        player_id,
+                        next_tick,
+                        last_ran_input.server_tick,
+                        player.queued_inputs.len(),
+                        player.queued_inputs.iter().next().map(|input| *input.0),
+                    );
+
+                    player.last_ran_input = Some(LastRanInput {
+                        // This would've been the client's next input.
+                        client_tick: last_ran_input.client_tick + 1,
+                        server_tick: next_tick,
+                        input: last_ran_input.input.clone(),
+                    });
+
+                    // TODO: Which target tick to specify when filling input?
+                    inputs.push((next_tick, (player_id, last_ran_input.input.input.clone())));
+                } else {
+                    debug!(
+                        "player {}: no input (tick {}), can't fill",
+                        player_id, next_tick,
+                    );
+                }
             }
         }
 
@@ -422,7 +484,10 @@ impl Game {
                 let tick_data = tick::Data {
                     events: player_events.into_vec(),
                     snapshot: snapshot.clone(),
-                    last_input_num: player.last_input.as_ref().map(|input| input.0),
+                    last_input_num: player
+                        .last_ran_input
+                        .as_ref()
+                        .map(|input| input.client_tick),
                 };
                 player.tick_history.push_tick(self.next_tick, tick_data);
             }
