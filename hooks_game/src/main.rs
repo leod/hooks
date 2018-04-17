@@ -15,7 +15,7 @@ use std::{env, io, path, thread};
 use nalgebra::{Point2, Point3, Vector2};
 
 use ggez::event::{self, Keycode, MouseButton};
-use ggez::graphics::Font;
+use ggez::graphics::{Color, Font};
 use ggez::{conf, ContextBuilder};
 
 use hooks_common::defs::{GameInfo, PlayerInput};
@@ -98,6 +98,15 @@ impl MainState {
 
         {
             profile!("clear");
+            ggez::graphics::set_background_color(
+                ctx,
+                Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 0.0,
+                },
+            );
             ggez::graphics::clear(ctx);
         }
 
