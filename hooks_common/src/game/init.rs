@@ -1,7 +1,7 @@
 use std::f32;
 
 use nalgebra::{Point2, Vector2};
-use rand::{IsaacRng, Rng};
+//use rand::{IsaacRng, Rng};
 use specs::prelude::World;
 
 use game::entity::test;
@@ -9,31 +9,29 @@ use game::entity::wall;
 use physics::{AngularVelocity, Position, Velocity};
 use repl;
 
-fn create_wall_rect(world: &mut World, center: Point2<f32>, size: Vector2<f32>) {
-    let d = 20.0;
-
+fn create_wall_rect(world: &mut World, center: Point2<f32>, size: Vector2<f32>, d: f32) {
     wall::create(
         world,
-        center - Vector2::new(0.0, size.y - d) / 2.0,
-        Vector2::new(size.x, d),
+        center - Vector2::new(0.0, size.y) / 2.0,
+        Vector2::new(size.x + d, d),
         0.0,
     );
     wall::create(
         world,
-        center + Vector2::new(0.0, size.y + d) / 2.0,
-        Vector2::new(size.x, d),
+        center + Vector2::new(0.0, size.y) / 2.0,
+        Vector2::new(size.x + d, d),
         0.0,
     );
     wall::create(
         world,
-        center - Vector2::new(size.x - d, 0.0) / 2.0,
-        Vector2::new(size.y, d),
+        center - Vector2::new(size.x, 0.0) / 2.0,
+        Vector2::new(size.y + d, d),
         f32::consts::PI / 2.0,
     );
     wall::create(
         world,
-        center + Vector2::new(size.x + d, 0.0) / 2.0,
-        Vector2::new(size.y, d),
+        center + Vector2::new(size.x, 0.0) / 2.0,
+        Vector2::new(size.y + d, d),
         f32::consts::PI / 2.0,
     );
 }
@@ -56,7 +54,25 @@ fn create_state(world: &mut World) {
         wall::create(world, pos, size, angle);
     }*/
 
-    create_wall_rect(world, Point2::new(0.0, 0.0), Vector2::new(2000.0, 2000.0));
+    create_wall_rect(
+        world,
+        Point2::new(0.0, 0.0),
+        Vector2::new(8000.0, 1500.0),
+        50.0,
+    );
+
+    wall::create(
+        world,
+        Point2::new(0.0, -500.0),
+        Vector2::new(1500.0, 20.0),
+        0.0,
+    );
+    wall::create(
+        world,
+        Point2::new(0.0, 650.0),
+        Vector2::new(2000.0, 20.0),
+        0.0,
+    );
 }
 
 pub mod auth {

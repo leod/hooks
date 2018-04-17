@@ -43,6 +43,10 @@ pub mod auth {
         physics_runner.run(world);
         physics_runner.run_interaction_events(world)?;
 
+        if let Some(player_entity) = player_entity {
+            player::run_input_post_sim(world, player_entity, input)?;
+        }
+
         Ok(())
     }
 }
