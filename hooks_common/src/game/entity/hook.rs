@@ -166,8 +166,9 @@ pub const LUNCH_TIME_SECS: f32 = 0.025;
 pub const LUNCH_RADIUS: f32 = 5.0;
 pub const ANGLE_STIFFNESS: f32 = 0.7;
 pub const OWNER_ANGLE_STIFFNESS: f32 = 1.0;
-pub const FIX_MAX_DISTANCE: f32 = 10.0;
-pub const SEGMENT_MAX_DISTANCE: f32 = 15.0;
+pub const FIX_MAX_DISTANCE: f32 = 15.0;
+pub const SEGMENT_MAX_DISTANCE: f32 = 20.0;
+pub const MAX_VIOLATION_SECS: f32 = 0.35;
 
 pub fn segment_attach_pos_back() -> Point2<f32> {
     Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
@@ -268,6 +269,7 @@ pub enum Mode {
 }
 
 /// The dynamic state of an active hook. This is replicated and expected to change frequently.
+/// TODO: Split into visible / internal state, reduce size
 #[derive(PartialEq, Clone, Copy, Debug, BitStore)]
 pub struct ActiveState {
     /// Hook mode.
@@ -286,6 +288,9 @@ pub struct ActiveState {
 
     /// Timer for how much time has passed since eating the last segment.
     lunch_timer: f32,
+
+    fix_violations: u8,
+    segment_violations: u8,
 }
 
 /// The dynamic state of a hook.
@@ -324,7 +329,6 @@ struct CurrentConstraints {
 }
 
 fn build_segment(builder: EntityBuilder) -> EntityBuilder {
-    // TODO
     let shape = Cuboid::new(Vector2::new(SEGMENT_LENGTH / 2.0, 1.5));
 
     let mut groups = CollisionGroups::new();
@@ -683,6 +687,8 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                 fixed: None,
                 want_fix: true,
                 lunch_timer: 0.0,
+                fix_violations: 0,
+                segment_violations: 0,
             }));
         }
 
@@ -723,6 +729,7 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
 
 #[derive(SystemData)]
 struct RunInputPostSimData<'a> {
+    game_info: Fetch<'a, GameInfo>,
     events: FetchMut<'a, event::Sink>,
 
     input: ReadStorage<'a, CurrentInput>,
@@ -765,16 +772,25 @@ pub fn run_input_post_sim(world: &World) -> Result<(), repl::Error> {
                     .0;
 
                 if distance > FIX_MAX_DISTANCE {
-                    active_state.fixed = None;
+                    active_state.fix_violations += 1;
 
-                    let pos = repl::try(&data.position, fix_constraint.entity_a)?;
-                    data.events.push(UnfixedEvent {
-                        hook_index: hook_def.index,
-                        pos: [pos.0.x, pos.0.y],
-                    });
+                    if active_state.fix_violations as f32 * data.game_info.tick_duration_secs() >
+                        MAX_VIOLATION_SECS
+                    {
+                        active_state.fixed = None;
+
+                        let pos = repl::try(&data.position, fix_constraint.entity_a)?;
+                        data.events.push(UnfixedEvent {
+                            hook_index: hook_def.index,
+                            pos: [pos.0.x, pos.0.y],
+                        });
+                    }
+                } else {
+                    active_state.fix_violations = 0;
                 }
             }
 
+            let mut segment_violation: bool = false;
             for segment_constraint in &current_constraints.segments {
                 let distance = segment_constraint
                     .def
@@ -793,9 +809,22 @@ pub fn run_input_post_sim(world: &World) -> Result<(), repl::Error> {
                     .0;
 
                 if distance > SEGMENT_MAX_DISTANCE {
-                    // TODO: Do we need to deactivate segments when forcefully despawning hook?
+                    segment_violation = true;
+                    break;
+                }
+            }
+
+            if segment_violation {
+                active_state.segment_violations += 1;
+                debug!("{}", active_state.segment_violations);
+
+                if active_state.segment_violations as f32 * data.game_info.tick_duration_secs() >
+                    MAX_VIOLATION_SECS
+                {
                     despawn = true;
                 }
+            } else {
+                active_state.segment_violations = 0;
             }
         }
 

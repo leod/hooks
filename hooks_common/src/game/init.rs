@@ -58,7 +58,7 @@ fn create_state(world: &mut World) {
         world,
         Point2::new(0.0, 0.0),
         Vector2::new(8000.0, 1500.0),
-        50.0,
+        200.0,
     );
 
     wall::create(
@@ -67,11 +67,12 @@ fn create_state(world: &mut World) {
         Vector2::new(1500.0, 20.0),
         0.0,
     );
+
     wall::create(
         world,
-        Point2::new(0.0, 650.0),
-        Vector2::new(2000.0, 20.0),
-        0.0,
+        Point2::new(-2000.0, 0.0),
+        Vector2::new(1000.0, 20.0),
+        f32::consts::PI / 2.0,
     );
 }
 
