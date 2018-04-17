@@ -1,5 +1,5 @@
 use std::f32;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
@@ -53,7 +53,7 @@ pub struct Client {
 
 pub enum Event {
     Disconnected,
-    ServerGameMsg(Vec<u8>),
+    ServerGameMsg(Vec<u8>, Instant),
 }
 
 impl Client {
@@ -170,7 +170,11 @@ impl Client {
                         }
                     } else if channel == CHANNEL_GAME {
                         // Game messages are relayed
-                        Ok(Some(Event::ServerGameMsg(packet.data().to_vec())))
+                        // TODO: Vec copy due to dropping packet
+                        Ok(Some(Event::ServerGameMsg(
+                            packet.data().to_vec(),
+                            packet.receive_instant(),
+                        )))
                     } else {
                         Err(Error::InvalidChannel(channel))
                     }

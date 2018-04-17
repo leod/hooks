@@ -87,7 +87,8 @@ fn register(reg: &mut Registry, game_info: &GameInfo) {
     hooks_common::auth::register(reg, game_info);
 }
 
-const TARGET_LAG_INPUTS: TickNum = 2;
+const TARGET_LAG_INPUTS: TickNum = 4;
+const CLIENT_TARGET_LAG_SNAPSHOTS: TickNum = 2;
 
 impl Game {
     pub fn new(game_info: GameInfo) -> Game {
@@ -320,19 +321,38 @@ impl Game {
 
         // Collect every player's queued inputs whose time has come
         let tick_duration = duration_to_secs(self.game_info().tick_duration());
+        let ticks_per_snapshot = self.game_info().ticks_per_snapshot;
         let next_tick = self.next_tick;
 
         let mut inputs = Vec::new();
         for (&player_id, player) in self.players.iter_mut() {
             let ping_secs = host.get_ping_secs(player_id).unwrap();
+            let receive_delay_ticks = (ping_secs / (2.0 * tick_duration)).ceil() as TickNum;
+            let delay_ticks = receive_delay_ticks + TARGET_LAG_INPUTS +
+                CLIENT_TARGET_LAG_SNAPSHOTS * ticks_per_snapshot;
+
+            /*debug!(
+                "ping={}, next={}, delay={}",
+                ping_secs,
+                next_tick,
+                delay_ticks,
+            );*/
+
             let player_inputs = player
                 .queued_inputs
                 .iter()
                 .map(|(&tick, input)| {
-                    // NOTE: This map is monotonic in the tick
-                    let recv_delay_ticks = (ping_secs / tick_duration).ceil() as TickNum;
-                    let target_tick = tick + recv_delay_ticks + TARGET_LAG_INPUTS;
+                    // NOTE: This map should be monotonic in the tick
+                    let target_tick = tick + delay_ticks;
+
+                    /*debug!(
+                        "\ttick={}, target={}",
+                        tick,
+                        target_tick,
+                    );*/
+
                     (target_tick, (tick, input.clone()))
+                    //(next_tick, (tick, input.clone()))
                 })
                 .filter(|&(target_tick, _)| target_tick <= next_tick)
                 .collect::<Vec<_>>();
