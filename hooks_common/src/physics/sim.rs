@@ -533,12 +533,6 @@ impl<'a> System<'a> for SolveConstraintsSys {
 
                 let (p_new_a, p_new_b) = {
                     // Set up input for constraint solving
-                    let x = |entity| {
-                        constraint::Pose {
-                            pos: position.get(entity).unwrap().0,
-                            angle: normalize_angle(orientation.get(entity).unwrap().0),
-                        }
-                    };
                     let m = |entity| {
                         constraint::Mass {
                             inv: inv_mass.get(entity).map(|m| m.0).unwrap_or(0.0),
@@ -546,8 +540,17 @@ impl<'a> System<'a> for SolveConstraintsSys {
                         }
                     };
 
-                    let x_a = x(c.entity_a);
-                    let x_b = x(c.entity_b);
+                    // TODO: repl unwrap
+                    let x_a = constraint::Pose::from_entity(
+                        &position,
+                        &orientation,
+                        c.entity_a
+                    ).unwrap();
+                    let x_b = constraint::Pose::from_entity(
+                        &position,
+                        &orientation,
+                        c.entity_b
+                    ).unwrap();
                     let m_a = m(c.entity_a);
                     let m_b = m(c.entity_b);
 

@@ -71,9 +71,9 @@ pub const DRAG: f32 = 4.0;
 pub const SNAP_ANGLE: f32 = f32::consts::PI / 12.0;
 pub const MAX_ANGULAR_VEL: f32 = f32::consts::PI * 5.0;
 pub const TAP_SECS: f32 = 0.25;
-pub const DASH_SECS: f32 = 0.5;
+pub const DASH_SECS: f32 = 0.3;
 pub const DASH_COOLDOWN_SECS: f32 = 2.0;
-pub const DASH_ACCEL: f32 = 5000.0;
+pub const DASH_ACCEL: f32 = 10000.0;
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
@@ -167,50 +167,36 @@ pub fn run_input(
 ) -> Result<(), repl::Error> {
     // Update hooks
     {
-        let player = world
-            .read::<Player>()
-            .get(entity)
-            .ok_or_else(|| {
-                repl::Error::Replication("player entity without Player component".to_string())
-            })?
-            .clone();
-        let input_state = world
-            .read::<InputState>()
-            .get(entity)
-            .ok_or_else(|| {
-                repl::Error::Replication("player entity without InputState component".to_string())
-            })?
-            .clone();
+        let player = repl::try(&world.read::<Player>(), entity)?.clone();
+        let input_state = repl::try(&world.read::<InputState>(), entity)?.clone();
 
         for i in 0..NUM_HOOKS {
             let hook_entity = repl::try_id_to_entity(world, player.hooks[i])?;
-
-            world.write::<hook::CurrentInput>().insert(
-                hook_entity,
-                hook::CurrentInput {
-                    rot_angle: input.rot_angle,
-                    shoot: if i == 0 {
-                        input.shoot_one
-                    } else {
-                        input.shoot_two
-                    },
-                    previous_shoot: if i == 0 {
-                        input_state.previous_shoot_one
-                    } else {
-                        input_state.previous_shoot_two
-                    },
-                    pull: if i == 0 {
-                        input.pull_one
-                    } else {
-                        input.pull_two
-                    },
+            let hook_input = hook::CurrentInput {
+                rot_angle: input.rot_angle,
+                shoot: if i == 0 {
+                    input.shoot_one
+                } else {
+                    input.shoot_two
                 },
-            );
+                previous_shoot: if i == 0 {
+                    input_state.previous_shoot_one
+                } else {
+                    input_state.previous_shoot_two
+                },
+                pull: if i == 0 {
+                    input.pull_one
+                } else {
+                    input.pull_two
+                },
+            };
+
+            world
+                .write::<hook::CurrentInput>()
+                .insert(hook_entity, hook_input);
         }
 
         hook::run_input(&world)?;
-
-        world.write::<hook::CurrentInput>().clear();
     }
 
     // Update player
@@ -220,9 +206,20 @@ pub fn run_input(
             .insert(entity, CurrentInput(input.clone()));
 
         InputSys.run_now(&world.res);
-
-        world.write::<CurrentInput>().clear();
     }
+
+    Ok(())
+}
+
+pub fn run_input_post_sim(
+    world: &mut World,
+    _entity: Entity,
+    _input: &PlayerInput,
+) -> Result<(), repl::Error> {
+    hook::run_input_post_sim(&world)?;
+
+    world.write::<hook::CurrentInput>().clear();
+    world.write::<CurrentInput>().clear();
 
     Ok(())
 }

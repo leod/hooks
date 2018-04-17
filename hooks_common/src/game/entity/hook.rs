@@ -23,8 +23,11 @@ pub fn register(reg: &mut Registry) {
     reg.component::<SegmentDef>();
     reg.component::<State>();
     reg.component::<CurrentInput>();
+    reg.component::<CurrentConstraints>();
 
     reg.event::<FixedEvent>();
+    reg.event::<UnfixedEvent>();
+    reg.event::<DespawnedEvent>();
 
     repl::entity::register_class(
         reg,
@@ -150,6 +153,7 @@ pub const LUNCH_RADIUS: f32 = 5.0;
 pub const ANGLE_STIFFNESS: f32 = 0.7;
 pub const OWNER_ANGLE_STIFFNESS: f32 = 1.0;
 pub const FIX_MAX_DISTANCE: f32 = 30.0;
+pub const SEGMENT_MAX_DISTANCE: f32 = 30.0;
 
 pub fn segment_attach_pos_back() -> Point2<f32> {
     Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)
@@ -171,6 +175,34 @@ pub struct FixedEvent {
 }
 
 impl Event for FixedEvent {
+    fn class(&self) -> event::Class {
+        event::Class::Order
+    }
+}
+
+/// This event is emitted when the hook detaches due to being violated too much.
+#[derive(Debug, Clone, BitStore)]
+pub struct UnfixedEvent {
+    /// Different hook colors for drawing.
+    pub hook_index: u32,
+
+    pub pos: [f32; 2],
+}
+
+impl Event for UnfixedEvent {
+    fn class(&self) -> event::Class {
+        event::Class::Order
+    }
+}
+
+/// This event is emitted when the hook despawns due to being violated too much.
+#[derive(Debug, Clone, BitStore)]
+pub struct DespawnedEvent {
+    /// Different hook colors for drawing.
+    pub hook_index: u32,
+}
+
+impl Event for DespawnedEvent {
     fn class(&self) -> event::Class {
         event::Class::Order
     }
@@ -265,6 +297,16 @@ pub struct CurrentInput {
     pub shoot: bool,
     pub previous_shoot: bool,
     pub pull: bool,
+}
+
+/// Remember hook constraints for destroying the hooks if they are violated too much.
+/// We need to store this since we want to check the constraint value *after* simulation.
+/// TODO: By copying the constraints, we are doing the work of calculating constraint values twice.
+///       This could be done better by sharing some Rc thingy with the simulation.
+#[derive(Component, Clone, Debug, Default)]
+struct CurrentConstraints {
+    fix: Option<Constraint>,
+    segments: Vec<Constraint>,
 }
 
 fn build_segment(builder: EntityBuilder) -> EntityBuilder {
@@ -416,7 +458,9 @@ fn first_segment_interaction(
 }
 
 #[derive(SystemData)]
-struct InputData<'a> {
+struct RunInputData<'a> {
+    entities: Entities<'a>,
+
     game_info: Fetch<'a, GameInfo>,
     entity_map: Fetch<'a, repl::EntityMap>,
 
@@ -431,15 +475,28 @@ struct InputData<'a> {
     orientation: WriteStorage<'a, Orientation>,
     angular_velocity: WriteStorage<'a, AngularVelocity>,
     hook_state: WriteStorage<'a, State>,
+    current_constraints: WriteStorage<'a, CurrentConstraints>,
 }
 
 pub fn run_input(world: &World) -> Result<(), repl::Error> {
-    let mut data = InputData::fetch(&world.res);
+    let mut data = RunInputData::fetch(&world.res);
 
     let dt = data.game_info.tick_duration_secs();
 
+    for (entity, _) in (&*data.entities, &data.input).join() {
+        // Remember the constraints that we create in the following steps.
+        // This will be used in `run_input_post_sim` to despawn hooks if they are violated too
+        // much.
+        data.current_constraints.insert(entity, Default::default());
+    }
+
     // Update all hooks that currently have some input attached to them
-    for (input, hook_def, hook_state) in (&data.input, &data.hook_def, &mut data.hook_state).join()
+    for (input, hook_def, hook_state, current_constraints) in (
+        &data.input,
+        &data.hook_def,
+        &mut data.hook_state,
+        &mut data.current_constraints,
+    ).join()
     {
         // Need to know the position of our owner entity
         let owner_entity = data.entity_map.try_id_to_entity(hook_def.owner)?;
@@ -470,24 +527,13 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                         fix_entity,
                         fix_pos_object,
                     );
-                    let distance = constraint
-                        .def
-                        .calculate(
-                            &Pose::from_entity(
-                                &data.position,
-                                &data.orientation,
-                                segment_entities[0],
-                            )?,
-                            &Pose::from_entity(&data.position, &data.orientation, fix_entity)?,
-                        )
-                        .0;
-                    if distance <= FIX_MAX_DISTANCE {
-                        data.constraints.add(constraint);
-                    } else {
-                        active_state.fixed = None;
-                    }
+                    data.constraints.add(constraint.clone());
+                    current_constraints.fix = Some(constraint);
                 } else {
-                    warn!("hook attached to dead entity {:?}", fix_entity_id);
+                    debug!(
+                        "hook attached to dead entity {:?}, detaching",
+                        fix_entity_id
+                    );
                     active_state.fixed = None;
                 }
             }
@@ -597,13 +643,15 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                             //let target_distance = 0.0;
                             let constraint_distance = cur_distance.min(target_distance);
 
-                            data.constraints.add(owner_segment_joint_constraint(
+                            let constraint = owner_segment_joint_constraint(
                                 owner_entity,
                                 last_entity,
                                 active_state.fixed.is_some(),
                                 segment_attach_pos_back(),
                                 constraint_distance,
-                            ));
+                            );
+                            data.constraints.add(constraint.clone());
+                            current_constraints.segments.push(constraint);
 
                             if active_state.fixed.is_some() {
                                 data.constraints
@@ -649,11 +697,102 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                 let entity_a = segment_entities[i];
                 let entity_b = segment_entities[i + 1];
 
-                data.constraints
-                    .add(segments_joint_constraint(entity_a, entity_b));
+                let constraint = segments_joint_constraint(entity_a, entity_b);
+                data.constraints.add(constraint.clone());
+                current_constraints.segments.push(constraint);
+
                 data.constraints
                     .add(segments_angle_constraint(entity_a, entity_b));
             }
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(SystemData)]
+struct RunInputPostSimData<'a> {
+    events: FetchMut<'a, event::Sink>,
+
+    input: ReadStorage<'a, CurrentInput>,
+    position: ReadStorage<'a, Position>,
+    orientation: ReadStorage<'a, Orientation>,
+    hook_def: ReadStorage<'a, Def>,
+    current_constraints: ReadStorage<'a, CurrentConstraints>,
+
+    hook_state: WriteStorage<'a, State>,
+}
+
+pub fn run_input_post_sim(world: &World) -> Result<(), repl::Error> {
+    let mut data = RunInputPostSimData::fetch(&world.res);
+
+    for (_, hook_def, current_constraints, hook_state) in (
+        &data.input,
+        &data.hook_def,
+        &data.current_constraints,
+        &mut data.hook_state,
+    ).join()
+    {
+        let mut despawn: bool = false;
+
+        if let Some(active_state) = hook_state.0.as_mut() {
+            if let Some(ref fix_constraint) = current_constraints.fix {
+                let distance = fix_constraint
+                    .def
+                    .calculate(
+                        &Pose::from_entity(
+                            &data.position,
+                            &data.orientation,
+                            fix_constraint.entity_a,
+                        )?,
+                        &Pose::from_entity(
+                            &data.position,
+                            &data.orientation,
+                            fix_constraint.entity_b,
+                        )?,
+                    )
+                    .0;
+
+                if distance > FIX_MAX_DISTANCE {
+                    active_state.fixed = None;
+
+                    let pos = repl::try(&data.position, fix_constraint.entity_a)?;
+                    data.events.push(UnfixedEvent {
+                        hook_index: hook_def.index,
+                        pos: [pos.0.x, pos.0.y],
+                    });
+                }
+            }
+
+            for segment_constraint in &current_constraints.segments {
+                let distance = segment_constraint
+                    .def
+                    .calculate(
+                        &Pose::from_entity(
+                            &data.position,
+                            &data.orientation,
+                            segment_constraint.entity_a,
+                        )?,
+                        &Pose::from_entity(
+                            &data.position,
+                            &data.orientation,
+                            segment_constraint.entity_b,
+                        )?,
+                    )
+                    .0;
+
+                if distance > SEGMENT_MAX_DISTANCE {
+                    // TODO: Do we need to deactivate segments when forcefully despawning hook?
+                    despawn = true;
+                }
+            }
+        }
+
+        if despawn {
+            hook_state.0 = None;
+            data.events.push(DespawnedEvent {
+                hook_index: hook_def.index,
+            });
         }
     }
 
