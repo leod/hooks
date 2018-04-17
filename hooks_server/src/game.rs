@@ -68,7 +68,7 @@ struct Player {
 impl Player {
     pub fn new(join_tick: TickNum, event_reg: event::Registry) -> Player {
         Player {
-            join_tick: join_tick,
+            join_tick,
             last_ack_tick: None,
             last_started_tick: None,
             tick_history: tick::History::new(event_reg),
@@ -106,7 +106,7 @@ fn register(reg: &mut Registry, game_info: &GameInfo) {
 }
 
 impl Game {
-    pub fn new(game_info: GameInfo) -> Game {
+    pub fn new(game_info: &GameInfo) -> Game {
         let mut game_state = {
             let mut reg = Registry::new();
 
@@ -138,7 +138,7 @@ impl Game {
         let update_duration = self.update_stopwatch.get_reset();
 
         // Detect players that are lagged too far behind
-        for (&player_id, player) in self.players.iter() {
+        for (&player_id, player) in &self.players {
             let num_delta = if let Some(last_ack_tick) = player.last_ack_tick {
                 assert!(last_ack_tick < self.next_tick);
                 self.next_tick - last_ack_tick
@@ -147,7 +147,7 @@ impl Game {
                 self.next_tick - player.join_tick + 1
             };
 
-            if num_delta > TickDeltaNum::max_value() as TickNum {
+            if num_delta > TickNum::from(TickDeltaNum::max_value()) {
                 // NOTE: In the future, if we have a higher tick rate, it might be better to send
                 //       a full snapshot to players who are lagged too far behind to use delta
                 //       encoding. Then, a different mechanism will need to be used to force
@@ -359,7 +359,7 @@ impl Game {
         let next_tick = self.next_tick;
 
         let mut inputs = Vec::new();
-        for (&player_id, player) in self.players.iter_mut() {
+        for (&player_id, player) in &mut self.players {
             // TODO: Proper player input buffering
             let ping_secs = host.get_ping_secs(player_id).unwrap();
 
@@ -412,41 +412,39 @@ impl Game {
                     input: input.clone(),
                 });
 
-                for &(_, client_tick, _) in player_inputs.iter() {
+                for &(_, client_tick, _) in &player_inputs {
                     player.queued_inputs.remove(&client_tick).unwrap();
                 }
 
                 inputs.extend(player_inputs.iter().map(|&(target_tick, _, ref input)| {
                     (target_tick, (player_id, input.input.clone()))
                 }));
+            } else if let Some(last_ran_input) = player.last_ran_input.clone() {
+                debug!(
+                    "player {}: no input (tick {}), filling (from tick {}) \
+                     with {} queued starting at {:?}",
+                    player_id,
+                    next_tick,
+                    last_ran_input.server_tick,
+                    player.queued_inputs.len(),
+                    player.queued_inputs.iter().next().map(|input| *input.0),
+                );
+
+                player.last_ran_input = Some(LastRanInput {
+                    /*// This would've been the client's next input.
+                    client_tick: last_ran_input.client_tick + 1,*/
+                    client_tick: last_ran_input.client_tick,
+                    server_tick: next_tick,
+                    input: last_ran_input.input.clone(),
+                });
+
+                // TODO: Which target tick to specify when filling input?
+                inputs.push((next_tick, (player_id, last_ran_input.input.input.clone())));
             } else {
-                if let Some(last_ran_input) = player.last_ran_input.clone() {
-                    debug!(
-                        "player {}: no input (tick {}), filling (from tick {}) \
-                         with {} queued starting at {:?}",
-                        player_id,
-                        next_tick,
-                        last_ran_input.server_tick,
-                        player.queued_inputs.len(),
-                        player.queued_inputs.iter().next().map(|input| *input.0),
-                    );
-
-                    player.last_ran_input = Some(LastRanInput {
-                        /*// This would've been the client's next input.
-                        client_tick: last_ran_input.client_tick + 1,*/
-                        client_tick: last_ran_input.client_tick,
-                        server_tick: next_tick,
-                        input: last_ran_input.input.clone(),
-                    });
-
-                    // TODO: Which target tick to specify when filling input?
-                    inputs.push((next_tick, (player_id, last_ran_input.input.input.clone())));
-                } else {
-                    debug!(
-                        "player {}: no input (tick {}), can't fill",
-                        player_id, next_tick,
-                    );
-                }
+                debug!(
+                    "player {}: no input (tick {}), can't fill",
+                    player_id, next_tick,
+                );
             }
         }
 
@@ -487,7 +485,7 @@ impl Game {
             None
         };
 
-        for (&player_id, player) in self.players.iter_mut() {
+        for (&player_id, player) in &mut self.players {
             // Events for this player are the special queued events as well as the shared
             // events of this tick
             let mut player_events = mem::replace(&mut player.queued_events, event::Sink::new());

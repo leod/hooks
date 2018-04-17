@@ -35,6 +35,6 @@ fn main() {
         game_info,
     };
 
-    let mut server = Server::create(config).unwrap();
+    let mut server = Server::create(&config).unwrap();
     server.run().unwrap();
 }

@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use rand::Rng;
 
-use hooks_common::PlayerInput;
 use hooks_common::registry::Registry;
+use hooks_common::PlayerInput;
 
 use hooks_game::client::Client;
 use hooks_game::game::{self, Game};

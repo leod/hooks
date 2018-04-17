@@ -150,7 +150,7 @@ impl ViewRunner {
     ) -> Result<Vec<Box<Event>>, repl::Error> {
         profile!("run");
 
-        let events = event::Sink::clone_from_vec(&tick_data.events);
+        let events = event::Sink::clone_from_slice(&tick_data.events);
         state.push_events(events.into_vec());
 
         self.common.run_pre_tick(state)?;

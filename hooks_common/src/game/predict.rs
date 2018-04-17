@@ -119,6 +119,7 @@ impl Log {
                 }
             }
         } else {
+            // The server has not executed any of our inputs yet.
             // NOTE: It is important that we load the initial snapshot for player entities.
             //       The reason is that, when prediction is enabled, `game::run::ViewRunner`
             //       ignores player-owned entities when loading the server's snapshots.

@@ -168,7 +168,7 @@ impl Game {
             self.receive_snapshot_timer += Instant::now().duration_since(receive_instant);
 
             let reply = ClientGameMsg::ReceivedTick(read_info.tick);
-            client.send_game(reply)?;
+            client.send_game(&reply)?;
 
             if let Some(reference_tick) = read_info.reference_tick {
                 // The fact that we have received a new delta encoded tick means that
@@ -199,7 +199,7 @@ impl Game {
 
         // Inform the server
         let target_tick = self.game_info.input_target_tick(client.ping_secs(), tick);
-        client.send_game(ClientGameMsg::StartedTick {
+        client.send_game(&ClientGameMsg::StartedTick {
             tick,
             target_tick,
             input: player_input.clone(),

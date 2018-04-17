@@ -119,7 +119,7 @@ where
                 .0
                 .get_mut(&id.0)
                 .map(Ok)
-                .unwrap_or(Err(repl::Error::InvalidPlayerId(id.0)))?;
+                .unwrap_or_else(|| Err(repl::Error::InvalidPlayerId(id.0)))?;
 
             if player.entity.is_some() {
                 return Err(repl::Error::Replication(format!(
@@ -181,7 +181,8 @@ impl<'a> System<'a> for RemovalSys {
 
             // Forget player-controlled main entity
             if (repl_id.0).0 != INVALID_PLAYER_ID {
-                let player_class_id = *class_ids.0.get(&game_info.player_entity_class).unwrap();
+                // TODO: repl unwrap
+                let player_class_id = class_ids.0[&game_info.player_entity_class];
 
                 if meta.class_id == player_class_id {
                     // We might have the case that the owner has just disconnected
@@ -304,7 +305,7 @@ pub mod view {
     }
 
     /// Remove entities as ordered.
-    pub fn handle_event(world: &mut World, event: &Box<Event>) -> Result<(), repl::Error> {
+    pub fn handle_event(world: &mut World, event: &Event) -> Result<(), repl::Error> {
         match_event!(event:
             RemoveOrder => {
                 let id = event.0;

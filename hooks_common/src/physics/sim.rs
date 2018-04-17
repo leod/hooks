@@ -282,51 +282,44 @@ impl<'a> System<'a> for SavePositionSys {
         ): Self::SystemData
     ) {
         for (entity, _, position) in (&*entities, filter.join(), &position).join() {
-            old_position.insert(entity, OldPosition(position.0.clone()));
+            old_position.insert(entity, OldPosition(position.0));
         }
         for (entity, _, orientation) in (&*entities, filter.join(), &orientation).join() {
-            old_orientation.insert(entity, OldOrientation(orientation.0.clone()));
+            old_orientation.insert(entity, OldOrientation(orientation.0));
         }
     }
 }
 
 struct CorrectVelocitySys;
 
+#[derive(SystemData)]
+struct CorrectVelocityData<'a> {
+    game_info: Fetch<'a, GameInfo>,
+
+    filter: Filter<'a>,
+    position: ReadStorage<'a, Position>,
+    old_position: ReadStorage<'a, OldPosition>,
+    orientation: ReadStorage<'a, Orientation>,
+    old_orientation: ReadStorage<'a, OldOrientation>,
+
+    velocity: WriteStorage<'a, Velocity>,
+    angular_velocity: WriteStorage<'a, AngularVelocity>,
+}
+
 impl<'a> System<'a> for CorrectVelocitySys {
-    type SystemData = (
-        Fetch<'a, GameInfo>,
-        Filter<'a>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, OldPosition>,
-        ReadStorage<'a, Orientation>,
-        ReadStorage<'a, OldOrientation>,
-        WriteStorage<'a, Velocity>,
-        WriteStorage<'a, AngularVelocity>,
-    );
+    type SystemData = CorrectVelocityData<'a>;
 
     #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
-    fn run(
-        &mut self,
-        (
-            game_info,
-            filter,
-            position,
-            old_position,
-            orientation,
-            old_orientation,
-            mut velocity,
-            mut angular_velocity,
-        ): Self::SystemData
-    ) {
-        let dt = game_info.tick_duration_secs();
+    fn run(&mut self, mut data: Self::SystemData) {
+        let dt = data.game_info.tick_duration_secs();
 
         for (_, position, old_position, velocity) in
-            (filter.join(), &position, &old_position, &mut velocity).join()
+            (data.filter.join(), &data.position, &data.old_position, &mut data.velocity).join()
         {
             velocity.0 = (position.0 - old_position.0) / dt;
         }
         for (_, orientation, old_orientation, angular_velocity) in
-            (filter.join(), &orientation, &old_orientation, &mut angular_velocity).join()
+            (data.filter.join(), &data.orientation, &data.old_orientation, &mut data.angular_velocity).join()
         {
             let x = orientation.0;
             let y = old_orientation.0;
@@ -378,9 +371,10 @@ impl<'a> System<'a> for IntegrateForceSys {
 
             // TODO: Angular friction
             if ang_velocity.0.abs() > 0.01 {
+                let positive = ang_velocity.0.is_sign_positive();
                 let signum = ang_velocity.0.signum();
                 ang_velocity.0 -= 100.0 * signum * dt;
-                if ang_velocity.0.signum() != signum {
+                if ang_velocity.0.is_sign_positive() != positive {
                     ang_velocity.0 = 0.0;
                 }
             } else {

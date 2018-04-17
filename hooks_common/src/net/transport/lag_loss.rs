@@ -137,7 +137,7 @@ impl<H: transport::Host> Host<H> {
 impl<H: transport::Host> Drop for Host<H> {
     fn drop(&mut self) {
         let queue = mem::replace(&mut self.queue, BinaryHeap::new());
-        for payload in queue.into_iter() {
+        for payload in queue {
             if let Err(error) = self.run_command(payload.command) {
                 warn!("Failed to run command while dropping host: {:?}", error);
             }

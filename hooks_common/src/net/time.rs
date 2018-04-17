@@ -60,7 +60,7 @@ impl PeerData for Time {
                     Time::send(
                         host,
                         peer_id,
-                        TimeMsg::Pong {
+                        &TimeMsg::Pong {
                             ping_send_time: send_time,
                         },
                     )?;
@@ -105,14 +105,14 @@ impl Time {
         let send_time = duration_to_secs(now.duration_since(self.start_instant));
 
         while self.send_ping_timer.trigger() {
-            Time::send(host, peer_id, TimeMsg::Ping { send_time })?;
+            Time::send(host, peer_id, &TimeMsg::Ping { send_time })?;
         }
 
         Ok(())
     }
 
     pub fn last_ping_secs(&self) -> Option<f32> {
-        self.ping_samples.back().map(|t| *t)
+        self.ping_samples.back().cloned()
     }
 
     pub fn ping_secs(&self) -> f32 {
@@ -120,10 +120,10 @@ impl Time {
         self.last_ping_secs().unwrap_or(DEFAULT_PING_SECS)
     }
 
-    fn send<H: Host>(host: &mut H, peer_id: PeerId, msg: TimeMsg) -> Result<(), H::Error> {
+    fn send<H: Host>(host: &mut H, peer_id: PeerId, msg: &TimeMsg) -> Result<(), H::Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
-            writer.write(&msg).unwrap();
+            writer.write(msg).unwrap();
             writer.into_inner().unwrap()
         };
 

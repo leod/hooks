@@ -6,8 +6,8 @@ use specs::prelude::*;
 use specs::storage::BTreeStorage;
 
 use defs::{EntityId, GameInfo, PlayerId, PlayerInput, INVALID_ENTITY_ID};
-use game::ComponentType;
 use game::entity::hook;
+use game::ComponentType;
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
 use physics::interaction;
 use physics::{AngularVelocity, Drag, Dynamic, InvAngularMass, InvMass, Orientation, Position,
@@ -164,7 +164,7 @@ impl State {
             } else {
                 Some(DashState {
                     secs_left,
-                    ..dash_state.clone()
+                    ..*dash_state
                 })
             }
         });
@@ -178,8 +178,8 @@ pub fn run_input(
 ) -> Result<(), repl::Error> {
     // Update hooks
     {
-        let player = repl::try(&world.read::<Player>(), entity)?.clone();
-        let input_state = repl::try(&world.read::<InputState>(), entity)?.clone();
+        let player = *repl::try(&world.read::<Player>(), entity)?;
+        let input_state = *repl::try(&world.read::<InputState>(), entity)?;
 
         for i in 0..NUM_HOOKS {
             let hook_entity = repl::try_id_to_entity(world, player.hooks[i])?;
@@ -244,9 +244,9 @@ pub mod auth {
         });
 
         let mut hooks = [INVALID_ENTITY_ID; NUM_HOOKS];
-        for i in 0..NUM_HOOKS {
+        for (i, hook) in hooks.iter_mut().enumerate() {
             let (hook_id, _) = hook::auth::create(world, id, i as u32);
-            hooks[i] = hook_id;
+            *hook = hook_id;
         }
 
         // Now that we have created our hooks, attach the player definition
@@ -382,12 +382,10 @@ impl<'a> System<'a> for InputSys {
             };
             if smallest_angle.abs() <= SNAP_ANGLE {
                 orientation.0 = input.0.rot_angle;
-            } else {
-                if smallest_angle < 0.0 {
-                    angular_velocity.0 -= ROT_ACCEL * dt;
-                } else if smallest_angle > 0.0 {
-                    angular_velocity.0 += ROT_ACCEL * dt;
-                }
+            } else if smallest_angle < 0.0 {
+                angular_velocity.0 -= ROT_ACCEL * dt;
+            } else if smallest_angle > 0.0 {
+                angular_velocity.0 += ROT_ACCEL * dt;
             }
 
             if angular_velocity.0.abs() > MAX_ANGULAR_VEL {

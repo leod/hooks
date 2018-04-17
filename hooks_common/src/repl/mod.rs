@@ -64,7 +64,7 @@ impl EntityMap {
     pub fn try_id_to_entity(&self, id: EntityId) -> Result<Entity, Error> {
         self.get_id_to_entity(id)
             .map(Ok)
-            .unwrap_or(Err(Error::InvalidEntityId(id)))
+            .unwrap_or_else(|| Err(Error::InvalidEntityId(id)))
     }
 
     pub fn is_entity(&self, id: EntityId) -> bool {
@@ -91,9 +91,7 @@ where
 {
     storage
         .get(entity)
-        .ok_or(Error::EntityMissingComponent(entity, unsafe {
-            type_name::<T>()
-        }))
+        .ok_or_else(|| Error::EntityMissingComponent(entity, unsafe { type_name::<T>() }))
 }
 
 pub fn try_mut<'a, T, D>(storage: &'a mut Storage<T, D>, entity: Entity) -> Result<&'a mut T, Error>
@@ -103,9 +101,7 @@ where
 {
     storage
         .get_mut(entity)
-        .ok_or(Error::EntityMissingComponent(entity, unsafe {
-            type_name::<T>()
-        }))
+        .ok_or_else(|| Error::EntityMissingComponent(entity, unsafe { type_name::<T>() }))
 }
 
 pub fn try_join_get<'a, J: Join>(
@@ -115,9 +111,7 @@ pub fn try_join_get<'a, J: Join>(
 ) -> Result<J::Type, Error> {
     join_iter
         .get(entity, entities)
-        .ok_or(Error::EntityMissingComponent(entity, unsafe {
-            type_name::<J::Type>()
-        }))
+        .ok_or_else(|| Error::EntityMissingComponent(entity, unsafe { type_name::<J::Type>() }))
 }
 
 /// An `Error` indicates that something went seriously wrong in replication. Either we have a bug,

@@ -19,7 +19,7 @@ pub mod auth {
 
         let player_entity = {
             let players = world.read_resource::<Players>();
-            players.0.get(&player_id).unwrap().entity
+            players.try_get(player_id)?.entity
         };
 
         if let Some(player_entity) = player_entity {

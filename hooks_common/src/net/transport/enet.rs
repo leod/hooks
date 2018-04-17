@@ -73,7 +73,7 @@ impl transport::Host for Host {
         } else if event.type_ == _ENetEventType_ENET_EVENT_TYPE_RECEIVE {
             let id = Peer(event.peer).id();
             if !event.peer.is_null() {
-                if let Some(_) = self.peers.get(&id) {
+                if self.peers.contains_key(&id) {
                     let packet = Packet(event.packet, Instant::now());
                     Ok(Some(Event::Receive(id, event.channelID, packet)))
                 } else {
@@ -113,7 +113,7 @@ impl transport::Host for Host {
         //info!("disconnecting {}", peer_id);
         let peer = self.peers
             .get(&peer_id)
-            .ok_or(Error::InvalidPeerId(peer_id))?;
+            .ok_or_else(|| Error::InvalidPeerId(peer_id))?;
 
         unsafe {
             enet_peer_disconnect(peer.0, data);
@@ -131,8 +131,8 @@ impl transport::Host for Host {
     ) -> Result<(), Error> {
         let peer = self.peers
             .get(&peer_id)
-            .ok_or(Error::InvalidPeerId(peer_id))?;
-        peer.send(channel_id, flag, data)
+            .ok_or_else(|| Error::InvalidPeerId(peer_id))?;
+        peer.send(channel_id, flag, &data)
     }
 }
 
@@ -147,7 +147,7 @@ impl Peer {
         unsafe { (*self.0).data as PeerId }
     }
 
-    fn send(&self, channel_id: ChannelId, flag: PacketFlag, data: Vec<u8>) -> Result<(), Error> {
+    fn send(&self, channel_id: ChannelId, flag: PacketFlag, data: &[u8]) -> Result<(), Error> {
         let flags = match flag {
             PacketFlag::Reliable => _ENetPacketFlag_ENET_PACKET_FLAG_RELIABLE as u32,
             PacketFlag::Unreliable => 0, // TODO: Check
@@ -191,10 +191,7 @@ impl Peer {
 
 impl Address {
     pub fn create(host: &str, port: u16) -> Result<Address, Error> {
-        let mut address = ENetAddress {
-            host: 0,
-            port: port,
-        };
+        let mut address = ENetAddress { host: 0, port };
 
         let c_host = CString::new(host).unwrap();
 
@@ -226,7 +223,7 @@ impl Host {
     ) -> Result<Host, Error> {
         let address = ENetAddress {
             host: ENET_HOST_ANY,
-            port: port,
+            port,
         };
 
         let handle = unsafe {
@@ -278,7 +275,7 @@ impl Host {
         }
     }
 
-    fn register_peer<'a>(&'a mut self, handle: *mut ENetPeer) -> PeerId {
+    fn register_peer(&mut self, handle: *mut ENetPeer) -> PeerId {
         let peer_id = self.next_peer_id;
         self.next_peer_id += 1;
 

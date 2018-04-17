@@ -89,7 +89,7 @@ pub enum Event {
 pub const PEER_COUNT: usize = 64;
 
 impl Host {
-    pub fn create(port: u16, game_info: GameInfo) -> Result<Host, Error> {
+    pub fn create(port: u16, game_info: &GameInfo) -> Result<Host, Error> {
         let host = enet::Host::create_server(port, PEER_COUNT, NUM_CHANNELS, 0, 0)?;
         let host = lag_loss::Host::new(
             host,
@@ -102,7 +102,7 @@ impl Host {
 
         Ok(Host {
             host,
-            game_info,
+            game_info: game_info.clone(),
             clients: BTreeMap::new(),
             queued_events: VecDeque::new(),
         })
@@ -215,10 +215,10 @@ impl Host {
         locked_peers.get(&player_id).map(|time| time.ping_secs())
     }
 
-    fn send_comm(&mut self, receiver_id: PlayerId, msg: ServerCommMsg) -> Result<(), Error> {
+    fn send_comm(&mut self, receiver_id: PlayerId, msg: &ServerCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
-            writer.write(&msg)?;
+            writer.write(msg)?;
             writer.into_inner()?
         };
 
@@ -264,7 +264,7 @@ impl Host {
                             your_id: peer_id,
                             game_info: self.game_info.clone(),
                         };
-                        self.send_comm(peer_id, reply)?;
+                        self.send_comm(peer_id, &reply)?;
 
                         Ok(None)
                     } else {

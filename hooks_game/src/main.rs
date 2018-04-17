@@ -116,8 +116,8 @@ impl MainState {
         Ok(())
     }
 
-    fn handle_event(&mut self, ctx: &mut ggez::Context, event: event::Event) -> bool {
-        match event {
+    fn handle_event(&mut self, ctx: &mut ggez::Context, event: &event::Event) -> bool {
+        match *event {
             event::Event::Quit { .. } => return false,
             event::Event::MouseMotion { x, y, .. } => {
                 let (size_x, size_y) = ggez::graphics::get_size(ctx);
@@ -210,7 +210,7 @@ impl MainState {
         ctx.timer_context.tick();
 
         for event in event::Events::new(ctx)?.poll() {
-            if !self.handle_event(ctx, event) {
+            if !self.handle_event(ctx, &event) {
                 return Ok(false);
             }
         }
@@ -250,9 +250,8 @@ fn main() {
     env_logger::init();
 
     let host = env::args()
-        .skip(1)
-        .next()
-        .unwrap_or("localhost".to_string());
+        .nth(1)
+        .unwrap_or_else(|| "localhost".to_string());
 
     let config = Config {
         host,

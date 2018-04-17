@@ -31,7 +31,7 @@ impl State {
     pub fn push_events(&self, events: Vec<Box<Event>>) {
         let mut sink = self.world.write_resource::<event::Sink>();
 
-        for event in events.into_iter() {
+        for event in events {
             sink.push_box(event);
         }
     }

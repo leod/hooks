@@ -71,15 +71,12 @@ where
 
     fn service(&mut self, timeout_ms: u32) -> Result<Option<Event<H::Packet>>, Error> {
         match self.receiver
-            .recv_timeout(Duration::from_millis(timeout_ms as u64))
+            .recv_timeout(Duration::from_millis(u64::from(timeout_ms)))
         {
             Ok(event) => {
-                match &event {
-                    &Event::Disconnect(peer_id) => {
-                        let mut peers = self.peers.lock().unwrap();
-                        peers.remove(&peer_id);
-                    }
-                    _ => {}
+                if let Event::Disconnect(peer_id) = event {
+                    let mut peers = self.peers.lock().unwrap();
+                    peers.remove(&peer_id);
                 }
 
                 Ok(Some(event))
@@ -124,7 +121,7 @@ where
     fn drop(&mut self) {
         let thread = mem::replace(&mut self.thread, None);
         if let Some(thread) = thread {
-            if let Ok(_) = self.sender.send(Command::Stop) {
+            if self.sender.send(Command::Stop).is_ok() {
                 if let Err(err) = thread.join() {
                     warn!("Failed to join background thread: {:?}", err);
                 }
@@ -158,7 +155,7 @@ where
         Host {
             sender: sender_command,
             receiver: receiver_event,
-            peers: peers,
+            peers,
             thread: Some(thread),
         }
     }
@@ -215,13 +212,13 @@ fn background_thread<H, D>(
 
         match host.service(0) {
             Ok(Some(event)) => {
-                let no_send = match &event {
-                    &Event::Connect(peer_id) => {
+                let no_send = match event {
+                    Event::Connect(peer_id) => {
                         let mut peers = peers.lock().unwrap();
                         peers.insert(peer_id, Default::default());
                         false
                     }
-                    &Event::Receive(peer_id, channel_id, ref packet) => {
+                    Event::Receive(peer_id, channel_id, ref packet) => {
                         // FIXME: Propagate errors to main thread
                         let no_send = {
                             let mut peers = peers.lock().unwrap();
@@ -238,7 +235,9 @@ fn background_thread<H, D>(
                 };
 
                 if !no_send {
-                    if let Err(_) = sender.send(event) {
+                    let result = sender.send(event);
+
+                    if result.is_err() {
                         // This should only happen while faultily shutting down -- just ignore
                         return;
                     }

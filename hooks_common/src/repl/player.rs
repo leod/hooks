@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use std::collections::btree_map;
+use std::collections::BTreeMap;
 
 use specs::prelude::{Entity, Join, World};
 
@@ -35,7 +35,7 @@ pub struct Player {
 impl Player {
     pub fn new(info: PlayerInfo) -> Player {
         Player {
-            info: info,
+            info,
             entity: None,
             next_entity_index: 0,
         }
@@ -63,12 +63,20 @@ impl Players {
         self.0.get(&id)
     }
 
+    pub fn try_get(&self, id: PlayerId) -> Result<&Player, repl::Error> {
+        self.get(id).ok_or_else(|| repl::Error::InvalidPlayerId(id))
+    }
+
     pub fn iter(&self) -> btree_map::Iter<PlayerId, Player> {
         self.0.iter()
     }
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 

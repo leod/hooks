@@ -30,14 +30,14 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn create(config: Config) -> Result<Server, host::Error> {
+    pub fn create(config: &Config) -> Result<Server, host::Error> {
         info!(
             "Starting server on port {} with game config {:?}",
             config.port, config.game_info
         );
 
-        let host = Host::create(config.port, config.game_info.clone())?;
-        let game = Game::new(config.game_info.clone());
+        let host = Host::create(config.port, &config.game_info)?;
+        let game = Game::new(&config.game_info);
 
         Ok(Server {
             profile: true,

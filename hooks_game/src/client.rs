@@ -78,7 +78,7 @@ impl Client {
             let msg = ClientCommMsg::WishConnect {
                 name: name.to_string(),
             };
-            Self::send_comm(&mut host, peer_id, msg)?;
+            Self::send_comm(&mut host, peer_id, &msg)?;
 
             // Wait for accept message
             if let Some(transport::Event::Receive(_, channel, packet)) = host.service(timeout_ms)? {
@@ -140,7 +140,7 @@ impl Client {
         assert!(!self.ready, "already ready");
 
         self.ready = true;
-        Self::send_comm(&mut self.host, self.peer_id, ClientCommMsg::Ready)
+        Self::send_comm(&mut self.host, self.peer_id, &ClientCommMsg::Ready)
     }
 
     pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
@@ -194,20 +194,20 @@ impl Client {
         locked_peers.get(&self.peer_id).unwrap().ping_secs()
     }
 
-    fn send_comm(host: &mut MyHost, peer_id: PeerId, msg: ClientCommMsg) -> Result<(), Error> {
+    fn send_comm(host: &mut MyHost, peer_id: PeerId, msg: &ClientCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
-            writer.write(&msg)?;
+            writer.write(msg)?;
             writer.into_inner()?
         };
 
         Ok(host.send(peer_id, CHANNEL_COMM, PacketFlag::Unsequenced, data)?)
     }
 
-    pub fn send_game(&mut self, msg: ClientGameMsg) -> Result<(), Error> {
+    pub fn send_game(&mut self, msg: &ClientGameMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());
-            writer.write(&msg)?;
+            writer.write(msg)?;
             writer.into_inner()?
         };
 

@@ -109,14 +109,14 @@ impl Def {
     /// Calculate the constraint value as well as the jacobian at some position.
     #[inline]
     pub fn calculate(&self, x_a: &Pose, x_b: &Pose) -> (f32, RowVector6<f32>) {
-        match self {
-            &Def::Joint {
+        match *self {
+            Def::Joint {
                 distance,
                 object_pos_a,
                 object_pos_b,
             } => {
-                let rot_a = Rotation2::new(x_a.angle).matrix().clone();
-                let rot_b = Rotation2::new(x_b.angle).matrix().clone();
+                let rot_a = *Rotation2::new(x_a.angle).matrix();
+                let rot_b = *Rotation2::new(x_b.angle).matrix();
                 let pos_a = rot_a * object_pos_a.coords + x_a.pos.coords;
                 let pos_b = rot_b * object_pos_b.coords + x_b.pos.coords;
 
@@ -150,12 +150,10 @@ impl Def {
                     0.0
                 };
 
-                let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
-                    .matrix()
-                    .clone() * rot_impact_a;
-                let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
-                    .matrix()
-                    .clone() * rot_impact_b;
+                let deriv_rot_a =
+                    *Rotation2::new(x_a.angle + f32::consts::PI / 2.0).matrix() * rot_impact_a;
+                let deriv_rot_b =
+                    *Rotation2::new(x_b.angle + f32::consts::PI / 2.0).matrix() * rot_impact_b;
 
                 let jacobian_f = Matrix2x6::new(
                     1.0,
@@ -189,26 +187,22 @@ impl Def {
 
                 (value, jacobian)
             }
-            &Def::Angle { angle } => {
+            Def::Angle { angle } => {
                 let value = x_a.angle - x_b.angle - angle;
                 let jacobian = RowVector6::new(0.0, 0.0, 1.0, 0.0, 0.0, -1.0);
                 (value, jacobian)
             }
-            &Def::Contact {
+            Def::Contact {
                 normal,
                 margin,
                 object_pos_a,
                 object_pos_b,
             } => {
                 // TODO: Create functions for this stuff
-                let rot_a = Rotation2::new(x_a.angle).matrix().clone();
-                let rot_b = Rotation2::new(x_b.angle).matrix().clone();
-                let deriv_rot_a = Rotation2::new(x_a.angle + f32::consts::PI / 2.0)
-                    .matrix()
-                    .clone();
-                let deriv_rot_b = Rotation2::new(x_b.angle + f32::consts::PI / 2.0)
-                    .matrix()
-                    .clone();
+                let rot_a = *Rotation2::new(x_a.angle).matrix();
+                let rot_b = *Rotation2::new(x_b.angle).matrix();
+                let deriv_rot_a = *Rotation2::new(x_a.angle + f32::consts::PI / 2.0).matrix();
+                let deriv_rot_b = *Rotation2::new(x_b.angle + f32::consts::PI / 2.0).matrix();
                 let pos_a = rot_a * object_pos_a.coords + x_a.pos.coords;
                 let pos_b = rot_b * object_pos_b.coords + x_b.pos.coords;
 
@@ -224,7 +218,7 @@ impl Def {
 
                 (-value, -jacobian)
             }
-            &Def::Sum(ref k1, ref k2) => {
+            Def::Sum(ref k1, ref k2) => {
                 let (value_1, jacobian_1) = k1.calculate(x_a, x_b);
                 let (value_2, jacobian_2) = k2.calculate(x_a, x_b);
 
@@ -235,11 +229,11 @@ impl Def {
 
     /// Is this an inequality constraint, i.e. `C >= 0`, or an equality constraint, i.e. `C = 0`?
     pub fn is_inequality(&self) -> bool {
-        match self {
-            &Def::Joint { .. } => false,
-            &Def::Angle { .. } => false,
-            &Def::Contact { .. } => true,
-            &Def::Sum(_, _) => false,
+        match *self {
+            Def::Joint { .. } => false,
+            Def::Angle { .. } => false,
+            Def::Contact { .. } => true,
+            Def::Sum(_, _) => false,
         }
     }
 }

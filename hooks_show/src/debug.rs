@@ -14,13 +14,13 @@ pub fn show(
     vars: &debug::Vars,
     pos: Point2<f32>,
 ) -> ggez::GameResult<Vector2<f32>> {
-    match vars {
-        &debug::Vars::Leaf(ref string) => {
+    match *vars {
+        debug::Vars::Leaf(ref string) => {
             let text = Text::new(ctx, &string, font)?;
             graphics::draw(ctx, &text, pos, 0.0)?;
             Ok(Vector2::new(text.width() as f32, text.height() as f32))
         }
-        &debug::Vars::Node(ref succs) => {
+        debug::Vars::Node(ref succs) => {
             let mut name_texts = Vec::new();
             let mut max_width: f32 = 0.0;
             for &(ref name, _) in succs {

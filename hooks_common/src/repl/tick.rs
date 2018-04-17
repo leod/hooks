@@ -1,6 +1,6 @@
+use std::collections::btree_map;
 use std::collections::BTreeMap;
 use std::collections::Bound::{Excluded, Included, Unbounded};
-use std::collections::btree_map;
 
 use bit_manager::{self, BitRead, BitWrite};
 
@@ -70,7 +70,7 @@ pub struct History<T: EntitySnapshot> {
 impl<T: EntitySnapshot> History<T> {
     pub fn new(event_reg: event::Registry) -> Self {
         Self {
-            event_reg: event_reg,
+            event_reg,
             ticks: BTreeMap::new(),
         }
     }
@@ -85,6 +85,10 @@ impl<T: EntitySnapshot> History<T> {
 
     pub fn len(&self) -> usize {
         self.ticks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ticks.is_empty()
     }
 
     pub fn push_tick(&mut self, num: TickNum, data: Data<T>) {
@@ -133,7 +137,7 @@ impl<T: EntitySnapshot> History<T> {
         let delta_num = if let Some(prev_num) = prev_num {
             // Reference tick must not be too far in the past
             assert!(prev_num < cur_num);
-            assert!(cur_num - prev_num <= TickDeltaNum::max_value() as TickNum);
+            assert!(cur_num - prev_num <= TickNum::from(TickDeltaNum::max_value()));
 
             (cur_num - prev_num) as TickDeltaNum
         } else {
@@ -148,18 +152,18 @@ impl<T: EntitySnapshot> History<T> {
         // Send events of all ticks between previous and current tick
         {
             let event_range = if let Some(prev_num) = prev_num {
-                // Send all the events that happened between the reference tick and now
+                // Delta encoding.
+                // => Send all the events that happened between the reference tick and now
                 (Included(prev_num), Included(cur_num))
+            } else if self.min_num().is_some() {
+                // No delta encoding.
+                // Although we have sent ticks to the client, it has not acknowledged any of them
+                // yet. Therefore, we have to resend all events from the start.
+                (Unbounded, Included(cur_num))
             } else {
-                // No delta snapshot encoding
-                if self.min_num().is_some() {
-                    // Although we have sent ticks to the client, it has not acknowledged any of them
-                    // yet. Therefore, we have to resend all events from the start.
-                    (Unbounded, Included(cur_num))
-                } else {
-                    // No ticks sent yet, so there are no events we could resend
-                    (Excluded(cur_num), Included(cur_num))
-                }
+                // No delta encoding.
+                // No ticks sent yet, so there are no events we could resend
+                (Excluded(cur_num), Included(cur_num))
             };
 
             // Sanity check: should have tick data for every tick inbetween
@@ -173,7 +177,7 @@ impl<T: EntitySnapshot> History<T> {
             // Write tick events backwards
             for (&num, data) in self.ticks.range(event_range).rev() {
                 assert!(num <= cur_num);
-                assert!(cur_num - num <= TickDeltaNum::max_value() as TickNum);
+                assert!(cur_num - num <= TickNum::from(TickDeltaNum::max_value()));
 
                 writer.write_bit(true)?;
                 self.write_events(&data.events, writer)?;
@@ -227,14 +231,14 @@ impl<T: EntitySnapshot> History<T> {
 
         let prev_num = if delta_num != NO_DELTA_TICK {
             // Sanity checks for the reference tick
-            if delta_num as TickNum > cur_num {
+            if TickNum::from(delta_num) > cur_num {
                 return Err(Error::ReceivedInvalidTick(
                     cur_num,
                     format!("tick reference is {} ticks in the past", delta_num),
                 ));
             }
 
-            let prev_num = cur_num - (delta_num as TickNum);
+            let prev_num = cur_num - TickNum::from(delta_num);
 
             if !self.ticks.contains_key(&prev_num) {
                 return Err(Error::ReceivedInvalidTick(
@@ -273,7 +277,7 @@ impl<T: EntitySnapshot> History<T> {
             if let btree_map::Entry::Vacant(entry) = self.ticks.entry(event_tick_num) {
                 // For non-existent intermediate ticks, we only have the events, but no world snapshot
                 let prev_data = Data {
-                    events: events,
+                    events,
                     snapshot: None,
                     last_input_tick: None,
                 };
