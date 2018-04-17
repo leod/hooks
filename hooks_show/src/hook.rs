@@ -72,11 +72,11 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
     let (entity_map, position, orientation, hook_def, hook_state) = DrawData::fetch(&world.res);
 
     for (hook_def, hook_state) in (&hook_def, &hook_state).join() {
-        if let &Some(hook::ActiveState {
+        if let Some(hook::ActiveState {
             num_active,
             ref fixed,
             ..
-        }) = &hook_state.0
+        }) = hook_state.0
         {
             // Look up our segments
             let mut segments = Vec::new();
@@ -87,7 +87,7 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
             }
 
             // Draw segment rects
-            for &segment in segments.iter() {
+            for &segment in &segments {
                 // TODO: specs unwrap
                 let pos = position.get(segment).unwrap().0.coords;
                 let angle = orientation.get(segment).unwrap().0;
@@ -128,7 +128,7 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 let pos = position.get(segment).unwrap().0.coords;
                 let angle = orientation.get(segment).unwrap().0;
 
-                let rot = Rotation2::new(angle).matrix().clone();
+                let rot = *Rotation2::new(angle).matrix();
                 let attach_p = rot * Point2::new(hook::SEGMENT_LENGTH / 2.0, 0.0) + pos;
                 let size = if i == 0 { 12.0 } else { 4.0 };
                 let scaling = Matrix4::from_diagonal(&Vector4::new(size, size, 1.0, 1.0));

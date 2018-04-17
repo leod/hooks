@@ -74,6 +74,7 @@ pub struct EntityClass<T: ComponentType> {
 
 /// All possible replicated entity types. Every replicated entity has a `entity::Meta` component,
 /// storing an index into this map.
+#[derive(Default)]
 pub struct EntityClasses<T: ComponentType>(pub BTreeMap<EntityClassId, EntityClass<T>>);
 
 impl<T: ComponentType> EntityClasses<T> {
@@ -85,7 +86,7 @@ impl<T: ComponentType> EntityClasses<T> {
 /// Snapshot of a set of entities at one point in time. In addition to the EntitySnapshot, we store
 /// the entities' meta-information here as well, so that we know which components should be
 /// replicated.
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub struct WorldSnapshot<T: EntitySnapshot>(pub BTreeMap<EntityId, (Meta, T)>);
 
 impl<T: EntitySnapshot> WorldSnapshot<T> {
@@ -281,18 +282,16 @@ impl<T: EntitySnapshot> WorldSnapshot<T> {
         let mut dist = 0.0f32;
 
         for join_item in join::FullJoinIter::new(self.0.iter(), other.0.iter()) {
-            match join_item {
-                join::Item::Both(
-                    &_id,
-                    &(ref left_meta, ref left_snapshot),
-                    &(ref right_meta, ref right_snapshot),
-                ) => {
-                    // This entity exists in the left and the right snapshot
-                    assert!(left_meta == right_meta);
+            if let join::Item::Both(
+                &_id,
+                &(ref left_meta, ref left_snapshot),
+                &(ref right_meta, ref right_snapshot),
+            ) = join_item
+            {
+                // This entity exists in the left and the right snapshot
+                assert!(left_meta == right_meta);
 
-                    dist += left_snapshot.distance(right_snapshot)?;
-                }
-                _ => {}
+                dist += left_snapshot.distance(right_snapshot)?;
             }
         }
 

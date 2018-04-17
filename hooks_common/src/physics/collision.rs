@@ -26,7 +26,7 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Object>();
     reg.component::<ObjectHandle>();
 
-    let contact_dispatcher = StatelessContactDispatcher::new();
+    let contact_dispatcher = StatelessContactDispatcher::default();
     let proximity_dispatcher = DefaultProximityDispatcher::new();
     let narrow_phase =
         DefaultNarrowPhase::new(Box::new(contact_dispatcher), Box::new(proximity_dispatcher));
@@ -135,40 +135,33 @@ impl<'a> System<'a> for UpdateSys {
 /// in the collision world. `Position`, `Orientation` and `Shape` also need to be given.
 pub struct MaintainSys;
 
-impl<'a> System<'a> for MaintainSys {
-    type SystemData = (
-        FetchMut<'a, CollisionWorld>,
-        Entities<'a>,
-        ReadStorage<'a, entity::Active>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, Orientation>,
-        ReadStorage<'a, Shape>,
-        ReadStorage<'a, Object>,
-        WriteStorage<'a, ObjectHandle>,
-    );
+#[derive(SystemData)]
+pub struct MaintainData<'a> {
+    entities: Entities<'a>,
 
-    fn run(
-        &mut self,
-        (
-            mut collision_world,
-            entities,
-            active,
-            position,
-            orientation,
-            shape,
-            object,
-            mut object_handle,
-        ): Self::SystemData,
-    ) {
+    active: ReadStorage<'a, entity::Active>,
+    position: ReadStorage<'a, Position>,
+    orientation: ReadStorage<'a, Orientation>,
+    shape: ReadStorage<'a, Shape>,
+    object: ReadStorage<'a, Object>,
+
+    object_handle: WriteStorage<'a, ObjectHandle>,
+}
+
+impl<'a> System<'a> for MaintainSys {
+    // Using a tuple here because of borrowing in a closure
+    type SystemData = (FetchMut<'a, CollisionWorld>, MaintainData<'a>);
+
+    fn run(&mut self, (mut collision_world, mut data): Self::SystemData) {
         // Create newly active entities in collision world
         let new_handles = (
-            &*entities,
-            &active,
-            &position,
-            &orientation,
-            &shape,
-            &object,
-            !&object_handle,
+            &*data.entities,
+            &data.active,
+            &data.position,
+            &data.orientation,
+            &data.shape,
+            &data.object,
+            !&data.object_handle,
         ).join()
             .map(
                 |(entity, _active, position, orientation, shape, object, _)| {
@@ -187,10 +180,16 @@ impl<'a> System<'a> for MaintainSys {
             .collect::<Vec<_>>();
 
         for &(entity, handle) in &new_handles {
-            object_handle.insert(entity, ObjectHandle(handle));
+            data.object_handle.insert(entity, ObjectHandle(handle));
         }
 
-        for (entity, _active, _, _) in (&*entities, &active, &object, !&object_handle).join() {
+        for (entity, _active, _, _) in (
+            &*data.entities,
+            &data.active,
+            &data.object,
+            !&data.object_handle,
+        ).join()
+        {
             panic!(
                 "Entity {:?} has collision::Object but not Position, Orientation or Shape",
                 entity
@@ -198,7 +197,7 @@ impl<'a> System<'a> for MaintainSys {
         }
 
         // Remove newly inactive entities from collision world
-        let removed_handles = (&*entities, !&active, &object_handle)
+        let removed_handles = (&*data.entities, !&data.active, &data.object_handle)
             .join()
             .map(|(entity, _, object_handle)| {
                 collision_world.remove(&[object_handle.0]);
@@ -207,7 +206,7 @@ impl<'a> System<'a> for MaintainSys {
             .collect::<Vec<_>>();
 
         for entity in removed_handles {
-            object_handle.remove(entity);
+            data.object_handle.remove(entity);
         }
     }
 }
@@ -244,14 +243,14 @@ impl<'a> System<'a> for RemovalSys {
 /// `ncollide` contact dispatcher that does not use state from previous tick.
 /// Adapted from the `DefaultContactDispatcher`.
 /// See also <http://users.nphysics.org/t/using-ncollide-in-less-stateful-ways/163>.
-pub struct StatelessContactDispatcher<P: Point, M> {
+struct StatelessContactDispatcher<P: Point, M> {
     _point_type: PhantomData<P>,
     _matrix_type: PhantomData<M>,
 }
 
-impl<P: Point, M> StatelessContactDispatcher<P, M> {
+impl<P: Point, M> Default for StatelessContactDispatcher<P, M> {
     /// Creates a new basic collision dispatcher.
-    pub fn new() -> StatelessContactDispatcher<P, M> {
+    fn default() -> StatelessContactDispatcher<P, M> {
         StatelessContactDispatcher {
             _point_type: PhantomData,
             _matrix_type: PhantomData,

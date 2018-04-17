@@ -128,8 +128,8 @@ where
                 handler.action.clone()
             } else {
                 // Fix up actions so that it is in the order of `entity_a` and `entity_b`
-                handler.action.as_ref().map(|action| match action {
-                    &Action::PreventOverlap { rotate_a, rotate_b } => Action::PreventOverlap {
+                handler.action.as_ref().map(|action| match *action {
+                    Action::PreventOverlap { rotate_a, rotate_b } => Action::PreventOverlap {
                         rotate_a: rotate_b,
                         rotate_b: rotate_a,
                     },

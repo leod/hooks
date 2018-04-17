@@ -197,7 +197,7 @@ impl Show {
         &mut self,
         ctx: &mut ggez::Context,
         world: &mut World,
-        events: &Vec<Box<Event>>,
+        events: &[Box<Event>],
     ) -> ggez::error::GameResult<()> {
         profile!("show events");
 

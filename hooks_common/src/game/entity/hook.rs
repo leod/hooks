@@ -367,7 +367,7 @@ pub mod auth {
 
         // Create hook segments
         let mut segments = [INVALID_ENTITY_ID; NUM_SEGMENTS];
-        for i in 0..NUM_SEGMENTS {
+        for (i, segment) in segments.iter_mut().enumerate() {
             // The first hook segment is special because it can attach to entities
             let class = if i == 0 {
                 "first_hook_segment"
@@ -378,7 +378,7 @@ pub mod auth {
             let (segment_id, _) = repl::entity::auth::create(world, owner.0, class, |builder| {
                 builder.with(SegmentDef { hook: id })
             });
-            segments[i] = segment_id;
+            *segment = segment_id;
         }
 
         // Now that we have the IDs of all the segments, attach the definition to the hook
@@ -514,13 +514,13 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
     {
         // Need to know the position of our owner entity
         let owner_entity = data.entity_map.try_id_to_entity(hook_def.owner)?;
-        let owner_pos = repl::try(&data.position, owner_entity)?.clone();
-        let owner_velocity = repl::try(&data.velocity, owner_entity)?.clone();
+        let owner_pos = *repl::try(&data.position, owner_entity)?;
+        let owner_velocity = *repl::try(&data.velocity, owner_entity)?;
 
         // Look up the segment entities of this hook
         let mut segment_entities = [owner_entity; NUM_SEGMENTS];
-        for i in 0..NUM_SEGMENTS {
-            segment_entities[i] = data.entity_map.try_id_to_entity(hook_def.segments[i])?;
+        for (i, segment_entity) in segment_entities.iter_mut().enumerate() {
+            *segment_entity = data.entity_map.try_id_to_entity(hook_def.segments[i])?;
         }
 
         // Update hook state
@@ -554,7 +554,7 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
 
             let num_active = active_state.num_active as usize;
 
-            match active_state.mode.clone() {
+            match active_state.mode {
                 Mode::Shooting => {
                     if input.shoot && num_active < NUM_SEGMENTS {
                         // Keep on shooting
@@ -675,18 +675,15 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
                     }
                 }
             }
-        } else {
-            // Hook currently inactive
-            if input.shoot && !input.previous_shoot {
-                // Start shooting the hook
-                overwrite_hook_state = Some(Some(ActiveState {
-                    mode: Mode::Shooting,
-                    num_active: 0,
-                    fixed: None,
-                    want_fix: true,
-                    lunch_timer: 0.0,
-                }));
-            }
+        } else if input.shoot && !input.previous_shoot {
+            // Hook currently inactive, start shooting it
+            overwrite_hook_state = Some(Some(ActiveState {
+                mode: Mode::Shooting,
+                num_active: 0,
+                fixed: None,
+                want_fix: true,
+                lunch_timer: 0.0,
+            }));
         }
 
         if let Some(overwrite_hook_state) = overwrite_hook_state {
@@ -694,9 +691,9 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
         }
 
         // Maintain the `Active` flag of our segments
-        let num_active = match &hook_state.0 {
-            &Some(ActiveState { num_active, .. }) => num_active as usize,
-            &None => 0,
+        let num_active = match hook_state.0 {
+            Some(ActiveState { num_active, .. }) => num_active as usize,
+            None => 0,
         };
         for i in 0..num_active {
             data.active.insert(segment_entities[i], Active);
@@ -840,7 +837,7 @@ fn segments_angle_constraint(entity_a: Entity, entity_b: Entity) -> Constraint {
     let stiffness = ANGLE_STIFFNESS;
     Constraint {
         def: angle_def,
-        stiffness: stiffness,
+        stiffness,
         entity_a,
         entity_b,
         vars_a: constraint::Vars {
@@ -862,7 +859,7 @@ fn owner_segment_joint_constraint(
     distance: f32,
 ) -> Constraint {
     let joint_def = constraint::Def::Joint {
-        distance: distance,
+        distance,
         object_pos_a: Point2::new(0.0, 0.0), //Point2::origin(),
         object_pos_b: last_object_pos,
     };

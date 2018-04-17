@@ -126,7 +126,7 @@ impl Registry {
         let type_index = self.type_indices[&type_id];
 
         writer.write(&type_index)?;
-        Ok(event.write(writer)?)
+        event.write(writer)
     }
 
     pub fn read(&self, reader: &mut Reader) -> Result<Box<Event>, Error> {
@@ -140,6 +140,7 @@ impl Registry {
     }
 }
 
+#[derive(Default)]
 pub struct Sink {
     events: Vec<Box<Event>>,
     ignore: bool,
@@ -153,7 +154,7 @@ impl Sink {
         }
     }
 
-    pub fn clone_from_vec(events: &Vec<Box<Event>>) -> Sink {
+    pub fn clone_from_slice(events: &[Box<Event>]) -> Sink {
         let events = events.iter().map(|event| (**event).clone_event()).collect();
         Sink {
             events,
@@ -196,7 +197,7 @@ impl Sink {
 
 impl Clone for Sink {
     fn clone(self: &Sink) -> Sink {
-        Sink::clone_from_vec(&self.events)
+        Sink::clone_from_slice(&self.events)
     }
 }
 
