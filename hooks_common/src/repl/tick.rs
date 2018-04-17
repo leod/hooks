@@ -20,7 +20,20 @@ pub struct Data<T: EntitySnapshot> {
     pub snapshot: Option<WorldSnapshot<T>>,
 
     /// The last of our player input that has been run in this tick, if any.
-    pub last_input_num: Option<TickNum>,
+    pub last_input_tick: Option<TickNum>,
+}
+
+/// Information about a delta-read tick.
+pub struct ReadInfo {
+    /// Number of the received tick.
+    pub tick: TickNum,
+
+    /// Previous tick that served as the basis of delta encoding. The server knows that we have
+    /// received it.
+    pub reference_tick: Option<TickNum>,
+
+    /// The last of our player input that has been run in this tick, if any.
+    pub last_input_tick: Option<TickNum>,
 }
 
 #[derive(Debug)]
@@ -130,7 +143,7 @@ impl<T: EntitySnapshot> History<T> {
 
         let cur_data = &self.ticks[&cur_num];
 
-        writer.write(&cur_data.last_input_num)?;
+        writer.write(&cur_data.last_input_tick)?;
 
         // Send events of all ticks between previous and current tick
         {
@@ -195,14 +208,12 @@ impl<T: EntitySnapshot> History<T> {
         Ok(())
     }
 
-    /// Decode tick data. If the tick was new to us, returns a triplet of tick nums, where the first
-    /// element is the reference tick num, the second element is the new tick num, and the third
-    /// element is the number of the last of our inputs executed on the server.
+    /// Decode tick data. If the tick was new to us, returns information about the tick nums.
     pub fn delta_read_tick(
         &mut self,
         classes: &EntityClasses<T::ComponentType>,
         reader: &mut event::Reader,
-    ) -> Result<Option<(Option<TickNum>, TickNum, Option<TickNum>)>, Error> {
+    ) -> Result<Option<ReadInfo>, Error> {
         let cur_num = reader.read::<TickNum>()?;
 
         if self.max_num().is_some() && cur_num < self.max_num().unwrap() {
@@ -238,7 +249,7 @@ impl<T: EntitySnapshot> History<T> {
             None
         };
 
-        let last_input_num = reader.read::<Option<TickNum>>()?;
+        let last_input_tick = reader.read::<Option<TickNum>>()?;
 
         // Loop for reading events backwards
         let mut event_tick_num = cur_num + 1;
@@ -264,7 +275,7 @@ impl<T: EntitySnapshot> History<T> {
                 let prev_data = Data {
                     events: events,
                     snapshot: None,
-                    last_input_num: None,
+                    last_input_tick: None,
                 };
 
                 entry.insert(prev_data);
@@ -347,9 +358,13 @@ impl<T: EntitySnapshot> History<T> {
         //       of intermediate ticks. The intermediate ticks do not have a snapshot.
         let cur_data = self.ticks.get_mut(&cur_num).unwrap();
         cur_data.snapshot = Some(cur_snapshot);
-        cur_data.last_input_num = last_input_num;
+        cur_data.last_input_tick = last_input_tick;
 
-        Ok(Some((prev_num, cur_num, last_input_num)))
+        Ok(Some(ReadInfo {
+            tick: cur_num,
+            reference_tick: prev_num,
+            last_input_tick,
+        }))
     }
 
     fn write_events(

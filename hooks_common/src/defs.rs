@@ -54,6 +54,8 @@ pub struct GameInfo {
     pub ticks_per_snapshot: u32,
     pub map_info: MapInfo,
     pub player_entity_class: String,
+    pub server_target_lag_inputs: TickNum,
+    pub client_target_lag_snapshots: TickNum,
 }
 
 impl GameInfo {
@@ -63,6 +65,20 @@ impl GameInfo {
 
     pub fn tick_duration_secs(&self) -> f32 {
         1.0 / (self.ticks_per_second as f32)
+    }
+
+    /// Estimate in which tick a client's input will be run on the server.
+    pub fn input_target_tick(&self, ping_secs: f32, client_tick: TickNum) -> TickNum {
+        // Crude estimate based on ping, I guess time synchronization stuff could help here...
+        let receive_delay_ticks = (ping_secs / (2.0 * self.tick_duration_secs())).ceil() as TickNum;
+        let delay_ticks = receive_delay_ticks + self.server_target_lag_inputs +
+            (self.client_target_lag_snapshots + 1) * self.ticks_per_snapshot;
+        client_tick + delay_ticks
+    }
+
+    /// How many ticks the client should lag behind the latest tick it received.
+    pub fn client_target_lag_ticks(&self) -> TickNum {
+        self.client_target_lag_snapshots * self.ticks_per_snapshot
     }
 }
 

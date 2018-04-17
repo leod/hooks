@@ -152,8 +152,8 @@ pub const LUNCH_TIME_SECS: f32 = 0.025;
 pub const LUNCH_RADIUS: f32 = 5.0;
 pub const ANGLE_STIFFNESS: f32 = 0.7;
 pub const OWNER_ANGLE_STIFFNESS: f32 = 1.0;
-pub const FIX_MAX_DISTANCE: f32 = 30.0;
-pub const SEGMENT_MAX_DISTANCE: f32 = 30.0;
+pub const FIX_MAX_DISTANCE: f32 = 10.0;
+pub const SEGMENT_MAX_DISTANCE: f32 = 15.0;
 
 pub fn segment_attach_pos_back() -> Point2<f32> {
     Point2::new(-SEGMENT_LENGTH / 2.0 + JOIN_MARGIN, 0.0)

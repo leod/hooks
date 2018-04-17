@@ -42,7 +42,7 @@ impl Log {
         sys.run_now(&world.res);
     }
 
-    fn record(&mut self, world: &World, tick_num: TickNum, input: &PlayerInput) {
+    fn record(&mut self, world: &World, tick: TickNum, input: &PlayerInput) {
         // Snapshot the predicted state of our entities
         let mut sys = game::StoreSnapshotSys {
             snapshot: game::WorldSnapshot::new(),
@@ -51,7 +51,7 @@ impl Log {
         sys.run_now(&world.res);
 
         self.entries.insert(
-            tick_num,
+            tick,
             LogEntry {
                 input: input.clone(),
                 snapshot: sys.snapshot,
@@ -65,29 +65,29 @@ impl Log {
         physics_runner: &mut physics::sim::Runner,
         tick_data: &tick::Data<game::EntitySnapshot>,
     ) -> Result<(), repl::Error> {
-        if let Some(last_input_num) = tick_data.last_input_num {
-            //debug!("got correction for {}", last_input_num);
+        if let Some(last_input_tick) = tick_data.last_input_tick {
+            //debug!("got correction for {}", last_input_tick);
 
             // The server informs us that this `tick_data` contains state after executing our input
-            // number `last_input_num`.
+            // number `last_input_tick`.
 
             // Forget older log entries
-            for &log_input_num in &self.entries.keys().cloned().collect::<Vec<_>>() {
-                if log_input_num < last_input_num {
-                    self.entries.remove(&log_input_num);
+            for &log_input_tick in &self.entries.keys().cloned().collect::<Vec<_>>() {
+                if log_input_tick < last_input_tick {
+                    self.entries.remove(&log_input_tick);
                 }
             }
 
             // If the tick data contains a snapshot, we can correct our prediction
             if let Some(auth_snapshot) = tick_data.snapshot.as_ref() {
                 // Calculate prediction error
-                let distance = if let Some(log_entry) = self.entries.get(&last_input_num) {
+                let distance = if let Some(log_entry) = self.entries.get(&last_input_tick) {
                     log_entry.snapshot.distance(&auth_snapshot)?
                 } else {
                     return Err(repl::Error::Replication(format!(
                         "Received prediction correction for input num {}\
                          but we have no log entry for that",
-                        last_input_num,
+                        last_input_tick,
                     )));
                 };
 
@@ -101,13 +101,13 @@ impl Log {
                     self.reset(world, auth_snapshot);
 
                     // Now apply our recorded inputs again
-                    for (&log_input_num, log_entry) in &self.entries {
+                    for (&log_input_tick, log_entry) in &self.entries {
                         // TODO
-                        if log_input_num <= last_input_num {
+                        if log_input_tick <= last_input_tick {
                             continue;
                         }
 
-                        //debug!("replaying {}", log_input_num);
+                        //debug!("replaying {}", log_input_tick);
 
                         input::auth::run_player_input(
                             world,
@@ -135,7 +135,7 @@ impl Log {
         &mut self,
         world: &mut World,
         physics_runner: &mut physics::sim::Runner,
-        tick_num: TickNum,
+        tick: TickNum,
         tick_data: &tick::Data<game::EntitySnapshot>,
         input: &PlayerInput,
     ) -> Result<(), repl::Error> {
@@ -146,11 +146,11 @@ impl Log {
         let ignore = world.write_resource::<event::Sink>().set_ignore(true);
 
         input::auth::run_player_input(world, physics_runner, self.my_player_id, input)?;
-        //debug!("running {}", tick_num);
+        //debug!("running {}", tick);
 
         world.write_resource::<event::Sink>().set_ignore(ignore);
 
-        self.record(world, tick_num, input);
+        self.record(world, tick, input);
 
         Ok(())
     }
