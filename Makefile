@@ -58,3 +58,5 @@ fmt:
 	cd hooks_common; cargo fmt
 	cd hooks_server; cargo fmt
 	cd hooks_game; cargo fmt
+	cd hooks_util; cargo fmt
+	cd hooks_show; cargo fmt

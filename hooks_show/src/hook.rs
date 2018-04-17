@@ -8,13 +8,13 @@ use ggez::graphics::{self, Drawable};
 
 use particle_frenzy;
 
-use hooks_util::profile;
 use hooks_common::event::Event;
+use hooks_common::game::entity::hook;
 use hooks_common::physics::{Orientation, Position};
 use hooks_common::repl::EntityMap;
-use hooks_common::game::entity::hook;
+use hooks_util::profile;
 
-use {Input, Output, Registry, with_transform};
+use {with_transform, Input, Output, Registry};
 
 /// Draw joints for debugging.
 pub fn register_show(reg: &mut Registry) {

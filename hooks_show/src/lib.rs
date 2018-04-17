@@ -15,23 +15,23 @@ extern crate specs;
 extern crate specs_derive;
 
 mod camera;
-mod rect;
-mod wall;
+pub mod debug;
+mod entity;
 mod hook;
 mod player;
-mod entity;
-pub mod debug;
+mod rect;
+mod wall;
 
-use nalgebra::{Point2, Matrix4};
+use nalgebra::{Matrix4, Point2};
 
 use specs::prelude::{Entity, World};
 
 use ggez::graphics::{self, DrawMode, Mesh};
 
-use hooks_util::profile;
-use hooks_common::{Event, GameInfo, PlayerId};
 use hooks_common::physics::Position;
 use hooks_common::repl::player::Players;
+use hooks_common::{Event, GameInfo, PlayerId};
+use hooks_util::profile;
 
 use self::camera::Camera;
 
@@ -129,10 +129,10 @@ impl Registry {
 pub fn with_transform<F, T>(
     ctx: &mut ggez::Context,
     transform: Matrix4<f32>,
-    f: F
+    f: F,
 ) -> ggez::error::GameResult<T>
 where
-    F: FnOnce(&mut ggez::Context) -> ggez::error::GameResult<T>
+    F: FnOnce(&mut ggez::Context) -> ggez::error::GameResult<T>,
 {
     let current_transform = graphics::get_transform(ctx);
     graphics::push_transform(ctx, Some(current_transform * transform));

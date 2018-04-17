@@ -4,11 +4,11 @@ use specs::prelude::{Join, ReadStorage, SystemData, World};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use hooks_util::profile;
-use hooks_common::game::entity::player::{Player, WIDTH, HEIGHT};
+use hooks_common::game::entity::player::{Player, HEIGHT, WIDTH};
 use hooks_common::physics::{Orientation, Position};
+use hooks_util::profile;
 
-use {Input, Registry, with_transform};
+use {with_transform, Input, Registry};
 
 pub fn register_show(reg: &mut Registry) {
     reg.draw_fn(draw);
@@ -45,7 +45,10 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
         )?;
 
         with_transform(ctx, matrix, |ctx| {
-            input.assets.rect_towards_x_fill.draw(ctx, Point2::origin(), 0.0)
+            input
+                .assets
+                .rect_towards_x_fill
+                .draw(ctx, Point2::origin(), 0.0)
         })?;
     }
 

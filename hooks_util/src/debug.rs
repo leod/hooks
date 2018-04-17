@@ -1,5 +1,5 @@
-use std::io::Write;
 use std::fmt;
+use std::io::Write;
 
 // TODO: Consider lazy evaluation of inspection with a visitor trait.
 
