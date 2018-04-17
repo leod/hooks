@@ -9,8 +9,37 @@ use game::entity::wall;
 use physics::{AngularVelocity, Position, Velocity};
 use repl;
 
+fn create_wall_rect(world: &mut World, center: Point2<f32>, size: Vector2<f32>) {
+    let d = 20.0;
+
+    wall::create(
+        world,
+        center - Vector2::new(0.0, size.y - d) / 2.0,
+        Vector2::new(size.x, d),
+        0.0,
+    );
+    wall::create(
+        world,
+        center + Vector2::new(0.0, size.y + d) / 2.0,
+        Vector2::new(size.x, d),
+        0.0,
+    );
+    wall::create(
+        world,
+        center - Vector2::new(size.x - d, 0.0) / 2.0,
+        Vector2::new(size.y, d),
+        f32::consts::PI / 2.0,
+    );
+    wall::create(
+        world,
+        center + Vector2::new(size.x + d, 0.0) / 2.0,
+        Vector2::new(size.y, d),
+        f32::consts::PI / 2.0,
+    );
+}
+
 fn create_state(world: &mut World) {
-    let n_walls = 200;
+    /*let n_walls = 200;
     let mut rng = IsaacRng::new_unseeded();
 
     for _ in 0..n_walls {
@@ -25,7 +54,9 @@ fn create_state(world: &mut World) {
         let angle = rng.gen::<f32>() * f32::consts::PI;
 
         wall::create(world, pos, size, angle);
-    }
+    }*/
+
+    create_wall_rect(world, Point2::new(0.0, 0.0), Vector2::new(2000.0, 2000.0));
 }
 
 pub mod auth {

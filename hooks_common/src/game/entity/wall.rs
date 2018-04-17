@@ -27,7 +27,7 @@ pub fn create(
     assert!(size.x > 0.0);
     assert!(size.y > 0.0);
 
-    let shape = Cuboid::new(size);
+    let shape = Cuboid::new(size / 2.0);
 
     let mut groups = CollisionGroups::new();
     groups.set_membership(&[collision::GROUP_WALL]);
@@ -40,7 +40,7 @@ pub fn create(
             builder
                 .with(Position(pos))
                 .with(Orientation(angle))
-                .with(Size(size * 2.0))
+                .with(Size(size))
                 .with(collision::Shape(ShapeHandle::new(shape)))
                 .with(collision::Object { groups, query_type })
         });

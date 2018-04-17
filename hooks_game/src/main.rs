@@ -260,7 +260,7 @@ fn main() {
     let mut reg = Registry::new();
     register(&mut reg, client.game_info());
 
-    let game = Game::new(reg, client.my_player_id(), client.game_info(), true);
+    let game = Game::new(reg, client.my_player_id(), client.game_info(), false);
 
     // Initialize ggez
     let ctx = &mut ContextBuilder::new("hooks-frenzy", "leod")
