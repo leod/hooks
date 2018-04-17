@@ -4,13 +4,13 @@ use specs::prelude::{Join, ReadStorage, SystemData, VecStorage, World};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use hooks_util::profile;
 use hooks_common;
-use hooks_common::repl;
 use hooks_common::entity::Active;
 use hooks_common::physics::{Orientation, Position};
+use hooks_common::repl;
+use hooks_util::profile;
 
-use {Input, Registry, with_transform};
+use {with_transform, Input, Registry};
 
 pub fn register(reg: &mut hooks_common::Registry) {
     reg.component::<Draw>();

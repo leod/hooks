@@ -3,11 +3,11 @@
 //!
 //! Currently, a thread local variable is used to collect statistics.
 
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::collections::VecDeque;
 use std::f32;
 use std::fmt;
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::collections::BTreeMap;
 
 use debug;
 

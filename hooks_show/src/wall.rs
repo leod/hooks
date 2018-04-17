@@ -4,11 +4,11 @@ use specs::prelude::{Join, ReadStorage, SystemData, World};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use hooks_util::profile;
 use hooks_common::game::entity::wall;
 use hooks_common::physics::{Orientation, Position};
+use hooks_util::profile;
 
-use {Input, Registry, with_transform};
+use {with_transform, Input, Registry};
 
 pub fn register_show(reg: &mut Registry) {
     reg.draw_fn(draw);
@@ -48,7 +48,12 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
         })?;
 
         let outline = 10.0;
-        let scaling = Matrix4::from_diagonal(&Vector4::new(size.0.x - outline, size.0.y - outline, 1.0, 1.0));
+        let scaling = Matrix4::from_diagonal(&Vector4::new(
+            size.0.x - outline,
+            size.0.y - outline,
+            1.0,
+            1.0,
+        ));
         let matrix = isometry.to_homogeneous() * scaling;
         graphics::set_color(
             ctx,

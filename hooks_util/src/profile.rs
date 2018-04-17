@@ -5,14 +5,16 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use timer;
 use debug;
+use timer;
 
 thread_local!(pub static PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new()));
 
 #[macro_export]
 macro_rules! profile {
-    ($name:expr) => (let _guard = profile::PROFILER.with(|p| p.borrow_mut().enter($name));)
+    ($name:expr) => {
+        let _guard = profile::PROFILER.with(|p| p.borrow_mut().enter($name));
+    };
 }
 
 pub struct Node {
@@ -132,17 +134,15 @@ impl debug::Inspect for Node {
             timer::duration_to_secs(root.duration_sum)
         });
         //let name = if self.pred.is_some() { "".to_string() } else { self.name.to_string() };
-        let mut vars = vec![
-            (
-                ":".to_string(),
-                debug::Vars::Leaf(format!(
-                    "{:3.2}% {:>4.2}ms/call {:.2}Hz",
-                    percent,
-                    duration_sum_secs * 1000.0 / (self.num_calls as f32),
-                    self.num_calls as f32 / root_duration_sum_secs
-                )),
-            ),
-        ];
+        let mut vars = vec![(
+            ":".to_string(),
+            debug::Vars::Leaf(format!(
+                "{:3.2}% {:>4.2}ms/call {:.2}Hz",
+                percent,
+                duration_sum_secs * 1000.0 / (self.num_calls as f32),
+                self.num_calls as f32 / root_duration_sum_secs
+            )),
+        )];
 
         if !self.succs.is_empty() {
             let mut succs = Vec::new();
