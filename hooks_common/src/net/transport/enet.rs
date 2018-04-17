@@ -87,6 +87,7 @@ impl transport::Host for Host {
                 let id = Peer(event.peer).id();
                 match self.peers.entry(id) {
                     btree_map::Entry::Occupied(entry) => {
+                        //info!("removing {}", id);
                         entry.remove();
                         Ok(Some(Event::Disconnect(id)))
                     }
@@ -109,6 +110,7 @@ impl transport::Host for Host {
     }
 
     fn disconnect(&mut self, peer_id: PeerId, data: u32) -> Result<(), Error> {
+        //info!("disconnecting {}", peer_id);
         let peer = self.peers
             .get(&peer_id)
             .ok_or(Error::InvalidPeerId(peer_id))?;

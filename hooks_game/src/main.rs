@@ -12,13 +12,14 @@ extern crate specs;
 
 use std::{env, io, path, thread};
 
-use nalgebra::{Point2, Vector2};
+use nalgebra::{Point2, Point3, Vector2};
 
 use ggez::event::{self, Keycode, MouseButton};
 use ggez::graphics::Font;
 use ggez::{conf, ContextBuilder};
 
 use hooks_common::defs::{GameInfo, PlayerInput};
+use hooks_common::physics::Position;
 use hooks_common::registry::Registry;
 use hooks_game::client::Client;
 use hooks_game::game::Game;
@@ -125,9 +126,23 @@ impl MainState {
                     x.max(0).min(size_x as i32) as f32,
                     y.max(0).min(size_y as i32) as f32,
                 );
-                let shift = clip - size / 2.0;
+                let point = clip - size / 2.0;
+                let world = self.game.world();
+                let pos = if let Some(my_entity) = self.show.my_player_entity(world) {
+                    let positions = world.read::<Position>();
+                    if let Some(position) = positions.get(my_entity) {
+                        let pos = Point3::new(clip.x, clip.y, 0.0) -
+                            self.show.camera().similarity() *
+                                Point3::new(position.0.coords.x, position.0.coords.y, 0.0);
+                        Vector2::new(pos.x, pos.y)
+                    } else {
+                        point
+                    }
+                } else {
+                    point
+                };
 
-                self.next_player_input.rot_angle = shift.y.atan2(shift.x)
+                self.next_player_input.rot_angle = pos.y.atan2(pos.x)
             }
             event::Event::MouseButtonDown {
                 mouse_btn: MouseButton::Left,
@@ -267,6 +282,7 @@ fn main() {
         .window_mode(
             conf::WindowMode::default()
                 .dimensions(1600, 900)
+                //.fullscreen_type(conf::FullscreenType::True)
                 .vsync(true),
         )
         .build()

@@ -9,8 +9,9 @@ pub fn register(reg: &mut hooks_common::Registry) {
 
     entity::add_ctor(reg, "test", |builder| {
         builder.with(rect::Draw {
-            width: 30.0,
-            height: 30.0,
+            width: 200.0,
+            height: 200.0,
+            fill: true,
         })
     });
 
@@ -18,6 +19,7 @@ pub fn register(reg: &mut hooks_common::Registry) {
         builder.with(rect::Draw {
             width: player::WIDTH,
             height: player::HEIGHT,
+            fill: false,
         })
     });
 

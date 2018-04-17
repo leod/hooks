@@ -25,6 +25,7 @@ pub fn register_show(reg: &mut Registry) {
 pub struct Draw {
     pub width: f32,
     pub height: f32,
+    pub fill: bool,
 }
 
 type DrawData<'a> = (
@@ -71,7 +72,11 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
         graphics::set_color(ctx, color)?;
 
         with_transform(ctx, matrix, |ctx| {
-            input.assets.rect_line.draw(ctx, Point2::origin(), 0.0)
+            if draw.fill {
+                input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)
+            } else {
+                input.assets.rect_line.draw(ctx, Point2::origin(), 0.0)
+            }
         })?;
     }
 

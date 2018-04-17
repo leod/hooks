@@ -264,7 +264,11 @@ impl Show {
         self.input.assets
     }
 
-    fn my_player_entity(&self, world: &World) -> Option<Entity> {
+    pub fn camera(&self) -> &Camera {
+        &self.camera
+    }
+
+    pub fn my_player_entity(&self, world: &World) -> Option<Entity> {
         let players = world.read_resource::<Players>();
 
         if let Some(player) = players.get(self.my_player_id) {

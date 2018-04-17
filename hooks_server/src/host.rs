@@ -94,7 +94,7 @@ impl Host {
         let host = lag_loss::Host::new(
             host,
             lag_loss::Config {
-                lag: Duration::from_millis(50),
+                lag: Duration::from_millis(0),
                 loss: 0.0,
             },
         );
