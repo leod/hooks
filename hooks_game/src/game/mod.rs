@@ -1,5 +1,5 @@
 use std::io::Cursor;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bit_manager::BitReader;
 use rand::{self, Rng};
@@ -65,7 +65,7 @@ pub struct Game {
     tick_timer: Timer,
 
     /// When do we expect to receive the next snapshot?
-    recv_snapshot_timer: Timer,
+    receive_snapshot_timer: Timer,
 
     /// Number of last started tick.
     last_tick: Option<TickNum>,
@@ -78,7 +78,7 @@ pub struct Game {
     interp_tick: Option<TickNum>,
 
     /// Newest tick of which we know that the server knows that we have received it.
-    server_recv_ack_tick: Option<TickNum>,
+    server_receive_ack_tick: Option<TickNum>,
 }
 
 pub fn register(reg: &mut Registry, game_info: &GameInfo) {
@@ -113,7 +113,7 @@ impl Game {
             game_runner,
             tick_history,
             tick_timer: Timer::new(game_info.tick_duration()),
-            recv_snapshot_timer: Timer::new(
+            receive_snapshot_timer: Timer::new(
                 game_info
                     .tick_duration()
                     .checked_mul(game_info.ticks_per_snapshot)
@@ -122,7 +122,7 @@ impl Game {
             last_tick: None,
             last_snapshot_tick: None,
             interp_tick: None,
-            server_recv_ack_tick: None,
+            server_receive_ack_tick: None,
         }
     }
 
@@ -134,7 +134,12 @@ impl Game {
         &mut self.game_state.world
     }
 
-    fn on_received_tick(&mut self, client: &mut Client, data: Vec<u8>) -> Result<(), Error> {
+    fn on_received_tick(
+        &mut self,
+        client: &mut Client,
+        data: Vec<u8>,
+        receive_instant: Instant,
+    ) -> Result<(), Error> {
         stats::record("tick bytes", data.len() as f32);
 
         let mut reader = BitReader::new(Cursor::new(data));
@@ -154,22 +159,28 @@ impl Game {
             //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
             assert!(self.tick_history.max_num() == Some(new_tick_num));
 
-            let timer_error = timer::duration_to_secs(self.recv_snapshot_timer.accum()) -
-                timer::duration_to_secs(self.recv_snapshot_timer.period());
-            stats::record("recv timer error", timer_error);
+            let timer_error = timer::duration_to_secs(self.receive_snapshot_timer.accum()) -
+                timer::duration_to_secs(self.receive_snapshot_timer.period());
+            stats::record("receive timer error", timer_error);
 
-            self.recv_snapshot_timer.reset();
+            // Reset timer for when we expect the next snapshot packet
+            self.receive_snapshot_timer.reset();
 
-            if rand::thread_rng().gen() {
-                // TMP: For testing delta encoding/decoding!
-                let reply = ClientGameMsg::ReceivedTick(new_tick_num);
-                client.send_game(reply)?;
-            }
+            // ... accounting for the fact that some time may have elapsed since we received this
+            // packet and handling it now
+            // TODO: This would not be necessary if we handled the package immediately in a
+            //       background thread. This would also have the advantage of sending the server
+            //       our `ReceivedTicket` quicker, which would allow it to use more recent ticks as
+            //       the basis of delta encoding.
+            self.receive_snapshot_timer += Instant::now().duration_since(receive_instant);
+
+            let reply = ClientGameMsg::ReceivedTick(new_tick_num);
+            client.send_game(reply)?;
 
             if let Some(old_tick_num) = old_tick_num {
                 // The fact that we have received a new delta encoded tick means that
                 // the server knows that we have the tick w.r.t. which it was encoded.
-                self.server_recv_ack_tick = Some(old_tick_num);
+                self.server_receive_ack_tick = Some(old_tick_num);
             }
         }
 
@@ -249,8 +260,8 @@ impl Game {
                     client::Event::Disconnected => {
                         return Ok(Some(Event::Disconnected));
                     }
-                    client::Event::ServerGameMsg(data) => {
-                        self.on_received_tick(client, data)?;
+                    client::Event::ServerGameMsg(data, receive_instant) => {
+                        self.on_received_tick(client, data, receive_instant)?;
                     }
                 }
             }
@@ -259,10 +270,10 @@ impl Game {
         // Remove ticks from our history that:
         // 1. We know for sure will not be used by the server as a reference for delta encoding.
         // 2. We have already started.
-        match (self.last_snapshot_tick, self.server_recv_ack_tick) {
-            (Some(last_snapshot_tick), Some(server_recv_ack_tick)) => {
+        match (self.last_snapshot_tick, self.server_receive_ack_tick) {
+            (Some(last_snapshot_tick), Some(server_receive_ack_tick)) => {
                 self.tick_history
-                    .prune_older_ticks(server_recv_ack_tick.min(last_snapshot_tick));
+                    .prune_older_ticks(server_receive_ack_tick.min(last_snapshot_tick));
             }
             _ => {}
         }
@@ -274,17 +285,14 @@ impl Game {
             if let Some(last_tick) = self.last_tick {
                 let tick_duration = self.game_info.tick_duration_secs();
                 let cur_time = last_tick as f32 * tick_duration + self.tick_timer.accum_secs();
-                let recv_snapshot_time =
-                    max_tick as f32 * tick_duration + self.recv_snapshot_timer.accum_secs();
+                let receive_snapshot_time =
+                    max_tick as f32 * tick_duration + self.receive_snapshot_timer.accum_secs();
                 let target_lag_time = self.target_lag_ticks as f32 * tick_duration;
-                let cur_lag_time = recv_snapshot_time - cur_time;
+                let cur_lag_time = receive_snapshot_time - cur_time;
                 let lag_time_error = target_lag_time - cur_lag_time;
 
-                let warp_thresh = 0.01; // 10ms
-                let max_warp = 2.0;
-                let min_warp = 0.5;
-
-                /*let warp_factor = if lag_time_error < warp_thresh {
+                /*let warp_thresh = 0.01; // 10ms
+                let warp_factor = if lag_time_error < warp_thresh {
                     1.5
                 } else if lag_time_error > -warp_thresh {
                     1.0 / 1.5
@@ -294,7 +302,7 @@ impl Game {
 
                 let warp_factor = 0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (lag_time_error / 0.05).exp());
 
-                self.recv_snapshot_timer += delta;
+                self.receive_snapshot_timer += delta;
                 self.tick_timer +=
                     timer::secs_to_duration(timer::duration_to_secs(delta) * warp_factor);
 
@@ -430,8 +438,8 @@ impl debug::Inspect for Game {
             ("interp_tick".to_string(), self.interp_tick.inspect()),
             ("last tick".to_string(), self.last_tick.inspect()),
             (
-                "server recv ack tick".to_string(),
-                self.server_recv_ack_tick.inspect(),
+                "server receive ack tick".to_string(),
+                self.server_receive_ack_tick.inspect(),
             ),
         ])
     }
