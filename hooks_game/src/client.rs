@@ -187,6 +187,13 @@ impl Client {
         }
     }
 
+    pub fn ping_secs(&self) -> f32 {
+        let peers = self.host.peers();
+        let locked_peers = peers.lock().unwrap();
+
+        locked_peers.get(&self.peer_id).unwrap().ping_secs()
+    }
+
     fn send_comm(host: &mut MyHost, peer_id: PeerId, msg: ClientCommMsg) -> Result<(), Error> {
         let data = {
             let mut writer = BitWriter::new(Vec::new());

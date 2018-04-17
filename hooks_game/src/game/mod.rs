@@ -44,9 +44,6 @@ impl From<repl::Error> for Error {
 pub struct Game {
     game_info: GameInfo,
 
-    /// How many ticks we want to lag behind the server, so that we can interpolate.
-    target_lag_ticks: TickNum,
-
     my_player_id: PlayerId,
 
     /// The complete state of the game.
@@ -93,8 +90,6 @@ pub enum Event {
     TickStarted(Vec<Box<event::Event>>),
 }
 
-pub const TARGET_LAG_SNAPSHOTS: TickNum = 2;
-
 impl Game {
     pub fn new(reg: Registry, my_player_id: PlayerId, game_info: &GameInfo, predict: bool) -> Game {
         let mut game_state = game::State::from_registry(reg);
@@ -106,7 +101,6 @@ impl Game {
 
         Game {
             game_info: game_info.clone(),
-            target_lag_ticks: TARGET_LAG_SNAPSHOTS * game_info.ticks_per_snapshot,
             my_player_id,
             game_state,
             game_runner,
@@ -144,19 +138,19 @@ impl Game {
         let mut reader = BitReader::new(Cursor::new(data));
 
         let entity_classes = self.game_state.world.read_resource::<game::EntityClasses>();
-        let tick_nums = self.tick_history
+        let read_info = self.tick_history
             .delta_read_tick(&entity_classes, &mut reader)?;
 
-        if let Some((old_tick_num, new_tick_num, last_input_num)) = tick_nums {
-            if let Some(last_input_num) = last_input_num {
+        if let Some(read_info) = read_info {
+            if let Some(last_input_tick) = read_info.last_input_tick {
                 stats::record(
                     "input delay ticks",
-                    new_tick_num as f32 - last_input_num as f32,
+                    read_info.tick as f32 - last_input_tick as f32,
                 );
             }
 
             //debug!("New tick {} w.r.t. {:?}", new_tick_num, old_tick_num);
-            assert!(self.tick_history.max_num() == Some(new_tick_num));
+            assert!(self.tick_history.max_num() == Some(read_info.tick));
 
             let timer_error = timer::duration_to_secs(self.receive_snapshot_timer.accum()) -
                 timer::duration_to_secs(self.receive_snapshot_timer.period());
@@ -173,13 +167,13 @@ impl Game {
             //       the basis of delta encoding.
             self.receive_snapshot_timer += Instant::now().duration_since(receive_instant);
 
-            let reply = ClientGameMsg::ReceivedTick(new_tick_num);
+            let reply = ClientGameMsg::ReceivedTick(read_info.tick);
             client.send_game(reply)?;
 
-            if let Some(old_tick_num) = old_tick_num {
+            if let Some(reference_tick) = read_info.reference_tick {
                 // The fact that we have received a new delta encoded tick means that
                 // the server knows that we have the tick w.r.t. which it was encoded.
-                self.server_receive_ack_tick = Some(old_tick_num);
+                self.server_receive_ack_tick = Some(reference_tick);
             }
         }
 
@@ -204,7 +198,12 @@ impl Game {
         self.last_tick = Some(tick);
 
         // Inform the server
-        client.send_game(ClientGameMsg::StartedTick(tick, player_input.clone()))?;
+        let target_tick = self.game_info.input_target_tick(client.ping_secs(), tick);
+        client.send_game(ClientGameMsg::StartedTick {
+            tick,
+            target_tick,
+            input: player_input.clone(),
+        })?;
 
         let tick_data = self.tick_history.get(tick).unwrap();
 
@@ -286,7 +285,8 @@ impl Game {
                 let cur_time = last_tick as f32 * tick_duration + self.tick_timer.accum_secs();
                 let receive_snapshot_time =
                     max_tick as f32 * tick_duration + self.receive_snapshot_timer.accum_secs();
-                let target_lag_time = self.target_lag_ticks as f32 * tick_duration;
+                let target_lag_time =
+                    self.game_info.client_target_lag_ticks() as f32 * tick_duration;
                 let cur_lag_time = receive_snapshot_time - cur_time;
                 let lag_time_error = target_lag_time - cur_lag_time;
 
@@ -310,11 +310,14 @@ impl Game {
                 stats::record("time lag current", cur_lag_time);
                 stats::record("time lag error", lag_time_error);
                 stats::record("time warp factor", warp_factor);
-                stats::record("lag ticks target", self.target_lag_ticks as f32);
+                stats::record(
+                    "lag ticks target",
+                    self.game_info.client_target_lag_ticks() as f32,
+                );
                 stats::record("lag ticks current", (max_tick - last_tick) as f32);
                 stats::record(
                     "lag ticks error",
-                    (max_tick - last_tick) as f32 - self.target_lag_ticks as f32,
+                    (max_tick - last_tick) as f32 - self.game_info.client_target_lag_ticks() as f32,
                 );
 
                 // Start ticks

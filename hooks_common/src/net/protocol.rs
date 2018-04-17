@@ -48,12 +48,20 @@ pub enum TimeMsg {
 
 #[derive(Debug, Clone, BitStore)]
 pub enum ClientGameMsg {
-    /// Client sends input for a tick.
-    PlayerInput(PlayerInput),
-
     /// Client acknowledges having received a tick.
     ReceivedTick(TickNum),
 
     /// Client started a tick.
-    StartedTick(TickNum, PlayerInput),
+    StartedTick {
+        /// Tick which the client started.
+        tick: TickNum,
+
+        /// Tick in which the client estimates that the server will execute the input. This should
+        /// always be larger than `tick`. This is currently just used for debugging, but might have
+        /// a future purpose in adjusting time.
+        target_tick: TickNum,
+
+        /// The input to be executed.
+        input: PlayerInput,
+    },
 }

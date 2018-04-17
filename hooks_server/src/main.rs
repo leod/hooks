@@ -27,6 +27,8 @@ fn main() {
         ticks_per_snapshot: 2,
         map_info,
         player_entity_class: "player".to_string(),
+        server_target_lag_inputs: 1,
+        client_target_lag_snapshots: 2,
     };
     let config = server::Config {
         port: 32444,
