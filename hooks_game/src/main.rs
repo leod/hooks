@@ -10,7 +10,6 @@ extern crate log;
 extern crate nalgebra;
 extern crate specs;
 
-use std::time::Duration;
 use std::{env, io, path, thread};
 
 use nalgebra::{Point2, Point3, Vector2};
@@ -192,7 +191,10 @@ impl MainState {
                 Keycode::F2 => self.show_profiler = !self.show_profiler,
                 Keycode::F3 => self.show_stats = !self.show_stats,
                 Keycode::P => {
-                    PROFILER.with(|p| p.borrow().inspect().print(&mut io::stdout()));
+                    PROFILER.with(|p| {
+                        p.borrow().inspect().print(&mut io::stdout());
+                        p.borrow_mut().reset();
+                    });
                 }
                 _ => {}
             },
