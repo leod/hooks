@@ -6,6 +6,7 @@ use specs::prelude::*;
 use specs::storage::BTreeStorage;
 
 use defs::{EntityId, GameInfo, PlayerId, PlayerInput, INVALID_ENTITY_ID};
+use event::{self, Event};
 use game::entity::hook;
 use game::ComponentType;
 use physics::collision::{self, CollisionGroups, Cuboid, GeometricQueryType, ShapeHandle};
@@ -20,6 +21,8 @@ pub fn register(reg: &mut Registry) {
     reg.component::<CurrentInput>();
     reg.component::<Player>();
     reg.component::<State>();
+
+    reg.event::<DashedEvent>();
 
     repl::entity::register_class(
         reg,
@@ -85,6 +88,19 @@ pub const TAP_SECS: f32 = 0.25;
 pub const DASH_SECS: f32 = 0.3;
 pub const DASH_COOLDOWN_SECS: f32 = 2.0;
 pub const DASH_ACCEL: f32 = 10000.0;
+
+#[derive(Debug, Clone, BitStore)]
+pub struct DashedEvent {
+    /// Different hook colors for drawing.
+    pub hook_index: u32,
+}
+
+impl Event for DashedEvent {
+    fn class(&self) -> event::Class {
+        event::Class::Order
+    }
+}
+
 
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
