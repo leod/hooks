@@ -46,7 +46,6 @@ impl From<bit_manager::Error> for Error {
 pub struct Client {
     host: MyHost,
     peer_id: PeerId,
-    my_player_id: PlayerId,
     game_info: GameInfo,
     ready: bool,
 }
@@ -81,46 +80,43 @@ impl Client {
             Self::send_comm(&mut host, peer_id, &msg)?;
 
             // Wait for accept message
-            if let Some(transport::Event::Receive(_, channel, packet)) = host.service(timeout_ms)? {
-                if channel != CHANNEL_COMM {
-                    // FIXME: In a bit of a funny situation, this is not actually an error, because
-                    // comm messages are sent reliably, while game messages are sent unreliably.
-                    // Thus, it can happen that we receive a game message before receiving the
-                    // acknowledgement of our connection request. So, what should we do here? Queue
-                    // the game messages and loop until we get a comm message?
-                    //
-                    // UPDATE: no, of course we can just ignore the game messages since they are
-                    // sent unreliably (TODO).
-                    return Err(Error::InvalidChannel(channel));
-                }
+            let start_instant = Instant::now();
+            while start_instant.elapsed() < Duration::from_millis(timeout_ms.into()) {
+                match host.service(10)? {
+                    Some(transport::Event::Receive(_, channel, packet)) => {
+                        if channel != CHANNEL_COMM {
+                            // Ignore any unreliable messages while connecting
+                            continue;
+                        }
 
-                let reply = Self::read_comm(packet.data())?;
-
-                #[allow(unreachable_patterns)]
-                match reply {
-                    ServerCommMsg::AcceptConnect {
-                        your_id: my_player_id,
-                        game_info,
-                    } => {
-                        // We are in!
-                        Ok(Client {
-                            host,
-                            peer_id,
-                            my_player_id,
-                            game_info,
-                            ready: false,
-                        })
+                        let reply = Self::read_comm(packet.data())?;
+                        return match reply {
+                            ServerCommMsg::AcceptConnect { game_info } => {
+                                // We are in!
+                                Ok(Client {
+                                    host,
+                                    peer_id,
+                                    game_info,
+                                    ready: false,
+                                })
+                            }
+                            reply => Err(Error::FailedToConnect(format!(
+                                "received message {:?} instead of accepted connection",
+                                reply
+                            ))),
+                        };
                     }
-                    reply => Err(Error::FailedToConnect(format!(
-                        "received message {:?} instead of accepted connection",
-                        reply
-                    ))),
+                    Some(_) => {
+                        return Err(Error::FailedToConnect(
+                            "did not receive message after connection wish".to_string(),
+                        ))
+                    }
+                    None => {}
                 }
-            } else {
-                Err(Error::FailedToConnect(
-                    "did not receive message after connection wish".to_string(),
-                ))
             }
+            Err(Error::FailedToConnect(
+                "timeout while waiting for reply after connection wish".to_string(),
+            ))
         } else {
             Err(Error::FailedToConnect(
                 "could not connect to server".to_string(),
@@ -128,19 +124,50 @@ impl Client {
         }
     }
 
-    pub fn my_player_id(&self) -> PlayerId {
-        self.my_player_id
-    }
-
     pub fn game_info(&self) -> &GameInfo {
         &self.game_info
     }
 
-    pub fn ready(&mut self) -> Result<(), Error> {
+    /// This should be called after all resources of the game have been loaded. We tell the server
+    /// that we are ready to join the game. As a result, we hope to get a `JoinGame` message,
+    /// including our player id.
+    pub fn ready(&mut self, timeout_ms: u32) -> Result<PlayerId, Error> {
         assert!(!self.ready, "already ready");
 
         self.ready = true;
-        Self::send_comm(&mut self.host, self.peer_id, &ClientCommMsg::Ready)
+
+        Self::send_comm(&mut self.host, self.peer_id, &ClientCommMsg::Ready)?;
+
+        // Wait for accept message
+        let start_instant = Instant::now();
+        while start_instant.elapsed() < Duration::from_millis(timeout_ms.into()) {
+            match self.host.service(10)? {
+                Some(transport::Event::Receive(_, channel, packet)) => {
+                    if channel != CHANNEL_COMM {
+                        // Ignore any unreliable messages while connecting
+                        continue;
+                    }
+
+                    let reply = Self::read_comm(packet.data())?;
+                    return match reply {
+                        ServerCommMsg::JoinGame { your_player_id } => Ok(your_player_id),
+                        reply => Err(Error::FailedToConnect(format!(
+                            "received message {:?} instead of accepted join",
+                            reply
+                        ))),
+                    };
+                }
+                Some(_) => {
+                    return Err(Error::FailedToConnect(
+                        "did not receive message after wanting to join game".to_string(),
+                    ))
+                }
+                None => {}
+            }
+        }
+        Err(Error::FailedToConnect(
+            "timeout while waiting for reply after wanting to join game".to_string(),
+        ))
     }
 
     pub fn update(&mut self, delta: Duration) -> Result<(), Error> {
@@ -167,6 +194,7 @@ impl Client {
 
                         match msg {
                             ServerCommMsg::AcceptConnect { .. } => Err(Error::UnexpectedCommMsg),
+                            ServerCommMsg::JoinGame { .. } => Err(Error::UnexpectedCommMsg),
                         }
                     } else if channel == CHANNEL_GAME {
                         // Game messages are relayed

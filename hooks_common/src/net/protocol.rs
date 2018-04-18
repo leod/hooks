@@ -34,10 +34,10 @@ pub enum ClientCommMsg {
 #[derive(Debug, Clone, BitStore)]
 pub enum ServerCommMsg {
     /// Response to `WishConnect`: Server accepts the connection request.
-    AcceptConnect {
-        your_id: PlayerId,
-        game_info: GameInfo,
-    },
+    AcceptConnect { game_info: GameInfo },
+
+    /// Response to `Ready`: Server lets us join the game.
+    JoinGame { your_player_id: PlayerId },
 }
 
 #[derive(Debug, Clone, BitStore)]

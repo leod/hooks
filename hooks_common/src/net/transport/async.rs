@@ -177,7 +177,7 @@ fn background_thread<H, D>(
     loop {
         //thread::yield_now();
         // TODO: Sleep in background thread?
-        thread::sleep(Duration::from_millis(1));
+        //thread::sleep(Duration::from_millis(1));
 
         match receiver.try_recv() {
             Ok(Command::Send(peer_id, channel_id, packet_flag, data)) => {

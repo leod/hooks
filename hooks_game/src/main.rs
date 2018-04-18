@@ -10,6 +10,7 @@ extern crate log;
 extern crate nalgebra;
 extern crate specs;
 
+use std::time::Duration;
 use std::{env, io, path, thread};
 
 use nalgebra::{Point2, Point3, Vector2};
@@ -269,22 +270,6 @@ fn main() {
     };
     let timeout_ms = 5000;
 
-    // Connect to server
-    let mut client = Client::connect(&config.host, config.port, &config.name, timeout_ms).unwrap();
-    info!(
-        "Connected to {}:{} with player id {} and game info {:?}",
-        config.host,
-        config.port,
-        client.my_player_id(),
-        client.game_info()
-    );
-
-    // Register and create game
-    let mut reg = Registry::new();
-    register(&mut reg, client.game_info());
-
-    let game = Game::new(reg, client.my_player_id(), client.game_info(), false);
-
     // Initialize ggez
     let ctx = &mut ContextBuilder::new("hooks-frenzy", "leod")
         .window_mode(
@@ -304,13 +289,32 @@ fn main() {
         info!("Loading resources from {:?}", path);
     }
 
-    let assets = Assets::new(ctx).unwrap();
-    let size = ggez::graphics::get_size(ctx);
-    let show = Show::load(ctx, size, client.my_player_id(), client.game_info(), assets).unwrap();
-    let font = Font::default_font().unwrap();
+    // Connect to server
+    let mut client = Client::connect(&config.host, config.port, &config.name, timeout_ms).unwrap();
+    info!(
+        "Connected to {}:{} with game info {:?}",
+        config.host,
+        config.port,
+        client.game_info()
+    );
 
     // Inform the server that we are good to go
-    client.ready().unwrap();
+    // TODO: Ready should be sent only when we have loaded all the necessary assets/maps
+    //       (Show/Game require my_player_id at construction time, need to refactor)
+    let my_player_id = client.ready(timeout_ms).unwrap();
+
+    info!("Joined game with id {}", my_player_id);
+
+    let assets = Assets::new(ctx).unwrap();
+    let size = ggez::graphics::get_size(ctx);
+    let show = Show::load(ctx, size, my_player_id, client.game_info(), assets).unwrap();
+    let font = Font::default_font().unwrap();
+
+    // Register and create game
+    let mut reg = Registry::new();
+    register(&mut reg, client.game_info());
+
+    let game = Game::new(reg, my_player_id, client.game_info(), false);
 
     let mut state = MainState {
         client,

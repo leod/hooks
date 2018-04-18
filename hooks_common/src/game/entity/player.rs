@@ -101,7 +101,6 @@ impl Event for DashedEvent {
     }
 }
 
-
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
 #[storage(BTreeStorage)]
