@@ -23,21 +23,20 @@ fn main() {
 
     let timeout_ms = 5000;
 
-    let quit_prob = 0.0;
     let shoot_prob = 0.01;
     let move_prob = 0.95;
     let rot_speed = 0.1;
 
-    let mut quit_timer = Timer::new(Duration::from_millis(2000));
+    let mut quit_timer = Timer::new(Duration::from_secs(10000));
 
     loop {
         let mut client = Client::connect(&host, port, &name, timeout_ms).unwrap();
+        let my_player_id = client.ready(timeout_ms).unwrap();
 
         let mut reg = Registry::new();
         hooks_game::game::register(&mut reg, client.game_info());
 
-        let mut game = Game::new(reg, client.my_player_id(), client.game_info(), false);
-        client.ready().unwrap();
+        let mut game = Game::new(reg, my_player_id, client.game_info(), false);
 
         let mut update_stopwatch = Stopwatch::new();
         let mut player_input = PlayerInput::default();
@@ -47,7 +46,8 @@ fn main() {
             let update_duration = update_stopwatch.get_reset();
             quit_timer += update_duration;
 
-            if quit_timer.trigger() && rng.gen::<f64>() < quit_prob {
+            let quit_prob = 1.0 - (-quit_timer.progress() as f64).exp();
+            if rng.gen::<f64>() < quit_prob {
                 break;
             }
 

@@ -209,7 +209,7 @@ impl Host {
     fn new(handle: *mut ENetHost) -> Host {
         Host {
             handle,
-            next_peer_id: 1,
+            next_peer_id: 100,
             peers: BTreeMap::new(),
         }
     }

@@ -6,9 +6,11 @@ use bit_manager::BitWriter;
 
 use shred::{Fetch, RunNow};
 
-use hooks_common::net::protocol::ClientGameMsg;
+use hooks_common::net::protocol::{ClientGameMsg, ServerCommMsg};
+use hooks_common::net::transport::PeerId;
 use hooks_common::registry::Registry;
 use hooks_common::repl::{player, tick};
+use hooks_common::INVALID_PLAYER_ID;
 use hooks_common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
                    TickDeltaNum, TickNum};
 use hooks_util::profile;
@@ -41,6 +43,10 @@ struct LastRanInput {
 }
 
 struct Player {
+    /// Unique in-game id. Note that this can be different from the `PeerId`, since bots can have
+    /// player ids as well.
+    id: PlayerId,
+
     /// Tick in which this player joined the game.
     join_tick: TickNum,
 
@@ -66,12 +72,13 @@ struct Player {
 }
 
 impl Player {
-    pub fn new(join_tick: TickNum, event_reg: event::Registry) -> Player {
+    pub fn new(id: PeerId, join_tick: TickNum, event_reg: &event::Registry) -> Player {
         Player {
+            id,
             join_tick,
             last_ack_tick: None,
             last_started_tick: None,
-            tick_history: tick::History::new(event_reg),
+            tick_history: tick::History::new(event_reg.clone()),
             queued_events: event::Sink::new(),
             queued_inputs: BTreeMap::new(),
             last_ran_input: None,
@@ -83,7 +90,8 @@ pub struct Game {
     game_state: game::State,
     game_runner: game::run::AuthRunner,
 
-    players: BTreeMap<PlayerId, Player>,
+    next_player_id: PlayerId,
+    players: BTreeMap<PeerId, Player>,
 
     /// Timer to start the next tick.
     tick_timer: Timer,
@@ -121,6 +129,7 @@ impl Game {
         Game {
             game_state,
             game_runner,
+            next_player_id: INVALID_PLAYER_ID + 1,
             players: BTreeMap::new(),
             tick_timer: Timer::new(game_info.tick_duration()),
             next_tick: 1,
@@ -138,7 +147,7 @@ impl Game {
         let update_duration = self.update_stopwatch.get_reset();
 
         // Detect players that are lagged too far behind
-        for (&player_id, player) in &self.players {
+        for (&peer_id, player) in &self.players {
             let num_delta = if let Some(last_ack_tick) = player.last_ack_tick {
                 assert!(last_ack_tick < self.next_tick);
                 self.next_tick - last_ack_tick
@@ -155,11 +164,11 @@ impl Game {
                 info!(
                     "Player {}'s last acknowledged tick is {} ticks (ca. {:?}) in the past. \
                      Forcefully disconnecting.",
-                    player_id,
+                    player.id,
                     num_delta,
                     self.tick_timer.period() * num_delta
                 );
-                host.force_disconnect(player_id, LeaveReason::Lagged)?;
+                host.force_disconnect(peer_id, LeaveReason::Lagged)?;
             }
         }
 
@@ -181,8 +190,18 @@ impl Game {
 
     fn handle_event(&mut self, host: &mut Host, event: host::Event) -> Result<(), host::Error> {
         match event {
-            host::Event::PlayerJoined(player_id, name) => {
-                assert!(!self.players.contains_key(&player_id));
+            host::Event::PlayerJoined(peer_id, name) => {
+                assert!(!self.players.contains_key(&peer_id));
+
+                let player_id = self.next_player_id;
+                self.next_player_id += 1;
+
+                host.send_comm(
+                    peer_id,
+                    &ServerCommMsg::JoinGame {
+                        your_player_id: player_id,
+                    },
+                );
 
                 let player_info = PlayerInfo::new(name.clone());
 
@@ -194,16 +213,20 @@ impl Game {
                     info: player_info,
                 });
 
-                let mut player = Player::new(self.next_tick, self.game_state.event_reg.clone());
+                let mut player = Player::new(
+                    player_id,
+                    self.next_tick,
+                    &self.game_state.event_reg.clone(),
+                );
 
                 // Send additional `JoinedEvent`s only for the new player, in the first tick
                 // that it receives
                 self.queue_player_list(&mut player);
 
-                self.players.insert(player_id, player);
+                self.players.insert(peer_id, player);
             }
-            host::Event::PlayerLeft(player_id, reason) => {
-                assert!(self.players.contains_key(&player_id));
+            host::Event::PlayerLeft(peer_id, reason) => {
+                let player_id = self.players[&peer_id].id;
 
                 // Inform game state on server and clients of player leaving
                 self.queued_events.push(player::LeftEvent {
@@ -211,11 +234,11 @@ impl Game {
                     reason,
                 });
 
-                self.players.remove(&player_id);
+                self.players.remove(&peer_id);
             }
-            host::Event::ClientGameMsg(player_id, msg, receive_instant) => {
-                assert!(self.players.contains_key(&player_id));
-                self.handle_client_game_msg(host, player_id, msg, receive_instant)?;
+            host::Event::ClientGameMsg(peer_id, msg, receive_instant) => {
+                assert!(self.players.contains_key(&peer_id));
+                self.handle_client_game_msg(host, peer_id, msg, receive_instant)?;
             }
         }
 
@@ -225,14 +248,14 @@ impl Game {
     fn handle_client_game_msg(
         &mut self,
         host: &mut Host,
-        player_id: PlayerId,
+        peer_id: PeerId,
         msg: ClientGameMsg,
         receive_instant: Instant,
     ) -> Result<(), host::Error> {
         match msg {
             ClientGameMsg::ReceivedTick(tick_num) => {
                 // Client has acknowledged a tick
-                let player = self.players.get_mut(&player_id).unwrap();
+                let player = self.players.get_mut(&peer_id).unwrap();
 
                 if tick_num >= self.next_tick {
                     // Invalid tick number! Forcefully disconnect the client.
@@ -241,10 +264,10 @@ impl Game {
                     warn!(
                         "Player {} says he received tick {}, but we will start\
                          tick {} next, disconnecting",
-                        player_id, tick_num, self.next_tick
+                        player.id, tick_num, self.next_tick
                     );
 
-                    return host.force_disconnect(player_id, LeaveReason::InvalidMsg);
+                    return host.force_disconnect(peer_id, LeaveReason::InvalidMsg);
                 }
 
                 // Since game messages are unreliable, it is possible that we receive
@@ -272,10 +295,10 @@ impl Game {
                         warn!(
                             "Player {} has acknowledged the non-snapshot tick {},\
                              disconnecting",
-                            player_id, tick_num
+                            player.id, tick_num
                         );
 
-                        return host.force_disconnect(player_id, LeaveReason::InvalidMsg);
+                        return host.force_disconnect(player.id, LeaveReason::InvalidMsg);
                     }
                 }
             }
@@ -284,18 +307,18 @@ impl Game {
                 target_tick,
                 input,
             } => {
+                let player = self.players.get_mut(&peer_id).unwrap();
+
                 if started_tick >= self.next_tick {
                     // Got input for a tick that we haven't even started yet!
                     warn!(
                         "Player {} says he started tick {}, but we will start\
                          tick {} next, disconnecting",
-                        player_id, started_tick, self.next_tick
+                        player.id, started_tick, self.next_tick
                     );
 
-                    return host.force_disconnect(player_id, LeaveReason::InvalidMsg);
+                    return host.force_disconnect(peer_id, LeaveReason::InvalidMsg);
                 }
-
-                let player = self.players.get_mut(&player_id).unwrap();
 
                 let is_new_tick: bool = match player.last_started_tick {
                     Some(last_started_tick) => {
@@ -303,10 +326,10 @@ impl Game {
                             // Player started tick twice!
                             warn!(
                                 "Player {} started tick {} twice, disconnecting",
-                                player_id, started_tick
+                                player.id, started_tick
                             );
 
-                            return host.force_disconnect(player_id, LeaveReason::InvalidMsg);
+                            return host.force_disconnect(peer_id, LeaveReason::InvalidMsg);
                         }
 
                         // Input might have been received out of order, ignore older
@@ -359,16 +382,9 @@ impl Game {
         let next_tick = self.next_tick;
 
         let mut inputs = Vec::new();
-        for (&player_id, player) in &mut self.players {
+        for (&peer_id, player) in &mut self.players {
             // TODO: Proper player input buffering
-            let ping_secs = host.get_ping_secs(player_id).unwrap();
-
-            /*debug!(
-                "ping={}, next={}, delay={}",
-                ping_secs,
-                next_tick,
-                delay_ticks,
-            );*/
+            let ping_secs = host.get_ping_secs(peer_id).unwrap();
 
             let player_inputs = player
                 .queued_inputs
@@ -376,13 +392,6 @@ impl Game {
                 .map(|(&client_tick, input)| {
                     // NOTE: This map should be monotonic in the tick
                     let target_tick = game_info.input_target_tick(ping_secs, client_tick);
-
-                    /*debug!(
-                        "\ttick={}, target={}",
-                        tick,
-                        target_tick,
-                    );*/
-
                     (target_tick, client_tick, input.clone())
                 })
                 .filter(|&(target_tick, _, _)| target_tick <= next_tick)
@@ -391,7 +400,7 @@ impl Game {
             if player_inputs.len() > 1 {
                 debug!(
                     "player {}: input jump of {} (tick {})",
-                    player_id,
+                    player.id,
                     player_inputs.len(),
                     next_tick,
                 );
@@ -401,7 +410,7 @@ impl Game {
                 if next_tick != input.target_tick {
                     debug!(
                         "run player {} input from tick {} in {} vs. client-estimated {}",
-                        player_id, client_tick, next_tick, input.target_tick,
+                        player.id, client_tick, next_tick, input.target_tick,
                     );
                 }
 
@@ -417,13 +426,13 @@ impl Game {
                 }
 
                 inputs.extend(player_inputs.iter().map(|&(target_tick, _, ref input)| {
-                    (target_tick, (player_id, input.input.clone()))
+                    (target_tick, (player.id, input.input.clone()))
                 }));
             } else if let Some(last_ran_input) = player.last_ran_input.clone() {
                 debug!(
                     "player {}: no input (tick {}), filling (from tick {}) \
                      with {} queued starting at {:?}",
-                    player_id,
+                    player.id,
                     next_tick,
                     last_ran_input.server_tick,
                     player.queued_inputs.len(),
@@ -439,11 +448,11 @@ impl Game {
                 });
 
                 // TODO: Which target tick to specify when filling input?
-                inputs.push((next_tick, (player_id, last_ran_input.input.input.clone())));
+                inputs.push((next_tick, (player.id, last_ran_input.input.input.clone())));
             } else {
                 debug!(
                     "player {}: no input (tick {}), can't fill",
-                    player_id, next_tick,
+                    player.id, next_tick,
                 );
             }
         }
@@ -465,7 +474,7 @@ impl Game {
         let tick_events = tick_events.unwrap();
 
         // Record tick in history and send snapshots for every player
-        profile!("send");
+        profile!("tick history");
 
         let entity_classes = self.game_state.world.read_resource::<game::EntityClasses>();
         let send_snapshot = self.next_tick % self.game_info().ticks_per_snapshot == 0;
@@ -485,7 +494,7 @@ impl Game {
             None
         };
 
-        for (&player_id, player) in &mut self.players {
+        for (&peer_id, player) in &mut self.players {
             // Events for this player are the special queued events as well as the shared
             // events of this tick
             let mut player_events = mem::replace(&mut player.queued_events, event::Sink::new());
@@ -526,7 +535,7 @@ impl Game {
                 profile!("send");
 
                 let buffer = writer.into_inner()?;
-                host.send_game(player_id, buffer)?;
+                host.send_game(peer_id, buffer)?;
 
                 //mem::replace(&mut self.write_buffer, buffer);
             }
@@ -544,9 +553,9 @@ impl Game {
         // events have not been processed in a tick yet) with the regular shared events.
         let other_players = self.game_state.world.read_resource::<player::Players>();
 
-        for (&other_id, other_player) in other_players.iter() {
+        for (&other_player_id, other_player) in other_players.iter() {
             new_player.queued_events.push(player::JoinedEvent {
-                id: other_id,
+                id: other_player_id,
                 info: other_player.info.clone(),
             });
         }
