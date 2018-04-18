@@ -277,7 +277,7 @@ fn main() {
         .window_mode(
             conf::WindowMode::default()
                 .dimensions(1600, 900)
-                //.fullscreen_type(conf::FullscreenType::True)
+                .fullscreen_type(conf::FullscreenType::True)
                 .vsync(true),
         )
         .build()

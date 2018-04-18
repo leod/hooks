@@ -26,7 +26,10 @@ pub mod auth {
                 let mut rng = rand::thread_rng();
 
                 // TODO: Spawn points here
-                let pos = Point2::new(rng.next_f32() * 200.00, rng.next_f32() * 200.0);
+                let pos = Point2::new(
+                    rng.next_f32() * 200.00 - 100.0,
+                    rng.next_f32() * 200.0 - 100.0,
+                );
                 entity::player::auth::create(world, player_id, pos);
             }
         }

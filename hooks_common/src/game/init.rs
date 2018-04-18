@@ -67,14 +67,12 @@ fn create_state(world: &mut World) {
         Vector2::new(1500.0, 20.0),
         0.0,
     );
-
     wall::create(
         world,
         Point2::new(-2000.0, 0.0),
         Vector2::new(1000.0, 20.0),
         f32::consts::PI / 2.0,
     );
-
     wall::create(
         world,
         Point2::new(2000.0, 0.0),
@@ -102,53 +100,32 @@ pub mod auth {
 
         /*repl::entity::auth::create(world, 0, "test", |builder| {
             builder
-                .with(Position(Point2::origin()))
-                .with(Velocity(Vector2::new(100.0, 0.0)))
-                .with(AngularVelocity(0.0))
-                .with(test::auth::Test(2.5, 5.0))
-        });
-        repl::entity::auth::create(world, 0, "test", |builder| {
-            builder
-                .with(Position(Point2::new(0.0, 200.0)))
-                .with(Velocity(Vector2::new(200.0, 0.0)))
-                .with(AngularVelocity(0.1))
-                .with(test::auth::Test(2.5, 5.0))
-        });
-        repl::entity::auth::create(world, 0, "test", |builder| {
-            builder
-                .with(Position(Point2::new(50.0, 400.0)))
-                .with(Velocity(Vector2::new(50.0, 0.0)))
-                .with(AngularVelocity(0.1))
-                .with(test::auth::Test(2.5, 5.0))
-        });*/
-        repl::entity::auth::create(world, 0, "test", |builder| {
-            builder
                 .with(Position(Point2::new(100.0, 600.0)))
                 .with(Velocity(Vector2::new(50.0, 0.0)))
                 .with(AngularVelocity(5.0))
                 .with(test::auth::Test(2.5, 5.0))
-        });
+        });*/
         repl::entity::auth::create(world, 0, "test", |builder| {
             builder
-                .with(Position(Point2::new(-50.0, 400.0)))
+                .with(Position(Point2::new(0.0, 300.0)))
                 .with(Velocity(Vector2::new(0.0, 0.0)))
                 .with(AngularVelocity(5.0))
                 .with(test::auth::Test(2.5, 5.0))
         });
         repl::entity::auth::create(world, 0, "test", |builder| {
             builder
-                .with(Position(Point2::new(100.0, -200.0)))
-                .with(Velocity(Vector2::new(200.0, 200.0)))
-                .with(AngularVelocity(0.5))
+                .with(Position(Point2::new(-900.0, -100.0)))
+                .with(Velocity(Vector2::new(0.0, 200.0)))
+                .with(AngularVelocity(0.0))
                 .with(test::auth::Test(2.5, 5.0))
         });
-        repl::entity::auth::create(world, 0, "test", |builder| {
+        /*repl::entity::auth::create(world, 0, "test", |builder| {
             builder
                 .with(Position(Point2::new(100.0, 0.0)))
                 .with(Velocity(Vector2::new(400.0, 0.0)))
                 .with(AngularVelocity(0.5))
                 .with(test::auth::Test(0.5, 1.0))
-        });
+        });*/
     }
 }
 
