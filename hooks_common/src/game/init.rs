@@ -74,6 +74,19 @@ fn create_state(world: &mut World) {
         Vector2::new(1000.0, 20.0),
         f32::consts::PI / 2.0,
     );
+
+    wall::create(
+        world,
+        Point2::new(2000.0, 0.0),
+        Vector2::new(3000.0, 20.0),
+        0.0,
+    );
+    wall::create(
+        world,
+        Point2::new(4500.0, 0.0),
+        Vector2::new(3000.0, 20.0),
+        0.0,
+    );
 }
 
 pub mod auth {

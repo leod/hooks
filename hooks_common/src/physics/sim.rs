@@ -311,6 +311,8 @@ impl<'a> System<'a> for CorrectVelocitySys {
 
     #[cfg_attr(rustfmt, rustfmt_skip)] // rustfmt bug
     fn run(&mut self, mut data: Self::SystemData) {
+        profile!("correct velocity");
+
         let dt = data.game_info.tick_duration_secs();
 
         for (_, position, old_position, velocity) in
@@ -412,6 +414,8 @@ impl<'a> System<'a> for HandleContactsSys {
             velocity,
         ): Self::SystemData
     ) {
+        profile!("handle contacts");
+
         for (oa, ob, gen) in collision_world.contact_pairs() {
             let mut contacts = Vec::new();
             gen.contacts(&mut contacts);
@@ -521,6 +525,8 @@ impl<'a> System<'a> for SolveConstraintsSys {
             mut orientation,
         ): Self::SystemData
     ) {
+        profile!("solve");
+
         for _ in 0..NUM_ITERATIONS {
             for c in &constraints.0 {
                 stats::record("constraints", constraints.0.len() as f32);

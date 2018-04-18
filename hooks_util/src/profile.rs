@@ -1,5 +1,5 @@
 // This module's implementation has been inspired by hprof:
-// <https://cmr.github.io/hprof/src/hprof/lib.rs.html#306-308>
+// <https://cmr.github.io/hprof/src/hprof/lib.rs.html>
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -82,6 +82,9 @@ impl Profiler {
             "should start frame at root profiling node"
         );
 
+        // This enables easily resetting profiling data in `reset`
+        self.current = self.root.clone();
+
         let mut current = self.current.borrow_mut();
         current.enter()
     }
@@ -109,6 +112,10 @@ impl Profiler {
         self.current.borrow_mut().enter()
     }
 
+    pub fn reset(&mut self) {
+        self.root = Rc::new(RefCell::new(Node::new("root", None)));
+    }
+
     fn leave(&mut self) {
         self.current.borrow_mut().leave();
 
@@ -133,7 +140,7 @@ impl debug::Inspect for Node {
             let root = p.root.borrow();
             timer::duration_to_secs(root.duration_sum)
         });
-        //let name = if self.pred.is_some() { "".to_string() } else { self.name.to_string() };
+
         let mut vars = vec![(
             ":".to_string(),
             debug::Vars::Leaf(format!(

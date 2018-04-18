@@ -14,6 +14,8 @@ use ncollide::query::algorithms::{JohnsonSimplex, VoronoiSimplex2, VoronoiSimple
 use ncollide::shape::{self, Ball, Plane, ShapeHandle2};
 use ncollide::world::{CollisionObjectHandle, CollisionWorld2};
 
+use hooks_util::profile;
+
 use entity;
 use physics::{Orientation, Position};
 use registry::Registry;
@@ -102,6 +104,8 @@ impl<'a> System<'a> for UpdateSys {
         &mut self,
         (mut collision_world, position, orientation, object_handle): Self::SystemData,
     ) {
+        profile!("collision update");
+
         // Update isometry of entities that have moved or rotated
         position.populate_modified(&mut self.modified_position_id, &mut self.modified_position);
         orientation.populate_modified(
@@ -153,6 +157,8 @@ impl<'a> System<'a> for MaintainSys {
     type SystemData = (FetchMut<'a, CollisionWorld>, MaintainData<'a>);
 
     fn run(&mut self, (mut collision_world, mut data): Self::SystemData) {
+        profile!("collision maintain");
+
         // Create newly active entities in collision world
         let new_handles = (
             &*data.entities,
