@@ -816,7 +816,6 @@ pub fn run_input_post_sim(world: &World) -> Result<(), repl::Error> {
 
             if segment_violation {
                 active_state.segment_violations += 1;
-                debug!("{}", active_state.segment_violations);
 
                 if active_state.segment_violations as f32 * data.game_info.tick_duration_secs() >
                     MAX_VIOLATION_SECS

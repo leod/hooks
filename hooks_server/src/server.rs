@@ -16,6 +16,7 @@ use host::{self, Host};
 pub struct Config {
     pub port: u16,
     pub game_info: GameInfo,
+    pub num_bots: usize,
 }
 
 pub struct Server {
@@ -37,7 +38,22 @@ impl Server {
         );
 
         let host = Host::create(config.port, &config.game_info)?;
-        let game = Game::new(&config.game_info);
+        let mut game = Game::new(&config.game_info);
+
+        if config.num_bots > 0 {
+            game.add_bot("alphasnd");
+        }
+        if config.num_bots > 1 {
+            game.add_bot("freak");
+        }
+        if config.num_bots > 2 {
+            game.add_bot("andre");
+        }
+        if config.num_bots > 3 {
+            for i in 0..config.num_bots - 3 {
+                game.add_bot(&format!("bot{}", i));
+            }
+        }
 
         Ok(Server {
             profile: true,
