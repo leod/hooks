@@ -65,7 +65,8 @@ struct Player {
     /// joined players of existing players, with a stack of `PlayerJoined` events.
     queued_events: event::Sink,
 
-    /// Inputs received from the client.
+    /// Inputs received from the client. The key of the map is the tick in which the client
+    /// executed the input.
     queued_inputs: BTreeMap<TickNum, TimedInput>,
 
     /// Last input that has been executed from this client, if any.
@@ -83,6 +84,86 @@ impl Player {
             queued_events: event::Sink::new(),
             queued_inputs: BTreeMap::new(),
             last_ran_input: None,
+        }
+    }
+
+    /// Retreives the inputs that should be executed in the next input, popping from the
+    /// `queued_inputs`. We also remember the player's last executed input in this function.
+    ///
+    /// The result is a list of inputs, together with the tick in which they were meant to be
+    /// executed (target tick) . If all timing things go well, this should have exactly one
+    /// element where the target tick is the tick the server will start next.
+    pub fn pop_inputs_to_be_run(
+        &mut self,
+        game_info: &GameInfo,
+        ping_secs: f32,
+        next_tick: TickNum,
+    ) -> Vec<(TickNum, PlayerInput)> {
+        // TODO: Proper player input buffering. This is a crude estimate based on ping, but I'm
+        //       sure this can be done better.
+
+        let ripe_inputs = self.queued_inputs
+            .iter()
+            .map(|(&client_tick, input)| {
+                // NOTE: This map should be monotonic in the tick
+                let target_tick = game_info.input_target_tick(ping_secs, client_tick);
+                (target_tick, client_tick, input.clone())
+            })
+            .filter(|&(target_tick, _, _)| target_tick <= next_tick)
+            .collect::<Vec<_>>();
+
+        if ripe_inputs.len() > 1 {
+            debug!(
+                "player {}: input jump of {} (tick {})",
+                self.id,
+                ripe_inputs.len(),
+                next_tick,
+            );
+        }
+
+        if let Some(&(_, client_tick, ref input)) = ripe_inputs.last() {
+            if next_tick != input.target_tick {
+                debug!(
+                    "run player {} input from tick {} in {} vs. client-estimated {}",
+                    self.id, client_tick, next_tick, input.target_tick,
+                );
+            }
+
+            // Remember the last input we run
+            self.last_ran_input = Some(LastRanInput {
+                client_tick,
+                server_tick: next_tick,
+                input: input.clone(),
+            });
+
+            for &(_, client_tick, _) in &ripe_inputs {
+                self.queued_inputs.remove(&client_tick).unwrap();
+            }
+
+            ripe_inputs
+                .iter()
+                .map(|&(target_tick, _, ref input)| (target_tick, input.input.clone()))
+                .collect()
+        } else if let Some(last_ran_input) = self.last_ran_input.clone() {
+            debug!(
+                "player {}: no input (tick {}), filling (from tick {}) \
+                 with {} queued starting at {:?}",
+                self.id,
+                next_tick,
+                last_ran_input.server_tick,
+                self.queued_inputs.len(),
+                self.queued_inputs.iter().next().map(|input| *input.0),
+            );
+
+            // TODO: Which target tick to specify when filling input?
+            vec![(next_tick, last_ran_input.input.input.clone())]
+        } else {
+            debug!(
+                "player {}: no input (tick {}), can't fill",
+                self.id, next_tick,
+            );
+
+            Vec::new()
         }
     }
 }
@@ -353,25 +434,25 @@ impl Game {
 
                 if is_new_tick {
                     player.last_started_tick = Some(started_tick);
-                }
 
-                /*// If we don't receive a player's inputs, we fill by repeating the
-                // previous input to get smoother behaviour. If the tick of that input
-                // does arrive later, we should ignore it here.
-                let is_new_input: bool = match &player.last_ran_input {
-                    &Some(ref last_input) => started_tick > last_input.client_tick,
-                    &None => true,
-                };*/
+                    /*// If we don't receive a player's inputs, we fill by repeating the
+                    // previous input to get smoother behaviour. If the tick of that input
+                    // does arrive later, we ignore it here.
+                    let is_new_input: bool = match &player.last_ran_input {
+                        &Some(ref last_input) => started_tick > last_input.client_tick,
+                        &None => true,
+                    };*/
 
-                let is_new_input: bool = true;
+                    let is_new_input: bool = true;
 
-                if is_new_input {
-                    let timed_input = TimedInput {
-                        target_tick,
-                        input: input.clone(),
-                        receive_instant,
-                    };
-                    player.queued_inputs.insert(started_tick, timed_input);
+                    if is_new_input {
+                        let timed_input = TimedInput {
+                            target_tick,
+                            input: input.clone(),
+                            receive_instant,
+                        };
+                        player.queued_inputs.insert(started_tick, timed_input);
+                    }
                 }
             }
         }
@@ -396,78 +477,14 @@ impl Game {
 
         let mut inputs = Vec::new();
         for (&peer_id, player) in &mut self.players {
-            // TODO: Proper player input buffering
             let ping_secs = host.get_ping_secs(peer_id).unwrap();
 
-            let player_inputs = player
-                .queued_inputs
-                .iter()
-                .map(|(&client_tick, input)| {
-                    // NOTE: This map should be monotonic in the tick
-                    let target_tick = game_info.input_target_tick(ping_secs, client_tick);
-                    (target_tick, client_tick, input.clone())
-                })
-                .filter(|&(target_tick, _, _)| target_tick <= next_tick)
-                .collect::<Vec<_>>();
-
-            if player_inputs.len() > 1 {
-                debug!(
-                    "player {}: input jump of {} (tick {})",
-                    player.id,
-                    player_inputs.len(),
-                    next_tick,
-                );
-            }
-
-            if let Some(&(_, client_tick, ref input)) = player_inputs.last() {
-                if next_tick != input.target_tick {
-                    debug!(
-                        "run player {} input from tick {} in {} vs. client-estimated {}",
-                        player.id, client_tick, next_tick, input.target_tick,
-                    );
-                }
-
-                // Remember the last input we run
-                player.last_ran_input = Some(LastRanInput {
-                    client_tick,
-                    server_tick: next_tick,
-                    input: input.clone(),
-                });
-
-                for &(_, client_tick, _) in &player_inputs {
-                    player.queued_inputs.remove(&client_tick).unwrap();
-                }
-
-                inputs.extend(player_inputs.iter().map(|&(target_tick, _, ref input)| {
-                    (target_tick, (player.id, input.input.clone()))
-                }));
-            } else if let Some(last_ran_input) = player.last_ran_input.clone() {
-                debug!(
-                    "player {}: no input (tick {}), filling (from tick {}) \
-                     with {} queued starting at {:?}",
-                    player.id,
-                    next_tick,
-                    last_ran_input.server_tick,
-                    player.queued_inputs.len(),
-                    player.queued_inputs.iter().next().map(|input| *input.0),
-                );
-
-                player.last_ran_input = Some(LastRanInput {
-                    /*// This would've been the client's next input.
-                    client_tick: last_ran_input.client_tick + 1,*/
-                    client_tick: last_ran_input.client_tick,
-                    server_tick: next_tick,
-                    input: last_ran_input.input.clone(),
-                });
-
-                // TODO: Which target tick to specify when filling input?
-                inputs.push((next_tick, (player.id, last_ran_input.input.input.clone())));
-            } else {
-                debug!(
-                    "player {}: no input (tick {}), can't fill",
-                    player.id, next_tick,
-                );
-            }
+            inputs.extend(
+                player
+                    .pop_inputs_to_be_run(&game_info, ping_secs, next_tick)
+                    .into_iter()
+                    .map(|(target_tick, input)| (target_tick, (player.id, input))),
+            );
         }
 
         inputs
