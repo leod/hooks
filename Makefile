@@ -1,5 +1,5 @@
 TARGET="target/"
-N_STRESS=3
+N_STRESS=5
 
 all: build
 
@@ -44,14 +44,6 @@ stress-release: build-release
 		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_server | grep -v \"EPA did not converge\"; cat"' \; \
 		split-window -h 'bash -c "sleep 1; RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_game | grep -v \"EPA did not converge\"; cat"' \; \
 		split-window -h 'bash -c "sleep 1; scripts/random_bots.sh '${N_STRESS}' release; cat"' \; \
-		select-layout even-horizontal
-
-stress: build
-	cargo build -j8 --examples
-	tmux \
-		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_server; cat"' \; \
-		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/debug/hooks_game &> game.log; cat"' \; \
-		split-window -h 'bash -c "for i in {1..'${N_STRESS}'}; do echo $i; target/debug/examples/random_bot & done ; cat"' \; \
 		select-layout even-horizontal
 
 fmt:

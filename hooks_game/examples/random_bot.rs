@@ -27,7 +27,7 @@ fn main() {
     let move_prob = 0.95;
     let rot_speed = 0.1;
 
-    let mut quit_timer = Timer::new(Duration::from_secs(10000));
+    let mut quit_timer = Timer::new(Duration::from_secs(100000));
 
     loop {
         let mut client = Client::connect(&host, port, &name, timeout_ms).unwrap();
