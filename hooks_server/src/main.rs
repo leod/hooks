@@ -10,6 +10,7 @@ extern crate log;
 extern crate rand;
 extern crate shred;
 
+mod bot;
 mod game;
 mod host;
 mod server;
@@ -33,6 +34,7 @@ fn main() {
     let config = server::Config {
         port: 32444,
         game_info,
+        num_bots: 30,
     };
 
     let mut server = Server::create(&config).unwrap();

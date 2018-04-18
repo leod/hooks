@@ -16,6 +16,7 @@ use hooks_common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInf
 use hooks_util::profile;
 use hooks_util::timer::{Stopwatch, Timer};
 
+use bot::Bot;
 use host::{self, Host};
 
 #[derive(Clone, Debug)]
@@ -92,6 +93,7 @@ pub struct Game {
 
     next_player_id: PlayerId,
     players: BTreeMap<PeerId, Player>,
+    bots: Vec<(PlayerId, Bot)>,
 
     /// Timer to start the next tick.
     tick_timer: Timer,
@@ -131,6 +133,7 @@ impl Game {
             game_runner,
             next_player_id: INVALID_PLAYER_ID + 1,
             players: BTreeMap::new(),
+            bots: Vec::new(),
             tick_timer: Timer::new(game_info.tick_duration()),
             next_tick: 1,
             update_stopwatch: Stopwatch::new(),
@@ -141,6 +144,13 @@ impl Game {
 
     pub fn game_info(&self) -> Fetch<GameInfo> {
         self.game_state.world.read_resource::<GameInfo>()
+    }
+
+    pub fn add_bot(&mut self, name: &str) -> PlayerId {
+        let player_id = self.register_player(name);
+        self.bots.push((player_id, Bot::default()));
+
+        player_id
     }
 
     pub fn update(&mut self, host: &mut Host) -> Result<(), host::Error> {
@@ -188,30 +198,33 @@ impl Game {
         Ok(())
     }
 
+    /// Generate an id for a new player and notify the game logic about it in the next tick.
+    fn register_player(&mut self, name: &str) -> PlayerId {
+        let id = self.next_player_id;
+        self.next_player_id += 1;
+
+        let info = PlayerInfo::new(name.to_string());
+
+        // At the start of the next tick, all players will receive an event that a new
+        // player has joined. This induces the repl player management on server and
+        // clients --- including the newly connected client.
+        self.queued_events.push(player::JoinedEvent { id, info });
+
+        id
+    }
+
     fn handle_event(&mut self, host: &mut Host, event: host::Event) -> Result<(), host::Error> {
         match event {
             host::Event::PlayerJoined(peer_id, name) => {
                 assert!(!self.players.contains_key(&peer_id));
 
-                let player_id = self.next_player_id;
-                self.next_player_id += 1;
-
+                let player_id = self.register_player(&name);
                 host.send_comm(
                     peer_id,
                     &ServerCommMsg::JoinGame {
                         your_player_id: player_id,
                     },
-                );
-
-                let player_info = PlayerInfo::new(name.clone());
-
-                // At the start of the next tick, all players will receive an event that a new
-                // player has joined. This induces the repl player management on server and
-                // clients --- including the newly connected client.
-                self.queued_events.push(player::JoinedEvent {
-                    id: player_id,
-                    info: player_info,
-                });
+                )?;
 
                 let mut player = Player::new(
                     player_id,
@@ -460,10 +473,14 @@ impl Game {
         inputs
             .sort_by(|&(target_tick_a, _), &(target_tick_b, _)| target_tick_a.cmp(&target_tick_b));
 
-        let inputs = inputs
+        let mut inputs = inputs
             .iter()
             .map(|&(_, ref player_input)| player_input.clone())
-            .collect();
+            .collect::<Vec<_>>();
+
+        for &mut (player_id, ref mut bot) in self.bots.iter_mut() {
+            inputs.push((player_id, bot.run()));
+        }
 
         let tick_events = {
             profile!("run");

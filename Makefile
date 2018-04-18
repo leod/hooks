@@ -1,5 +1,5 @@
 TARGET="target/"
-N_STRESS=10
+N_STRESS=3
 
 all: build
 
@@ -19,8 +19,8 @@ run: build
 
 run-release: build-release
 	tmux \
-		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server; cat"' \; \
-		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_game; cat"' \; \
+		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_server | grep -v \"EPA did not converge\"; cat"' \; \
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_game | grep -v \"EPA did not converge\"; cat"' \; \
 		select-layout even-horizontal
 
 run-game: build
