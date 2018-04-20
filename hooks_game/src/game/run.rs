@@ -99,19 +99,17 @@ impl AuthRunner {
     pub fn run_tick(
         &mut self,
         state: &mut State,
-        inputs: Vec<(PlayerId, PlayerInput)>,
+        input_batches: Vec<Vec<(PlayerId, PlayerInput)>>,
     ) -> Result<Vec<Box<Event>>, repl::Error> {
         self.common.run_pre_tick(state)?;
 
         //debug!("num inputs: {}", inputs.len());
 
-        // TODO: For now, just run everyone's input here. This might need to get refined!
-        for (player_id, input) in inputs {
+        for inputs in input_batches {
             input::auth::run_player_input(
                 &mut state.world,
                 &mut self.common.physics_runner,
-                player_id,
-                &input,
+                &inputs,
             )?;
         }
 

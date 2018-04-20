@@ -190,8 +190,7 @@ impl Log {
                         input::auth::run_player_input(
                             world,
                             physics_runner,
-                            self.my_player_id,
-                            &log_entry.input,
+                            &[(self.my_player_id, log_entry.input.clone())],
                         )?;
                     }
                 }
@@ -224,7 +223,11 @@ impl Log {
         // TODO: This will need to be refined. Might want to predict only some events.
         let ignore = world.write_resource::<event::Sink>().set_ignore(true);
 
-        input::auth::run_player_input(world, physics_runner, self.my_player_id, input)?;
+        input::auth::run_player_input(
+            world,
+            physics_runner,
+            &[(self.my_player_id, input.clone())],
+        )?;
         //debug!("running {}", tick);
 
         world.write_resource::<event::Sink>().set_ignore(ignore);

@@ -475,33 +475,41 @@ impl Game {
         let game_info = self.game_info().clone();
         let next_tick = self.next_tick;
 
-        let mut inputs = Vec::new();
+        // Inputs to be executed in this new tick. Due to irregularities in ping, it can happen
+        // that we need to catch up some players here, by executing more than one input in one
+        // tick. The key of `next_inputs` is the target tick in which the input was supposed to
+        // run.
+        let mut next_inputs: BTreeMap<TickNum, Vec<(PlayerId, PlayerInput)>> = BTreeMap::new();
+
         for (&peer_id, player) in &mut self.players {
             let ping_secs = host.get_ping_secs(peer_id).unwrap();
+            let player_inputs = player.pop_inputs_to_be_run(&game_info, ping_secs, next_tick);
 
-            inputs.extend(
-                player
-                    .pop_inputs_to_be_run(&game_info, ping_secs, next_tick)
-                    .into_iter()
-                    .map(|(target_tick, input)| (target_tick, (player.id, input))),
-            );
+            for (target_tick, input) in player_inputs {
+                next_inputs
+                    .entry(target_tick)
+                    .or_default()
+                    .push((player.id, input));
+            }
         }
 
-        inputs
-            .sort_by(|&(target_tick_a, _), &(target_tick_b, _)| target_tick_a.cmp(&target_tick_b));
-
-        let mut inputs = inputs
-            .iter()
-            .map(|&(_, ref player_input)| player_input.clone())
-            .collect::<Vec<_>>();
-
+        // Let the bots have some fun too
         for &mut (player_id, ref mut bot) in self.bots.iter_mut() {
-            inputs.push((player_id, bot.run()));
+            let input = bot.run();
+            next_inputs
+                .entry(next_tick)
+                .or_default()
+                .push((player_id, input));
         }
 
         let tick_events = {
             profile!("run");
-            self.game_runner.run_tick(&mut self.game_state, inputs)
+
+            // At this point, we no longer care about the target tick num -- we only needed it to
+            // group the inputs into batches
+            let next_inputs = next_inputs.into_iter().map(|(_, inputs)| inputs).collect();
+
+            self.game_runner.run_tick(&mut self.game_state, next_inputs)
         };
 
         // Can unwrap here, since replication errors should at most happen on the client-side

@@ -104,7 +104,13 @@ impl Event for DashedEvent {
 /// Component that is attached whenever player input should be executed for an entity.
 #[derive(Component, Clone, Debug)]
 #[storage(BTreeStorage)]
-pub struct CurrentInput(pub PlayerInput);
+pub struct CurrentInput(pub PlayerInput, [bool; NUM_TAP_KEYS]);
+
+impl CurrentInput {
+    fn new(input: PlayerInput) -> CurrentInput {
+        CurrentInput(input, [false; NUM_TAP_KEYS])
+    }
+}
 
 // Tappable keys
 const MOVE_FORWARD_KEY: usize = 0;
@@ -188,11 +194,10 @@ impl State {
 
 pub fn run_input(
     world: &mut World,
-    entity: Entity,
-    input: &PlayerInput,
+    inputs: &[(PlayerId, PlayerInput, Entity)],
 ) -> Result<(), repl::Error> {
     // Update hooks
-    {
+    for &(_, ref input, entity) in inputs {
         let player = *repl::try(&world.read::<Player>(), entity)?;
         let input_state = *repl::try(&world.read::<InputState>(), entity)?;
 
@@ -221,26 +226,25 @@ pub fn run_input(
                 .write::<hook::CurrentInput>()
                 .insert(hook_entity, hook_input);
         }
-
-        hook::run_input(&world)?;
     }
+
+    hook::run_input(&world)?;
 
     // Update player
-    {
+    for &(_, ref input, entity) in inputs {
         world
             .write::<CurrentInput>()
-            .insert(entity, CurrentInput(input.clone()));
-
-        InputSys.run_now(&world.res);
+            .insert(entity, CurrentInput::new(input.clone()));
     }
+
+    InputSys.run_now(&world.res);
 
     Ok(())
 }
 
 pub fn run_input_post_sim(
     world: &mut World,
-    _entity: Entity,
-    _input: &PlayerInput,
+    _inputs: &[(PlayerId, PlayerInput, Entity)],
 ) -> Result<(), repl::Error> {
     hook::run_input_post_sim(&world)?;
 
@@ -303,8 +307,8 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 #[derive(SystemData)]
 struct InputData<'a> {
     game_info: Fetch<'a, GameInfo>,
-    input: ReadStorage<'a, CurrentInput>,
 
+    input: WriteStorage<'a, CurrentInput>,
     orientation: WriteStorage<'a, Orientation>,
     velocity: WriteStorage<'a, Velocity>,
     angular_velocity: WriteStorage<'a, AngularVelocity>,
@@ -321,8 +325,7 @@ impl<'a> System<'a> for InputSys {
         let dt = data.game_info.tick_duration_secs();
 
         // Update tap state
-        let mut tapped_keys = [false; NUM_TAP_KEYS];
-        for (input, input_state) in (&data.input, &mut data.input_state).join() {
+        for (mut input, input_state) in (&mut data.input, &mut data.input_state).join() {
             let tap_input = [
                 input.0.move_forward,
                 input.0.move_backward,
@@ -333,7 +336,7 @@ impl<'a> System<'a> for InputSys {
             for i in 0..NUM_TAP_KEYS {
                 if tap_input[i] && !input_state.previous_tap_input[i] {
                     if input_state.tap_state[i].secs_left > 0.0 {
-                        tapped_keys[i] = true;
+                        input.1[i] = true;
                         input_state.tap_state[i].secs_left = 0.0;
                     } else {
                         input_state.tap_state[i].secs_left = TAP_SECS;
@@ -362,16 +365,16 @@ impl<'a> System<'a> for InputSys {
             let forward = Rotation2::new(orientation.0).matrix() * Vector2::new(1.0, 0.0);
             let right = Vector2::new(-forward.y, forward.x);
 
-            if tapped_keys[MOVE_FORWARD_KEY] {
+            if input.1[MOVE_FORWARD_KEY] {
                 state.dash(forward);
             }
-            if tapped_keys[MOVE_BACKWARD_KEY] {
+            if input.1[MOVE_BACKWARD_KEY] {
                 state.dash(-forward);
             }
-            if tapped_keys[MOVE_RIGHT_KEY] {
+            if input.1[MOVE_RIGHT_KEY] {
                 state.dash(right);
             }
-            if tapped_keys[MOVE_LEFT_KEY] {
+            if input.1[MOVE_LEFT_KEY] {
                 state.dash(-right);
             }
 

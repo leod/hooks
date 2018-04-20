@@ -1,4 +1,4 @@
-extern crate hooks_common;
+extern crate hooks_client;
 extern crate hooks_game;
 extern crate hooks_util;
 extern crate rand;
@@ -8,11 +8,11 @@ use std::time::Duration;
 
 use rand::Rng;
 
-use hooks_common::registry::Registry;
-use hooks_common::PlayerInput;
+use hooks_game::registry::Registry;
+use hooks_game::PlayerInput;
 
-use hooks_game::client::Client;
-use hooks_game::game::{self, Game};
+use hooks_client::client::Client;
+use hooks_client::game::{self, Game};
 
 use hooks_util::timer::{Stopwatch, Timer};
 
@@ -34,7 +34,7 @@ fn main() {
         let my_player_id = client.ready(timeout_ms).unwrap();
 
         let mut reg = Registry::new();
-        hooks_game::game::register(&mut reg, client.game_info());
+        hooks_client::game::register(&mut reg, client.game_info());
 
         let mut game = Game::new(reg, my_player_id, client.game_info(), false);
 

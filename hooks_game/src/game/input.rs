@@ -10,42 +10,45 @@ pub mod auth {
     pub fn run_player_input(
         world: &mut World,
         physics_runner: &mut physics::sim::Runner,
-        player_id: PlayerId,
-        input: &PlayerInput,
+        inputs: &[(PlayerId, PlayerInput)],
     ) -> Result<(), repl::Error> {
-        // TODO: We need to be careful and limit the number of inputs that may be applied in one
-        //       tick. Currently, it is possible to explode the simulation by lagging the client
-        //       and assumably applying too many inputs at once.
-
-        let player_entity = {
+        // Take only the input of those players that currently control an entity
+        let inputs_with_entity = {
             let players = world.read_resource::<Players>();
-            players.try_get(player_id)?.entity
+
+            let mut inputs_with_entity = Vec::new();
+            for &(id, ref input) in inputs {
+                if let Some(entity) = players.try_get(id)?.entity {
+                    inputs_with_entity.push((id, input.clone(), entity));
+                }
+            }
+
+            inputs_with_entity
         };
 
-        if let Some(player_entity) = player_entity {
-            player::run_input(world, player_entity, input)?;
-        }
-
-        // Simulate only this player's entities
+        // Simulate only these players' entities
         {
             let repl_id = world.read::<repl::Id>();
             let mut update = world.write();
 
             update.clear();
 
-            for (entity, repl_id) in (&*world.entities(), &repl_id).join() {
-                if (repl_id.0).0 == player_id {
-                    update.insert(entity, Update);
+            // TODO: Maintain a separate list of repl entities for each player?
+            for &(player_id, _, _) in &inputs_with_entity {
+                for (entity, repl_id) in (&*world.entities(), &repl_id).join() {
+                    if (repl_id.0).0 == player_id {
+                        update.insert(entity, Update);
+                    }
                 }
             }
         }
 
+        player::run_input(world, &inputs_with_entity)?;
+
         physics_runner.run(world);
         physics_runner.run_interaction_events(world)?;
 
-        if let Some(player_entity) = player_entity {
-            player::run_input_post_sim(world, player_entity, input)?;
-        }
+        player::run_input_post_sim(world, &inputs_with_entity)?;
 
         Ok(())
     }
