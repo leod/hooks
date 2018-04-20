@@ -80,6 +80,36 @@ pub struct Vars {
     pub angle: bool,
 }
 
+impl Vars {
+    pub fn pose() -> Vars {
+        Vars {
+            pos: true,
+            angle: true,
+        }
+    }
+
+    pub fn pos() -> Vars {
+        Vars {
+            pos: true,
+            angle: false,
+        }
+    }
+
+    pub fn angle() -> Vars {
+        Vars {
+            pos: false,
+            angle: true,
+        }
+    }
+
+    pub fn none() -> Vars {
+        Vars {
+            pos: false,
+            angle: false,
+        }
+    }
+}
+
 /// A constraint between two entities.
 #[derive(Clone, Debug)]
 pub struct Constraint {

@@ -19,8 +19,8 @@ run: build
 
 run-release: build-release
 	tmux \
-		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_server | grep -v \"EPA did not converge\"; cat"' \; \
-		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=debug target/release/hooks_client | grep -v \"EPA did not converge\"; cat"' \; \
+		new-session 'bash -c "RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_server | grep -v \"EPA did not converge\"; cat"' \; \
+		split-window -h 'bash -c "RUST_BACKTRACE=1 RUST_LOG=info target/release/hooks_client | grep -v \"EPA did not converge\"; cat"' \; \
 		select-layout even-horizontal
 
 run-client: build

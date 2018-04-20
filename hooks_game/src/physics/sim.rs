@@ -451,9 +451,6 @@ impl<'a> System<'a> for HandleContactsSys {
                 if let Some(action) = action {
                     match action {
                         interaction::Action::PreventOverlap { rotate_a, rotate_b } => {
-                            let filter_a = filter.filter(entity_a);
-                            let filter_b = filter.filter(entity_b);
-
                             // Try to resolve the overlap with a constraint
                             let constraint = Constraint {
                                 def: constraint::Def::Contact {
@@ -466,12 +463,12 @@ impl<'a> System<'a> for HandleContactsSys {
                                 entity_a,
                                 entity_b,
                                 vars_a: constraint::Vars {
-                                    pos: filter_a,
-                                    angle: rotate_a && filter_a
+                                    pos: true,
+                                    angle: rotate_a,
                                 },
                                 vars_b: constraint::Vars {
-                                    pos: filter_b,
-                                    angle: rotate_b && filter_b
+                                    pos: true,
+                                    angle: rotate_b,
                                 },
                             };
                             constraints.add(constraint);
@@ -508,6 +505,7 @@ struct SolveConstraintsSys;
 impl<'a> System<'a> for SolveConstraintsSys {
     type SystemData = (
         Fetch<'a, Constraints>,
+        Filter<'a>,
         ReadStorage<'a, InvMass>,
         ReadStorage<'a, InvAngularMass>,
         WriteStorage<'a, Position>,
@@ -519,6 +517,7 @@ impl<'a> System<'a> for SolveConstraintsSys {
         &mut self,
         (
             constraints,
+            filter,
             inv_mass,
             inv_angular_mass,
             mut position,
@@ -553,14 +552,24 @@ impl<'a> System<'a> for SolveConstraintsSys {
                     ).unwrap();
                     let m_a = m(c.entity_a);
                     let m_b = m(c.entity_b);
+                    let vars_a = if filter.filter(c.entity_a) {
+                        c.vars_a.clone()
+                    } else {
+                        constraint::Vars::none()
+                    };
+                    let vars_b = if filter.filter(c.entity_b) {
+                        c.vars_b.clone()
+                    } else {
+                        constraint::Vars::none()
+                    };
 
                     constraint::solve_for_position(
                         &c.def,
                         c.stiffness,
                         &x_a,
                         &x_b,
-                        &m_a.zero_out_constants(&c.vars_a),
-                        &m_b.zero_out_constants(&c.vars_b),
+                        &m_a.zero_out_constants(&vars_a),
+                        &m_b.zero_out_constants(&vars_b),
                     )
                 };
 

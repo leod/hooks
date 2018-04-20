@@ -1,3 +1,5 @@
+#![feature(entry_or_default)]
+
 extern crate bit_manager;
 extern crate env_logger;
 extern crate hooks_game;
@@ -34,7 +36,7 @@ fn main() {
     let config = server::Config {
         port: 32444,
         game_info,
-        num_bots: 0,
+        num_bots: 5,
     };
 
     let mut server = Server::create(&config).unwrap();

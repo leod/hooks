@@ -852,14 +852,8 @@ fn segments_joint_constraint(entity_a: Entity, entity_b: Entity) -> Constraint {
         stiffness: 1.0,
         entity_a,
         entity_b,
-        vars_a: constraint::Vars {
-            pos: true,
-            angle: true,
-        },
-        vars_b: constraint::Vars {
-            pos: true,
-            angle: true,
-        },
+        vars_a: constraint::Vars::pose(),
+        vars_b: constraint::Vars::pose(),
     }
 }
 
@@ -871,14 +865,8 @@ fn segments_angle_constraint(entity_a: Entity, entity_b: Entity) -> Constraint {
         stiffness,
         entity_a,
         entity_b,
-        vars_a: constraint::Vars {
-            pos: false,
-            angle: true,
-        },
-        vars_b: constraint::Vars {
-            pos: false,
-            angle: true,
-        },
+        vars_a: constraint::Vars::angle(),
+        vars_b: constraint::Vars::angle(),
     }
 }
 
@@ -891,7 +879,7 @@ fn owner_segment_joint_constraint(
 ) -> Constraint {
     let joint_def = constraint::Def::Joint {
         distance,
-        object_pos_a: Point2::new(0.0, 0.0), //Point2::origin(),
+        object_pos_a: Point2::origin(),
         object_pos_b: last_object_pos,
     };
     Constraint {
@@ -903,10 +891,7 @@ fn owner_segment_joint_constraint(
             pos: owner_pos_var,
             angle: false,
         },
-        vars_b: constraint::Vars {
-            pos: true,
-            angle: true,
-        },
+        vars_b: constraint::Vars::pose(),
     }
 }
 
@@ -917,14 +902,8 @@ fn owner_segment_angle_constraint(owner_entity: Entity, last_entity: Entity) -> 
         stiffness: OWNER_ANGLE_STIFFNESS,
         entity_a: owner_entity,
         entity_b: last_entity,
-        vars_a: constraint::Vars {
-            pos: false,
-            angle: true,
-        },
-        vars_b: constraint::Vars {
-            pos: false,
-            angle: false,
-        },
+        vars_a: constraint::Vars::angle(),
+        vars_b: constraint::Vars::none(),
     }
 }
 
@@ -943,13 +922,7 @@ fn fix_first_segment_constraint(
         stiffness: 1.0,
         entity_a: first_entity,
         entity_b: fix_entity,
-        vars_a: constraint::Vars {
-            pos: true,
-            angle: true,
-        },
-        vars_b: constraint::Vars {
-            pos: false,
-            angle: false,
-        },
+        vars_a: constraint::Vars::pose(),
+        vars_b: constraint::Vars::pos(),
     }
 }
