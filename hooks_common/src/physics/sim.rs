@@ -527,10 +527,10 @@ impl<'a> System<'a> for SolveConstraintsSys {
     ) {
         profile!("solve");
 
+        stats::record("constraints", constraints.0.len() as f32);
+
         for _ in 0..NUM_ITERATIONS {
             for c in &constraints.0 {
-                stats::record("constraints", constraints.0.len() as f32);
-
                 let (p_new_a, p_new_b) = {
                     // Set up input for constraint solving
                     let m = |entity| {

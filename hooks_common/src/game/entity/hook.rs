@@ -231,6 +231,9 @@ impl Event for DespawnedEvent {
 ///       `EntityId` also contains the `PlayerId` of the entity owner. As we assume that every hook
 ///       belongs to exactly one player, this means we are sending redundant information. However,
 ///       the increased ease of use wins here for now.
+/// TODO: With many players, this component is too large, as it gets copied around a lot on the
+///       server and in prediction. Might need to figure out a better way of handling static
+///       components.
 #[derive(Component, PartialEq, Clone, Copy, Debug, BitStore)]
 pub struct Def {
     /// Different hook colors for drawing.

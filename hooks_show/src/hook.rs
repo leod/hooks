@@ -93,7 +93,7 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 let angle = orientation.get(segment).unwrap().0;
 
                 let scaling =
-                    Matrix4::from_diagonal(&Vector4::new(hook::SEGMENT_LENGTH, 3.0, 1.0, 1.0));
+                    Matrix4::from_diagonal(&Vector4::new(hook::SEGMENT_LENGTH, 2.0, 1.0, 1.0));
                 let isometry = Isometry3::new(
                     Vector3::new(pos.x, pos.y, 0.0),
                     angle * Vector3::z_axis().unwrap(),

@@ -65,7 +65,7 @@ impl Client {
         let host = lag_loss::Host::new(
             host,
             lag_loss::Config {
-                lag: Duration::from_millis(0),
+                lag: Duration::from_millis(50),
                 loss: 0.0,
             },
         );

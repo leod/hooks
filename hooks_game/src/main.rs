@@ -277,7 +277,7 @@ fn main() {
         .window_mode(
             conf::WindowMode::default()
                 .dimensions(1600, 900)
-                .fullscreen_type(conf::FullscreenType::True)
+                //.fullscreen_type(conf::FullscreenType::True)
                 .vsync(true),
         )
         .build()
@@ -316,7 +316,7 @@ fn main() {
     let mut reg = Registry::new();
     register(&mut reg, client.game_info());
 
-    let game = Game::new(reg, my_player_id, client.game_info(), false);
+    let game = Game::new(reg, my_player_id, client.game_info(), true);
 
     let mut state = MainState {
         client,

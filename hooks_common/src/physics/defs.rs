@@ -154,14 +154,14 @@ impl BitStore for Position {
 impl repl::Component for Position {
     fn distance(&self, other: &Position) -> f32 {
         let d = self.0 - other.0;
-        d.x.max(d.y)
+        d.x.abs().max(d.y.abs())
     }
 }
 
 impl repl::Component for Velocity {
     fn distance(&self, other: &Velocity) -> f32 {
         let d = self.0 - other.0;
-        d.x.max(d.y)
+        d.x.abs().max(d.y.abs())
     }
 }
 
