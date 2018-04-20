@@ -1,6 +1,6 @@
 extern crate env_logger;
 extern crate ggez;
-extern crate hooks_common;
+extern crate hooks_client;
 extern crate hooks_game;
 extern crate hooks_show;
 #[macro_use]
@@ -18,11 +18,11 @@ use ggez::event::{self, Keycode, MouseButton};
 use ggez::graphics::{Color, Font};
 use ggez::{conf, ContextBuilder};
 
-use hooks_common::defs::{GameInfo, PlayerInput};
-use hooks_common::physics::Position;
-use hooks_common::registry::Registry;
-use hooks_game::client::Client;
-use hooks_game::game::Game;
+use hooks_client::client::Client;
+use hooks_client::game::Game;
+use hooks_game::defs::{GameInfo, PlayerInput};
+use hooks_game::physics::Position;
+use hooks_game::registry::Registry;
 use hooks_show::{Assets, Show};
 use hooks_util::debug::{self, Inspect};
 use hooks_util::profile::{self, PROFILER};
@@ -31,7 +31,7 @@ use hooks_util::timer::{duration_to_secs, Stopwatch};
 
 fn register(reg: &mut Registry, game_info: &GameInfo) {
     // Game state
-    hooks_game::game::register(reg, game_info);
+    hooks_client::game::register(reg, game_info);
 
     // Components for showing game state
     hooks_show::register(reg);
@@ -78,11 +78,11 @@ impl MainState {
             delta = self.update_stopwatch.get_reset();
 
             match event {
-                hooks_game::game::Event::Disconnected => {
+                hooks_client::game::Event::Disconnected => {
                     info!("Got disconnected! Bye.");
                     ctx.quit()?;
                 }
-                hooks_game::game::Event::TickStarted(ref events) => {
+                hooks_client::game::Event::TickStarted(ref events) => {
                     self.show.handle_events(ctx, self.game.world_mut(), events)?;
                 }
             }

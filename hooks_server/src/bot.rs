@@ -2,7 +2,7 @@
 
 use rand::{self, Rng};
 
-use hooks_common::PlayerInput;
+use hooks_game::PlayerInput;
 
 #[derive(Default)]
 pub struct Bot {

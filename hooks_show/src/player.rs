@@ -4,8 +4,8 @@ use specs::prelude::{Join, ReadStorage, SystemData, World};
 use ggez;
 use ggez::graphics::{self, Drawable};
 
-use hooks_common::game::entity::player::{Player, HEIGHT, WIDTH};
-use hooks_common::physics::{Orientation, Position};
+use hooks_game::game::entity::player::{Player, HEIGHT, WIDTH};
+use hooks_game::physics::{Orientation, Position};
 use hooks_util::profile;
 
 use {with_transform, Input, Registry};

@@ -543,7 +543,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "hooks_common"
+name = "hooks_client"
+version = "0.1.0"
+dependencies = [
+ "bit_manager 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ggez 0.4.0 (git+https://github.com/leod/ggez.git?branch=nalgebra-0.14)",
+ "hooks_game 0.1.0",
+ "hooks_show 0.1.0",
+ "hooks_util 0.1.0",
+ "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nalgebra 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shred 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "specs 0.10.0 (git+https://github.com/slide-rs/specs.git)",
+ "specs-derive 0.2.0 (git+https://github.com/slide-rs/specs.git)",
+]
+
+[[package]]
+name = "hooks_game"
 version = "0.1.0"
 dependencies = [
  "bit_manager 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -562,30 +580,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "hooks_game"
-version = "0.1.0"
-dependencies = [
- "bit_manager 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "env_logger 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "ggez 0.4.0 (git+https://github.com/leod/ggez.git?branch=nalgebra-0.14)",
- "hooks_common 0.1.0",
- "hooks_show 0.1.0",
- "hooks_util 0.1.0",
- "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "nalgebra 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "shred 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "specs 0.10.0 (git+https://github.com/slide-rs/specs.git)",
- "specs-derive 0.2.0 (git+https://github.com/slide-rs/specs.git)",
-]
-
-[[package]]
 name = "hooks_server"
 version = "0.1.0"
 dependencies = [
  "bit_manager 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "hooks_common 0.1.0",
+ "hooks_game 0.1.0",
  "hooks_show 0.1.0",
  "hooks_util 0.1.0",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -601,7 +601,7 @@ dependencies = [
  "env_logger 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "gfx_device_gl 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ggez 0.4.0 (git+https://github.com/leod/ggez.git?branch=nalgebra-0.14)",
- "hooks_common 0.1.0",
+ "hooks_game 0.1.0",
  "hooks_util 0.1.0",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "nalgebra 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",

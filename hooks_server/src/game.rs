@@ -6,13 +6,13 @@ use bit_manager::BitWriter;
 
 use shred::{Fetch, RunNow};
 
-use hooks_common::net::protocol::{ClientGameMsg, ServerCommMsg};
-use hooks_common::net::transport::PeerId;
-use hooks_common::registry::Registry;
-use hooks_common::repl::{player, tick};
-use hooks_common::INVALID_PLAYER_ID;
-use hooks_common::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
-                   TickDeltaNum, TickNum};
+use hooks_game::net::protocol::{ClientGameMsg, ServerCommMsg};
+use hooks_game::net::transport::PeerId;
+use hooks_game::registry::Registry;
+use hooks_game::repl::{player, tick};
+use hooks_game::INVALID_PLAYER_ID;
+use hooks_game::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
+                 TickDeltaNum, TickNum};
 use hooks_util::profile;
 use hooks_util::timer::{Stopwatch, Timer};
 
@@ -193,7 +193,7 @@ pub struct Game {
 }
 
 fn register(reg: &mut Registry, game_info: &GameInfo) {
-    hooks_common::auth::register(reg, game_info);
+    hooks_game::auth::register(reg, game_info);
 }
 
 impl Game {

@@ -3,7 +3,7 @@
 extern crate gfx_device_gl;
 extern crate ggez;
 #[macro_use]
-extern crate hooks_common;
+extern crate hooks_game;
 #[macro_use]
 extern crate hooks_util;
 #[macro_use]
@@ -28,14 +28,14 @@ use specs::prelude::{Entity, World};
 
 use ggez::graphics::{self, DrawMode, Mesh};
 
-use hooks_common::physics::Position;
-use hooks_common::repl::player::Players;
-use hooks_common::{Event, GameInfo, PlayerId};
+use hooks_game::physics::Position;
+use hooks_game::repl::player::Players;
+use hooks_game::{Event, GameInfo, PlayerId};
 use hooks_util::profile;
 
 use self::camera::Camera;
 
-pub fn register(reg: &mut hooks_common::Registry) {
+pub fn register(reg: &mut hooks_game::Registry) {
     rect::register(reg);
     entity::register(reg);
 }
