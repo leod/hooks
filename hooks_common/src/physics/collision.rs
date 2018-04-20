@@ -12,7 +12,7 @@ use ncollide::narrow_phase::{BallBallContactGenerator, CompositeShapeShapeContac
                              SupportMapPlaneContactGenerator, SupportMapSupportMapContactGenerator};
 use ncollide::query::algorithms::{JohnsonSimplex, VoronoiSimplex2, VoronoiSimplex3};
 use ncollide::shape::{self, Ball, Plane, ShapeHandle2};
-use ncollide::world::{CollisionObjectHandle, CollisionWorld2};
+use ncollide::world::{CollisionGroupsPairFilter, CollisionObjectHandle, CollisionWorld2};
 
 use hooks_util::profile;
 
@@ -106,6 +106,10 @@ impl<'a> System<'a> for UpdateSys {
     ) {
         profile!("collision update");
 
+        // HACK: Force update of proximites (needed only for client)
+        collision_world.register_broad_phase_pair_filter("lol", CollisionGroupsPairFilter::new());
+        collision_world.unregister_broad_phase_pair_filter("lol");
+
         // Update isometry of entities that have moved or rotated
         position.populate_modified(&mut self.modified_position_id, &mut self.modified_position);
         orientation.populate_modified(
@@ -119,13 +123,6 @@ impl<'a> System<'a> for UpdateSys {
             for (_, position, orientation, object_handle) in
                 (&modified, &position, &orientation, &object_handle).join()
             {
-                /*if collision_world.collision_object(object_handle.0).is_none() {
-                    // This should happen exactly once for each object when it is first created.
-                    // `CreateObjectSys` has added the object, but the collision world has
-                    // not been updated yet, so changing the position here would be an error.
-                    continue;
-                }*/
-
                 let isometry = Isometry2::new(position.0.coords, orientation.0);
                 collision_world.set_position(object_handle.0, isometry);
             }

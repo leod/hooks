@@ -110,6 +110,13 @@ pub mod auth {
                 .with(Position(Point2::new(0.0, 300.0)))
                 .with(Velocity(Vector2::new(0.0, 0.0)))
                 .with(AngularVelocity(5.0))
+                .with(test::auth::Test(0.5, 1.0))
+        });
+        repl::entity::auth::create(world, 0, "test", |builder| {
+            builder
+                .with(Position(Point2::new(-1400.0, -100.0)))
+                .with(Velocity(Vector2::new(0.0, 200.0)))
+                .with(AngularVelocity(0.0))
                 .with(test::auth::Test(2.5, 5.0))
         });
         repl::entity::auth::create(world, 0, "test", |builder| {

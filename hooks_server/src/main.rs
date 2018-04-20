@@ -34,7 +34,7 @@ fn main() {
     let config = server::Config {
         port: 32444,
         game_info,
-        num_bots: 10,
+        num_bots: 0,
     };
 
     let mut server = Server::create(&config).unwrap();
