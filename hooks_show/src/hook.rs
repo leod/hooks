@@ -8,10 +8,10 @@ use ggez::graphics::{self, Drawable};
 
 use particle_frenzy;
 
-use hooks_common::event::Event;
-use hooks_common::game::entity::hook;
-use hooks_common::physics::{Orientation, Position};
-use hooks_common::repl::EntityMap;
+use hooks_game::event::Event;
+use hooks_game::game::entity::hook;
+use hooks_game::physics::{Orientation, Position};
+use hooks_game::repl::EntityMap;
 use hooks_util::profile;
 
 use {with_transform, Input, Output, Registry};

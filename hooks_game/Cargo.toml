@@ -3,23 +3,17 @@ name = "hooks_game"
 version = "0.1.0"
 authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
 
-[lib]
-name = "hooks_game"
-path = "src/lib.rs"
-
 [dependencies]
 hooks_util = { path = "../hooks_util" }
-hooks_common = { path = "../hooks_common" }
-hooks_show = { path = "../hooks_show" }
-ggez = { git = "https://github.com/leod/ggez.git", branch = "nalgebra-0.14" }
+bit_manager = "*"
+bit_manager_derive = "*"
+shred = "0.6.2"
+shred-derive = "0.4.0"
 specs = { git = "https://github.com/slide-rs/specs.git" }
 specs-derive = { git = "https://github.com/slide-rs/specs.git" }
-shred = "0.6.2"
+nalgebra = "0.14.0"
+ncollide = { git = "https://github.com/sebcrozet/ncollide.git" }
+enet-sys = "0.2.0"
+mopa = "0.2.2"
 log = "0.4"
-bit_manager = "*"
-env_logger = "0.5.0-rc.2"
 rand = "0.4"
-nalgebra = "0.14"
-
-[[example]]
-name = "random_bot"

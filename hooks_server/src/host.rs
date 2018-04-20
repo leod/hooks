@@ -3,12 +3,12 @@ use std::time::{Duration, Instant};
 
 use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
-use hooks_common::net;
-use hooks_common::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
-                                  CHANNEL_GAME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, async, enet, lag_loss};
-use hooks_common::net::transport::{ChannelId, Host as _Host, Packet, PacketFlag, PeerId};
-use hooks_common::{GameInfo, LeaveReason, INVALID_PLAYER_ID};
+use hooks_game::net;
+use hooks_game::net::protocol::{self, ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
+                                CHANNEL_GAME, NUM_CHANNELS};
+use hooks_game::net::transport::{self, async, enet, lag_loss};
+use hooks_game::net::transport::{ChannelId, Host as _Host, Packet, PacketFlag, PeerId};
+use hooks_game::{GameInfo, LeaveReason, INVALID_PLAYER_ID};
 
 type MyHost = async::Host<lag_loss::Host<enet::Host>, net::time::Time>;
 

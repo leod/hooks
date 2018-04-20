@@ -1,10 +1,10 @@
-use hooks_common;
-use hooks_common::entity;
-use hooks_common::game::entity::player;
+use hooks_game;
+use hooks_game::entity;
+use hooks_game::game::entity::player;
 
 use rect;
 
-pub fn register(reg: &mut hooks_common::Registry) {
+pub fn register(reg: &mut hooks_game::Registry) {
     // TODO: Get sizes from e.g. collision shapes?
 
     entity::add_ctor(reg, "test", |builder| {

@@ -1,6 +1,6 @@
 extern crate bit_manager;
 extern crate env_logger;
-extern crate hooks_common;
+extern crate hooks_game;
 #[cfg(feature = "show")]
 extern crate hooks_show;
 #[macro_use]
@@ -15,7 +15,7 @@ mod game;
 mod host;
 mod server;
 
-use hooks_common::{GameInfo, MapInfo};
+use hooks_game::{GameInfo, MapInfo};
 
 use server::Server;
 

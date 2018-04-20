@@ -1,17 +1,25 @@
 [package]
-name = "hooks_show"
+name = "hooks_client"
 version = "0.1.0"
 authors = ["Leonard Dahlmann <leo.dahlmann@gmail.com>"]
+
+[lib]
+name = "hooks_client"
+path = "src/lib.rs"
 
 [dependencies]
 hooks_util = { path = "../hooks_util" }
 hooks_game = { path = "../hooks_game" }
+hooks_show = { path = "../hooks_show" }
 ggez = { git = "https://github.com/leod/ggez.git", branch = "nalgebra-0.14" }
-particle-frenzy = { git = "https://github.com/leod/particle-frenzy.git" }
 specs = { git = "https://github.com/slide-rs/specs.git" }
 specs-derive = { git = "https://github.com/slide-rs/specs.git" }
+shred = "0.6.2"
 log = "0.4"
 bit_manager = "*"
 env_logger = "0.5.0-rc.2"
+rand = "0.4"
 nalgebra = "0.14"
-gfx_device_gl = "0.15"
+
+[[example]]
+name = "random_bot"

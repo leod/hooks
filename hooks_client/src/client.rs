@@ -5,12 +5,12 @@ use bit_manager::{self, BitRead, BitReader, BitWrite, BitWriter};
 
 use hooks_util::stats;
 
-use hooks_common::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
-                                  CHANNEL_GAME, NUM_CHANNELS};
-use hooks_common::net::transport::{self, async, enet, lag_loss};
-use hooks_common::net::transport::{Host, Packet, PacketFlag, PeerId};
-use hooks_common::net::{self, protocol};
-use hooks_common::{GameInfo, LeaveReason, PlayerId};
+use hooks_game::net::protocol::{ClientCommMsg, ClientGameMsg, ServerCommMsg, CHANNEL_COMM,
+                                CHANNEL_GAME, NUM_CHANNELS};
+use hooks_game::net::transport::{self, async, enet, lag_loss};
+use hooks_game::net::transport::{Host, Packet, PacketFlag, PeerId};
+use hooks_game::net::{self, protocol};
+use hooks_game::{GameInfo, LeaveReason, PlayerId};
 
 type MyHost = async::Host<lag_loss::Host<enet::Host>, net::time::Time>;
 

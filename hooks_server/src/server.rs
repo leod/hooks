@@ -2,7 +2,7 @@ use std::io;
 use std::thread;
 use std::time::Duration;
 
-use hooks_common::GameInfo;
+use hooks_game::GameInfo;
 #[cfg(feature = "show")]
 use hooks_show::Show;
 use hooks_util::debug::Inspect;
