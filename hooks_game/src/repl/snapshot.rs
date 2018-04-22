@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 use bit_manager::{self, BitRead, BitWrite};
+use specs::prelude::SystemData;
 
 use hooks_util::{join, stats};
 

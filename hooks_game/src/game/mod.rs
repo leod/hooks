@@ -2,8 +2,8 @@ pub mod catch;
 pub mod entity;
 pub mod init;
 pub mod input;
-pub mod predict;
-pub mod run;
+//pub mod predict;
+//pub mod run;
 pub mod state;
 
 use registry::Registry;

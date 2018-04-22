@@ -113,16 +113,12 @@ pub fn deferred_remove(world: &World, entity: Entity) {
 
 /// Remove entities tagged with `Remove` from the world.
 pub fn perform_removals(world: &mut World) {
-    {
-        let entities = world.entities();
-        let mut remove = world.write::<Remove>();
+    let entities = world.entities();
+    let mut remove = world.write::<Remove>();
 
-        for (entity, _) in (&*entities, &remove).join() {
-            entities.delete(entity).unwrap();
-        }
-
-        remove.clear();
+    for (entity, _) in (&*entities, &remove).join() {
+        entities.delete(entity).unwrap();
     }
 
-    world.maintain();
+    remove.clear();
 }

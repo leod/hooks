@@ -11,8 +11,8 @@ use hooks_game::net::transport::PeerId;
 use hooks_game::registry::Registry;
 use hooks_game::repl::{player, tick};
 use hooks_game::INVALID_PLAYER_ID;
-use hooks_game::{self, event, game, GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput,
-                 TickDeltaNum, TickNum};
+use hooks_game::{self, event, run}
+use hooks_game::{GameInfo, LeaveReason, PlayerId, PlayerInfo, PlayerInput, TickDeltaNum, TickNum};
 use hooks_util::profile;
 use hooks_util::timer::{Stopwatch, Timer};
 
@@ -169,8 +169,7 @@ impl Player {
 }
 
 pub struct Game {
-    game_state: game::State,
-    game_runner: game::run::AuthRunner,
+    run_game: run::auth::Run,
 
     next_player_id: PlayerId,
     players: BTreeMap<PeerId, Player>,
@@ -198,20 +197,11 @@ fn register(reg: &mut Registry, game_info: &GameInfo) {
 
 impl Game {
     pub fn new(game_info: &GameInfo) -> Game {
-        let mut game_state = {
-            let mut reg = Registry::new();
-
-            register(&mut reg, &game_info);
-
-            game::State::from_registry(reg)
-        };
-        game::init::auth::create_state(&mut game_state.world);
-
-        let game_runner = game::run::AuthRunner::new(&mut game_state.world);
+        let mut reg = Registry::new();
+        let run_game = run::auth::Run::new(reg);
 
         Game {
-            game_state,
-            game_runner,
+            run_game,
             next_player_id: INVALID_PLAYER_ID + 1,
             players: BTreeMap::new(),
             bots: Vec::new(),
@@ -224,7 +214,7 @@ impl Game {
     }
 
     pub fn game_info(&self) -> Fetch<GameInfo> {
-        self.game_state.world.read_resource::<GameInfo>()
+        self.run_game.world().read_resource::<GameInfo>()
     }
 
     pub fn add_bot(&mut self, name: &str) -> PlayerId {
