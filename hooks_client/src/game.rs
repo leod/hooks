@@ -8,7 +8,7 @@ use hooks_game::net::protocol::ClientGameMsg;
 use hooks_game::physics::{Orientation, Position};
 use hooks_game::registry::Registry;
 use hooks_game::repl::{self, interp, tick};
-use hooks_game::{self, event, game, GameInfo, PlayerId, PlayerInput, TickNum};
+use hooks_game::{self, event, run, GameInfo, PlayerId, PlayerInput, TickNum};
 use hooks_util::debug;
 use hooks_util::profile;
 use hooks_util::stats;
@@ -46,11 +46,8 @@ pub struct Game {
 
     my_player_id: PlayerId,
 
-    /// The complete state of the game.
-    game_state: game::State,
-
-    /// Runner for advancing the game state.
-    game_runner: game::run::ViewRunner,
+    /// Game state, and logic for running a tick.
+    run_game: run::view::Run,
 
     /// Recent ticks we have received. This has two uses:
     /// 1. Older ticks serve as the basis for delta decoding ticks received from the server.
