@@ -452,15 +452,6 @@ impl Game {
     fn start_tick(&mut self, host: &mut Host) -> Result<(), host::Error> {
         profile!("tick");
 
-        // Here, the state's `event::Sink` is empty. Push all the events that we have queued.
-        assert!(
-            self.game_state
-                .world
-                .read_resource::<event::Sink>()
-                .is_empty()
-        );
-        self.game_state.push_events(self.queued_events.clear());
-
         // Collect every player's queued inputs whose time has come
         let game_info = self.game_info().clone();
         let next_tick = self.next_tick;
@@ -495,11 +486,13 @@ impl Game {
         let tick_events = {
             profile!("run");
 
+            let next_events = self.queued_events.clear();
+
             // At this point, we no longer care about the target tick num -- we only needed it to
             // group the inputs into batches
             let next_inputs = next_inputs.into_iter().map(|(_, inputs)| inputs).collect();
 
-            self.game_runner.run_tick(&mut self.game_state, next_inputs)
+            self.run_game.run_tick(next_events, next_inputs)
         };
 
         // Can unwrap here, since replication errors should at most happen on the client-side
@@ -508,7 +501,7 @@ impl Game {
         // Record tick in history and send snapshots for every player
         profile!("tick history");
 
-        let entity_classes = self.game_state.world.read_resource::<game::EntityClasses>();
+        let entity_classes = self.world().read_resource::<game::EntityClasses>();
         let send_snapshot = self.next_tick % self.game_info().ticks_per_snapshot == 0;
 
         let snapshot = if send_snapshot {
@@ -520,7 +513,7 @@ impl Game {
                 snapshot: game::WorldSnapshot::new(),
                 only_player: None,
             };
-            sys.run_now(&self.game_state.world.res);
+            sys.run_now(&self.world());
             Some(sys.snapshot)
         } else {
             None
@@ -583,7 +576,7 @@ impl Game {
         // Only consider those players that are already registered in the game logic. The new player
         // will get information about other new players (that have joined but whose PlayerJoined
         // events have not been processed in a tick yet) with the regular shared events.
-        let other_players = self.game_state.world.read_resource::<player::Players>();
+        let other_players = self.world().read_resource::<player::Players>();
 
         for (&other_player_id, other_player) in other_players.iter() {
             new_player.queued_events.push(player::JoinedEvent {
