@@ -83,29 +83,29 @@ impl Constraints {
 
 /// Setup for additional steps to run in physics tick.
 #[derive(Default)]
-pub struct RunnerSetup {
+pub struct RunSetup {
     systems: Vec<Box<System>>,
 }
 
-impl RunnerSetup {
+impl RunSetup {
     pub fn new() -> Setup {
         Default::default()
     }
 
-    pub fn system<T: System>(&mut self, system: T) {
+    pub fn add_system<T: System>(&mut self, system: T) {
         systems.push(Box::new(system));
     }
 }
 
 /// Stores the state necessary to run a simulation.
-pub struct Runner {
-    setup: RunnerSetup,
+pub struct Run {
+    setup: RunSetup,
     collision_update_sys: collision::UpdateSys,
 }
 
-impl Runner {
-    pub fn new(world: &mut World, setup: RunnerSetup) -> Runner {
-        Runner {
+impl Run {
+    pub fn new(world: &mut World, setup: RunSetup) -> Run {
+        Run {
             setup,
             collision_update_sys: collision::UpdateSys::new(world),
         }
