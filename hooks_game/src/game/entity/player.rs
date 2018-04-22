@@ -31,7 +31,6 @@ pub fn register(reg: &mut Registry) {
             ComponentType::Position,
             ComponentType::Orientation,
             ComponentType::Player,
-            // TODO: Only send to owner
             ComponentType::Velocity,
             ComponentType::AngularVelocity,
             ComponentType::PlayerInputState,
@@ -133,7 +132,9 @@ pub struct InputState {
     tap_state: [TapState; NUM_TAP_KEYS],
 }
 
-impl repl::Component for InputState {}
+impl repl::Component for InputState {
+    const OWNER_ONLY: bool = true;
+}
 
 #[derive(Component, PartialEq, Clone, Copy, Debug, BitStore)]
 #[storage(BTreeStorage)]
@@ -151,6 +152,7 @@ pub struct DashState {
     pub secs_left: f32,
 }
 
+// TODO: Split into visible / internal state
 #[derive(Component, PartialEq, Clone, Copy, Debug, Default, BitStore)]
 #[storage(BTreeStorage)]
 pub struct State {

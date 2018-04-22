@@ -38,6 +38,10 @@ pub trait Component:
     /// Does this component change during its lifetime?
     const STATIC: bool = false;
 
+    /// Should the server send this component only to the entity's owner? Some entity state (say
+    /// velocity) is necessary only for prediction.
+    const OWNER_ONLY: bool = false;
+
     /// Difference between two instances of the component. We use this to detect prediction errors.
     fn distance(&self, _other: &Self) -> f32 {
         0.0
