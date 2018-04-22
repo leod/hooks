@@ -81,14 +81,32 @@ impl Constraints {
     }
 }
 
+/// Setup for additional steps to run in physics tick.
+#[derive(Default)]
+pub struct RunnerSetup {
+    systems: Vec<Box<System>>,
+}
+
+impl RunnerSetup {
+    pub fn new() -> Setup {
+        Default::default()
+    }
+
+    pub fn system<T: System>(&mut self, system: T) {
+        systems.push(Box::new(system));
+    }
+}
+
 /// Stores the state necessary to run a simulation.
 pub struct Runner {
+    setup: RunnerSetup,
     collision_update_sys: collision::UpdateSys,
 }
 
 impl Runner {
-    pub fn new(world: &mut World) -> Runner {
+    pub fn new(world: &mut World, setup: RunnerSetup) -> Runner {
         Runner {
+            setup,
             collision_update_sys: collision::UpdateSys::new(world),
         }
     }
@@ -96,10 +114,15 @@ impl Runner {
     pub fn run(&mut self, world: &World) {
         profile!("physics");
 
+        PrepareSys.run_now(&world.res);
+
+        for system in &self.setup.systems {
+            system.run_now(&world.res);
+        }
+
         collision::MaintainSys.run_now(&world.res);
         self.collision_update_sys.run_now(&world.res);
 
-        PrepareSys.run_now(&world.res);
         FrictionForceSys.run_now(&world.res);
         DragForceSys.run_now(&world.res);
         //JointForceSys.run_now(&world.res);
@@ -135,10 +158,10 @@ struct Force(Vector2<f32>);
 struct PrepareSys;
 
 impl<'a> System<'a> for PrepareSys {
-    type SystemData = (Entities<'a>, Filter<'a>, WriteStorage<'a, Force>);
+    type SystemData = (Entities<'a>, Dynamic<'a>, WriteStorage<'a, Force>);
 
-    fn run(&mut self, (entities, filter, mut force): Self::SystemData) {
-        for (entity, _) in (&*entities, filter.join()).join() {
+    fn run(&mut self, (entities, dynamic, mut force): Self::SystemData) {
+        for (entity, _) in (&*entities, dynamic.join()).join() {
             force.insert(entity, Force(zero()));
         }
     }

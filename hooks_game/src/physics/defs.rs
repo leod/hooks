@@ -159,6 +159,8 @@ impl repl::Component for Position {
 }
 
 impl repl::Component for Velocity {
+    const OWNER_ONLY: bool = true;
+
     fn distance(&self, other: &Velocity) -> f32 {
         let d = self.0 - other.0;
         d.x.abs().max(d.y.abs())
@@ -172,6 +174,8 @@ impl repl::Component for Orientation {
 }
 
 impl repl::Component for AngularVelocity {
+    const OWNER_ONLY: bool = true;
+
     fn distance(&self, other: &AngularVelocity) -> f32 {
         (self.0 - other.0).abs()
     }
