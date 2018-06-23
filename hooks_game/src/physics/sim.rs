@@ -10,7 +10,7 @@ use entity::{self, Active};
 use registry::Registry;
 use repl;
 
-use physics::collision::CollisionWorld;
+use physics::collision::MyCollisionWorld;
 use physics::constraint::Constraint;
 use physics::{collision, constraint, interaction, AngularVelocity, Drag, Dynamic, Friction,
               InvAngularMass, InvMass, Orientation, Position, Update, Velocity};
@@ -70,9 +70,11 @@ struct OldPosition(Point2<f32>);
 struct OldOrientation(f32);
 
 /// Resource to store the interactions that were detected in a time step.
+#[derive(Default)]
 struct InteractionEvents(Vec<interaction::Event>);
 
 /// Resource to store the constraints that are to be applied in the current time step.
+#[derive(Default)]
 pub struct Constraints(Vec<Constraint>);
 
 impl Constraints {
@@ -148,7 +150,7 @@ struct FrictionForceSys;
 
 impl<'a> System<'a> for FrictionForceSys {
     type SystemData = (
-        Fetch<'a, GameInfo>,
+        ReadExpect<'a, GameInfo>,
         Filter<'a>,
         ReadStorage<'a, InvMass>,
         ReadStorage<'a, Friction>,
@@ -181,7 +183,7 @@ struct DragForceSys;
 
 impl<'a> System<'a> for DragForceSys {
     type SystemData = (
-        Fetch<'a, GameInfo>,
+        ReadExpect<'a, GameInfo>,
         Filter<'a>,
         ReadStorage<'a, Drag>,
         WriteStorage<'a, Velocity>,
@@ -294,7 +296,7 @@ struct CorrectVelocitySys;
 
 #[derive(SystemData)]
 struct CorrectVelocityData<'a> {
-    game_info: Fetch<'a, GameInfo>,
+    game_info: ReadExpect<'a, GameInfo>,
 
     filter: Filter<'a>,
     position: ReadStorage<'a, Position>,
@@ -339,7 +341,7 @@ struct IntegrateForceSys;
 
 impl<'a> System<'a> for IntegrateForceSys {
     type SystemData = (
-        Fetch<'a, GameInfo>,
+        ReadExpect<'a, GameInfo>,
         Filter<'a>,
         ReadStorage<'a, InvMass>,
         ReadStorage<'a, Force>,
@@ -390,10 +392,10 @@ struct HandleContactsSys;
 
 impl<'a> System<'a> for HandleContactsSys {
     type SystemData = (
-        Fetch<'a, CollisionWorld>,
-        Fetch<'a, interaction::Handlers>,
-        FetchMut<'a, InteractionEvents>,
-        FetchMut<'a, Constraints>,
+        ReadExpect<'a, MyCollisionWorld>,
+        Read<'a, interaction::Handlers>,
+        Write<'a, InteractionEvents>,
+        Write<'a, Constraints>,
         Filter<'a>,
         ReadStorage<'a, entity::Meta>,
         ReadStorage<'a, repl::Id>,
@@ -421,80 +423,82 @@ impl<'a> System<'a> for HandleContactsSys {
             gen.contacts(&mut contacts);
 
             for contact in &contacts {
-                let entity_a = *oa.data();
-                let entity_b = *ob.data();
+                for contact in contact.contacts() {
+                    let entity_a = *oa.data();
+                    let entity_b = *ob.data();
 
-                // Only consider contacts where at least one object is currently being simulated
-                // FIXME: We should be able to get this with an ncollide filter!
-                if !filter.filter(entity_a) && !filter.filter(entity_b) {
-                    continue;
-                }
+                    // Only consider contacts where at least one object is currently being simulated
+                    // FIXME: We should be able to get this with an ncollide filter!
+                    if !filter.filter(entity_a) && !filter.filter(entity_b) {
+                        continue;
+                    }
 
-                // Let's not have a player's entities collide with each other just yet
-                match (repl_id.get(entity_a), repl_id.get(entity_b)) {
-                    (Some(&repl::Id((owner_a, _))), Some(&repl::Id((owner_b, _))))
-                        if owner_a == owner_b => continue,
-                    _ => {},
-                }
+                    // Let's not have a player's entities collide with each other just yet
+                    match (repl_id.get(entity_a), repl_id.get(entity_b)) {
+                        (Some(&repl::Id((owner_a, _))), Some(&repl::Id((owner_b, _))))
+                            if owner_a == owner_b => continue,
+                        _ => {},
+                    }
 
-                let action = interaction::get_action(
-                    &interaction_handlers,
-                    &meta,
-                    entity_a,
-                    entity_b
-				);
+                    let action = interaction::get_action(
+                        &interaction_handlers,
+                        &meta,
+                        entity_a,
+                        entity_b
+                    );
 
-                // TODO: Easier way to get object-space contact coordinates?
-                let object_pos_a = oa.position().inverse() * contact.world1;
-                let object_pos_b = ob.position().inverse() * contact.world2;
+                    // TODO: Easier way to get object-space contact coordinates?
+                    let object_pos_a = contact.kinematic.local1();
+                    let object_pos_b = contact.kinematic.local2();
 
-                if let Some(action) = action {
-                    match action {
-                        interaction::Action::PreventOverlap { rotate_a, rotate_b } => {
-                            // Try to resolve the overlap with a constraint
-                            let constraint = Constraint {
-                                def: constraint::Def::Contact {
-                                    normal: contact.normal.unwrap(),
-                                    margin: CONTACT_MARGIN,
-                                    object_pos_a,
-                                    object_pos_b,
-                                },
-                                stiffness: 1.0,
-                                entity_a,
-                                entity_b,
-                                vars_a: constraint::Vars {
-                                    pos: true,
-                                    angle: rotate_a,
-                                },
-                                vars_b: constraint::Vars {
-                                    pos: true,
-                                    angle: rotate_b,
-                                },
-                            };
-                            constraints.add(constraint);
+                    if let Some(action) = action {
+                        match action {
+                            interaction::Action::PreventOverlap { rotate_a, rotate_b } => {
+                                // Try to resolve the overlap with a constraint
+                                let constraint = Constraint {
+                                    def: constraint::Def::Contact {
+                                        normal: contact.contact.normal.unwrap(),
+                                        margin: CONTACT_MARGIN,
+                                        object_pos_a,
+                                        object_pos_b,
+                                    },
+                                    stiffness: 1.0,
+                                    entity_a,
+                                    entity_b,
+                                    vars_a: constraint::Vars {
+                                        pos: true,
+                                        angle: rotate_a,
+                                    },
+                                    vars_b: constraint::Vars {
+                                        pos: true,
+                                        angle: rotate_b,
+                                    },
+                                };
+                                constraints.add(constraint);
+                            }
                         }
                     }
-                }
 
-                // Record the collision event
-                let info_a = interaction::EntityInfo {
-                    entity: entity_a,
-                    object_pos: object_pos_a,
-                    vel: velocity.get(entity_a).map(|v| v.0),
-                };
-                let info_b = interaction::EntityInfo {
-                    entity: entity_b,
-                    object_pos: object_pos_b,
-                    vel: velocity.get(entity_b).map(|v| v.0),
-                };
-                let event = interaction::Event {
-                    a: info_a,
-                    b: info_b,
-                    // TODO: What is the difference between `world1` and `world2` here?
-                    pos: contact.world1,
-                    normal: contact.normal.unwrap(),
-                };
-                interactions.0.push(event);
+                    // Record the collision event
+                    let info_a = interaction::EntityInfo {
+                        entity: entity_a,
+                        object_pos: object_pos_a,
+                        vel: velocity.get(entity_a).map(|v| v.0),
+                    };
+                    let info_b = interaction::EntityInfo {
+                        entity: entity_b,
+                        object_pos: object_pos_b,
+                        vel: velocity.get(entity_b).map(|v| v.0),
+                    };
+                    let event = interaction::Event {
+                        a: info_a,
+                        b: info_b,
+                        // TODO: What is the difference between `world1` and `world2` here?
+                        pos: contact.contact.world1,
+                        normal: contact.contact.normal.unwrap(),
+                    };
+                    interactions.0.push(event);
+                }
             }
         }
     }
@@ -504,7 +508,7 @@ struct SolveConstraintsSys;
 
 impl<'a> System<'a> for SolveConstraintsSys {
     type SystemData = (
-        Fetch<'a, Constraints>,
+        Read<'a, Constraints>,
         Filter<'a>,
         ReadStorage<'a, InvMass>,
         ReadStorage<'a, InvAngularMass>,
@@ -595,7 +599,7 @@ struct IntegrateVelocitySys;
 
 impl<'a> System<'a> for IntegrateVelocitySys {
     type SystemData = (
-        Fetch<'a, GameInfo>,
+        ReadExpect<'a, GameInfo>,
         Filter<'a>,
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, AngularVelocity>,

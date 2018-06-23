@@ -55,7 +55,7 @@ impl Player {
 /// For each player, store information (like the name and statistics) and the current main entity
 /// of the player, if it exists. Management of the player's entity handle is currently handled by
 /// the `repl::entity` mod.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Players(pub BTreeMap<PlayerId, Player>);
 
 impl Players {
@@ -140,7 +140,7 @@ fn handle_event_pre_tick(world: &mut World, event: &Event) -> Result<(), repl::E
             // Remove all entities owned by the disconnected player
             let owned_entities = {
                 let entities = world.entities();
-                let mut repl_ids = world.read::<repl::Id>();
+                let mut repl_ids = world.read_storage::<repl::Id>();
 
                 (&*entities, &repl_ids).join()
                     .filter_map(|(entity, &repl::Id(id))| {

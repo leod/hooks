@@ -152,10 +152,10 @@ struct RemovalSys;
 
 impl<'a> System<'a> for RemovalSys {
     type SystemData = (
-        Fetch<'a, GameInfo>,
-        Fetch<'a, entity::ClassIds>,
-        FetchMut<'a, repl::EntityMap>,
-        FetchMut<'a, player::Players>,
+        ReadExpect<'a, GameInfo>,
+        Read<'a, entity::ClassIds>,
+        Write<'a, repl::EntityMap>,
+        Write<'a, player::Players>,
         ReadStorage<'a, repl::Id>,
         ReadStorage<'a, entity::Meta>,
         ReadStorage<'a, entity::Remove>,
@@ -213,7 +213,7 @@ pub mod auth {
 
     impl<'a> System<'a> for RemovalSys {
         type SystemData = (
-            FetchMut<'a, event::Sink>,
+            Write<'a, event::Sink>,
             ReadStorage<'a, repl::Id>,
             ReadStorage<'a, entity::Remove>,
         );

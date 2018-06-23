@@ -9,14 +9,17 @@ extern crate hooks_util;
 extern crate log;
 extern crate nalgebra;
 extern crate specs;
+extern crate winit;
 
 use std::{env, io, path, thread};
 
 use nalgebra::{Point2, Point3, Vector2};
 
-use ggez::event::{self, Keycode, MouseButton};
+use ggez::event::{self, KeyCode, MouseButton};
+use ggez::event::winit_event::Event;
 use ggez::graphics::{Color, Font};
 use ggez::{conf, ContextBuilder};
+use winit::EventsLoop;
 
 use hooks_client::client::Client;
 use hooks_client::game::Game;
@@ -80,7 +83,7 @@ impl MainState {
             match event {
                 hooks_client::game::Event::Disconnected => {
                     info!("Got disconnected! Bye.");
-                    ctx.quit()?;
+                    ctx.quit();
                 }
                 hooks_client::game::Event::TickStarted(ref events) => {
                     self.show.handle_events(ctx, self.game.world_mut(), events)?;
@@ -98,7 +101,7 @@ impl MainState {
 
         {
             profile!("clear");
-            ggez::graphics::set_background_color(
+            ggez::graphics::clear(
                 ctx,
                 Color {
                     r: 0.0,
@@ -107,7 +110,6 @@ impl MainState {
                     a: 0.0,
                 },
             );
-            ggez::graphics::clear(ctx);
         }
 
         self.show.draw(ctx, self.game.world())?;
@@ -125,10 +127,10 @@ impl MainState {
         Ok(())
     }
 
-    fn handle_event(&mut self, ctx: &mut ggez::Context, event: &event::Event) -> bool {
+    fn handle_event(&mut self, ctx: &mut ggez::Context, event: &Event) -> bool {
         match *event {
-            event::Event::Quit { .. } => return false,
-            event::Event::MouseMotion { x, y, .. } => {
+            Event::Quit { .. } => return false,
+            Event::MouseMotion { x, y, .. } => {
                 let (size_x, size_y) = ggez::graphics::get_size(ctx);
                 let size = Vector2::new(size_x as f32, size_y as f32);
                 let clip = Vector2::new(
@@ -138,7 +140,7 @@ impl MainState {
                 let point = clip - size / 2.0;
                 let world = self.game.world();
                 let pos = if let Some(my_entity) = self.show.my_player_entity(world) {
-                    let positions = world.read::<Position>();
+                    let positions = world.read_storage::<Position>();
                     if let Some(position) = positions.get(my_entity) {
                         let pos = Point3::new(clip.x, clip.y, 0.0) -
                             self.show.camera().similarity() *
@@ -153,44 +155,44 @@ impl MainState {
 
                 self.next_player_input.rot_angle = pos.y.atan2(pos.x)
             }
-            event::Event::MouseButtonDown {
+            Event::MouseButtonDown {
                 mouse_btn: MouseButton::Left,
                 ..
             } => {
                 self.next_player_input.shoot_one = true;
             }
-            event::Event::MouseButtonUp {
+            Event::MouseButtonUp {
                 mouse_btn: MouseButton::Left,
                 ..
             } => {
                 self.next_player_input.shoot_one = false;
             }
-            event::Event::MouseButtonDown {
+            Event::MouseButtonDown {
                 mouse_btn: MouseButton::Right,
                 ..
             } => {
                 self.next_player_input.shoot_two = true;
             }
-            event::Event::MouseButtonUp {
+            Event::MouseButtonUp {
                 mouse_btn: MouseButton::Right,
                 ..
             } => {
                 self.next_player_input.shoot_two = false;
             }
-            event::Event::KeyDown {
+            Event::KeyDown {
                 keycode: Some(keycode),
                 ..
             } => match keycode {
-                Keycode::W => self.next_player_input.move_forward = true,
-                Keycode::S => self.next_player_input.move_backward = true,
-                Keycode::A => self.next_player_input.move_left = true,
-                Keycode::D => self.next_player_input.move_right = true,
-                Keycode::Q => self.next_player_input.pull_one = true,
-                Keycode::E => self.next_player_input.pull_two = true,
-                Keycode::F1 => self.show_debug = !self.show_debug,
-                Keycode::F2 => self.show_profiler = !self.show_profiler,
-                Keycode::F3 => self.show_stats = !self.show_stats,
-                Keycode::P => {
+                KeyCode::W => self.next_player_input.move_forward = true,
+                KeyCode::S => self.next_player_input.move_backward = true,
+                KeyCode::A => self.next_player_input.move_left = true,
+                KeyCode::D => self.next_player_input.move_right = true,
+                KeyCode::Q => self.next_player_input.pull_one = true,
+                KeyCode::E => self.next_player_input.pull_two = true,
+                KeyCode::F1 => self.show_debug = !self.show_debug,
+                KeyCode::F2 => self.show_profiler = !self.show_profiler,
+                KeyCode::F3 => self.show_stats = !self.show_stats,
+                KeyCode::P => {
                     PROFILER.with(|p| {
                         p.borrow().inspect().print(&mut io::stdout());
                         p.borrow_mut().reset();
@@ -198,16 +200,16 @@ impl MainState {
                 }
                 _ => {}
             },
-            event::Event::KeyUp {
+            Event::KeyUp {
                 keycode: Some(keycode),
                 ..
             } => match keycode {
-                Keycode::W => self.next_player_input.move_forward = false,
-                Keycode::S => self.next_player_input.move_backward = false,
-                Keycode::A => self.next_player_input.move_left = false,
-                Keycode::D => self.next_player_input.move_right = false,
-                Keycode::Q => self.next_player_input.pull_one = false,
-                Keycode::E => self.next_player_input.pull_two = false,
+                KeyCode::W => self.next_player_input.move_forward = false,
+                KeyCode::S => self.next_player_input.move_backward = false,
+                KeyCode::A => self.next_player_input.move_left = false,
+                KeyCode::D => self.next_player_input.move_right = false,
+                KeyCode::Q => self.next_player_input.pull_one = false,
+                KeyCode::E => self.next_player_input.pull_two = false,
                 _ => {}
             },
             _ => {}
@@ -216,23 +218,30 @@ impl MainState {
         true
     }
 
-    pub fn run_frame(&mut self, ctx: &mut ggez::Context) -> ggez::GameResult<bool> {
+    pub fn run_frame(
+        &mut self,
+        ctx: &mut ggez::Context,
+        events_loop: &mut EventsLoop,
+    ) -> ggez::GameResult<bool> {
         let _frame = PROFILER.with(|p| p.borrow_mut().frame());
 
         ctx.timer_context.tick();
 
-        for event in event::Events::new(ctx)?.poll() {
+        let mut quit = false;
+        events_loop.poll_events(|event| {
+            ctx.process_event(&event);
+
             if !self.handle_event(ctx, &event) {
-                return Ok(false);
+                quit = true;
             }
-        }
+        });
 
         self.update(ctx)?;
         self.draw(ctx)?;
 
         thread::yield_now();
 
-        Ok(true)
+        Ok(quit)
     }
 }
 
@@ -273,12 +282,12 @@ fn main() {
     let timeout_ms = 5000;
 
     // Initialize ggez
-    let ctx = &mut ContextBuilder::new("hooks-frenzy", "leod")
+    let (ctx, events_loop) = &mut ContextBuilder::new("hooks-frenzy", "leod")
         .window_mode(
             conf::WindowMode::default()
                 .dimensions(1600, 900)
                 //.fullscreen_type(conf::FullscreenType::True)
-                .vsync(true),
+                //.vsync(true),
         )
         .build()
         .unwrap();
@@ -316,7 +325,7 @@ fn main() {
     let mut reg = Registry::new();
     register(&mut reg, client.game_info());
 
-    let game = Game::new(reg, my_player_id, client.game_info(), true);
+    let game = Game::new(reg, my_player_id, client.game_info(), false);
 
     let mut state = MainState {
         client,
@@ -331,5 +340,5 @@ fn main() {
         show_stats: false,
     };
 
-    while state.run_frame(ctx).unwrap() {}
+    while state.run_frame(ctx, events_loop).unwrap() {}
 }

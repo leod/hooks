@@ -22,6 +22,7 @@ struct Ctors(BTreeMap<EntityClassId, Vec<Ctor>>);
 
 /// Maps from entity class names to their unique id. This map should be exactly the same on server
 /// and clients and not change during a game.
+#[derive(Default)]
 pub struct ClassIds(pub BTreeMap<String, EntityClassId>);
 
 /// Meta-information about entities.
@@ -108,14 +109,14 @@ where
 /// giving systems a chance to know about the removal. The entities are removed with the next call
 /// to `perform_removals`.
 pub fn deferred_remove(world: &World, entity: Entity) {
-    world.write::<Remove>().insert(entity, Remove);
+    world.write_storage::<Remove>().insert(entity, Remove);
 }
 
 /// Remove entities tagged with `Remove` from the world.
 pub fn perform_removals(world: &mut World) {
     {
         let entities = world.entities();
-        let mut remove = world.write::<Remove>();
+        let mut remove = world.write_storage::<Remove>();
 
         for (entity, _) in (&*entities, &remove).join() {
             entities.delete(entity).unwrap();

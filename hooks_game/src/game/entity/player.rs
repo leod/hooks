@@ -198,8 +198,8 @@ pub fn run_input(
 ) -> Result<(), repl::Error> {
     // Update hooks
     for &(_, ref input, entity) in inputs {
-        let player = *repl::try(&world.read::<Player>(), entity)?;
-        let input_state = *repl::try(&world.read::<InputState>(), entity)?;
+        let player = *repl::try(&world.read_storage::<Player>(), entity)?;
+        let input_state = *repl::try(&world.read_storage::<InputState>(), entity)?;
 
         for i in 0..NUM_HOOKS {
             let hook_entity = repl::try_id_to_entity(world, player.hooks[i])?;
@@ -223,7 +223,7 @@ pub fn run_input(
             };
 
             world
-                .write::<hook::CurrentInput>()
+                .write_storage::<hook::CurrentInput>()
                 .insert(hook_entity, hook_input);
         }
     }
@@ -233,7 +233,7 @@ pub fn run_input(
     // Update player
     for &(_, ref input, entity) in inputs {
         world
-            .write::<CurrentInput>()
+            .write_storage::<CurrentInput>()
             .insert(entity, CurrentInput::new(input.clone()));
     }
 
@@ -248,8 +248,8 @@ pub fn run_input_post_sim(
 ) -> Result<(), repl::Error> {
     hook::run_input_post_sim(&world)?;
 
-    world.write::<hook::CurrentInput>().clear();
-    world.write::<CurrentInput>().clear();
+    world.write_storage::<hook::CurrentInput>().clear();
+    world.write_storage::<CurrentInput>().clear();
 
     Ok(())
 }
@@ -269,7 +269,7 @@ pub mod auth {
         }
 
         // Now that we have created our hooks, attach the player definition
-        world.write::<Player>().insert(entity, Player { hooks });
+        world.write_storage::<Player>().insert(entity, Player { hooks });
 
         (id, entity)
     }
@@ -306,7 +306,7 @@ fn build_player(builder: EntityBuilder) -> EntityBuilder {
 
 #[derive(SystemData)]
 struct InputData<'a> {
-    game_info: Fetch<'a, GameInfo>,
+    game_info: ReadExpect<'a, GameInfo>,
 
     input: WriteStorage<'a, CurrentInput>,
     orientation: WriteStorage<'a, Orientation>,

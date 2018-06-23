@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use bit_manager::BitWriter;
 
-use shred::{Fetch, RunNow};
+use shred::{Read, RunNow};
 
 use hooks_game::net::protocol::{ClientGameMsg, ServerCommMsg};
 use hooks_game::net::transport::PeerId;
@@ -223,8 +223,8 @@ impl Game {
         }
     }
 
-    pub fn game_info(&self) -> Fetch<GameInfo> {
-        self.game_state.world.read_resource::<GameInfo>()
+    pub fn game_info(&self) -> Read<GameInfo> {
+        self.game_state.world.read_resource::<GameInfo>().into()
     }
 
     pub fn add_bot(&mut self, name: &str) -> PlayerId {

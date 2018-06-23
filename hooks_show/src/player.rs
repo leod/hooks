@@ -1,8 +1,8 @@
-use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
+use nalgebra::{Isometry3, Matrix4, Vector3, Vector4};
 use specs::prelude::{Join, ReadStorage, SystemData, World};
 
 use ggez;
-use ggez::graphics::{self, Drawable};
+use ggez::graphics::{self, Drawable, DrawParam};
 
 use hooks_game::game::entity::player::{Player, HEIGHT, WIDTH};
 use hooks_game::physics::{Orientation, Position};
@@ -34,25 +34,13 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
         );
         let matrix = isometry.to_homogeneous() * scaling;
 
-        graphics::set_color(
-            ctx,
-            graphics::Color {
-                r: 1.0,
-                g: 1.0,
-                b: 1.0,
-                a: 1.0,
-            },
-        )?;
-
         with_transform(ctx, matrix, |ctx| {
             input
                 .assets
                 .rect_towards_x_fill
-                .draw(ctx, Point2::origin(), 0.0)
+                .draw(ctx, DrawParam::new().color([1.0, 1.0, 1.0, 1.0]))
         })?;
     }
-
-    graphics::set_color(ctx, graphics::WHITE)?;
 
     Ok(())
 }

@@ -1,18 +1,15 @@
-use std::marker::PhantomData;
-
 use specs::prelude::*;
 use specs::storage::{BTreeStorage, VecStorage};
 
-use nalgebra::{self, Isometry2};
-use ncollide::math::{Isometry, Point};
-use ncollide::narrow_phase::{BallBallContactGenerator, CompositeShapeShapeContactGenerator,
+use nalgebra::Isometry2;
+/*use ncollide2d::narrow_phase::{BallBallManifoldGenerator, CompositeShapeShapeManifoldGenerator,
                              ContactAlgorithm, ContactDispatcher, DefaultNarrowPhase,
                              DefaultProximityDispatcher, OneShotContactManifoldGenerator,
-                             PlaneSupportMapContactGenerator, ShapeCompositeShapeContactGenerator,
-                             SupportMapPlaneContactGenerator, SupportMapSupportMapContactGenerator};
-use ncollide::query::algorithms::{JohnsonSimplex, VoronoiSimplex2, VoronoiSimplex3};
-use ncollide::shape::{self, Ball, Plane, ShapeHandle2};
-use ncollide::world::{CollisionGroupsPairFilter, CollisionObjectHandle, CollisionWorld2};
+                             PlaneSupportMapManifoldGenerator, ShapeCompositeShapeManifoldGenerator,
+                             SupportMapPlaneManifoldGenerator, SupportMapSupportMapManifoldGenerator};
+use ncollide2d::query::algorithms::{JohnsonSimplex, VoronoiSimplex2, VoronoiSimplex3};
+use ncollide2d::shape::{self, Ball, Plane, ShapeHandle2};*/
+use ncollide2d::world::{CollisionGroupsPairFilter, CollisionObjectHandle, CollisionWorld};
 
 use hooks_util::profile;
 
@@ -20,26 +17,27 @@ use entity;
 use physics::{Orientation, Position};
 use registry::Registry;
 
-pub use ncollide::shape::{Cuboid, ShapeHandle};
-pub use ncollide::world::{CollisionGroups, GeometricQueryType};
+pub use ncollide2d::shape::{Cuboid, ShapeHandle};
+pub use ncollide2d::world::{CollisionGroups, GeometricQueryType};
 
 pub fn register(reg: &mut Registry) {
     reg.component::<Shape>();
     reg.component::<Object>();
     reg.component::<ObjectHandle>();
 
-    let contact_dispatcher = StatelessContactDispatcher::default();
+    // FIXME: How to do this with ncollide 0.16? Is it even necessary?
+    /*let contact_dispatcher = StatelessContactDispatcher::default();
     let proximity_dispatcher = DefaultProximityDispatcher::new();
     let narrow_phase =
-        DefaultNarrowPhase::new(Box::new(contact_dispatcher), Box::new(proximity_dispatcher));
-    let mut collision_world = CollisionWorld2::<f32, Entity>::new(0.02);
-    collision_world.set_narrow_phase(Box::new(narrow_phase));
+        DefaultNarrowPhase::new(Box::new(contact_dispatcher), Box::new(proximity_dispatcher));*/
+    let collision_world = CollisionWorld::<f32, Entity>::new(0.02);
+    //collision_world.set_narrow_phase(Box::new(narrow_phase));
     reg.resource(collision_world);
 
     reg.removal_system(RemovalSys, "collision");
 }
 
-pub type CollisionWorld = CollisionWorld2<f32, Entity>;
+pub type MyCollisionWorld = CollisionWorld<f32, Entity>;
 
 // Collision groups. Put them here for now.
 pub const GROUP_WALL: usize = 0;
@@ -51,7 +49,7 @@ pub const GROUP_NEUTRAL: usize = 3;
 /// For now, we assume that an object's shape will not change in its lifetime.
 #[derive(Clone, Component)]
 #[storage(VecStorage)]
-pub struct Shape(pub ShapeHandle2<f32>);
+pub struct Shape(pub ShapeHandle<f32>);
 
 /// Component which indicates that we should inform the collision world of this entity.
 /// Note that only `entity::Active` entities are kept in the collision world.
@@ -77,10 +75,10 @@ pub struct UpdateSys {
 
 impl UpdateSys {
     pub fn new(world: &mut World) -> UpdateSys {
-        let mut position = world.write::<Position>();
+        let mut position = world.write_storage::<Position>();
         let modified_position_id = position.track_modified();
 
-        let mut orientation = world.write::<Orientation>();
+        let mut orientation = world.write_storage::<Orientation>();
         let modified_orientation_id = orientation.track_modified();
 
         UpdateSys {
@@ -94,7 +92,7 @@ impl UpdateSys {
 
 impl<'a> System<'a> for UpdateSys {
     type SystemData = (
-        FetchMut<'a, CollisionWorld>,
+        WriteExpect<'a, MyCollisionWorld>,
         ReadStorage<'a, Position>,
         ReadStorage<'a, Orientation>,
         ReadStorage<'a, ObjectHandle>,
@@ -151,7 +149,7 @@ pub struct MaintainData<'a> {
 
 impl<'a> System<'a> for MaintainSys {
     // Using a tuple here because of borrowing in a closure
-    type SystemData = (FetchMut<'a, CollisionWorld>, MaintainData<'a>);
+    type SystemData = (WriteExpect<'a, MyCollisionWorld>, MaintainData<'a>);
 
     fn run(&mut self, (mut collision_world, mut data): Self::SystemData) {
         profile!("collision maintain");
@@ -220,7 +218,7 @@ struct RemovalSys;
 impl<'a> System<'a> for RemovalSys {
     type SystemData = (
         Entities<'a>,
-        FetchMut<'a, CollisionWorld>,
+        WriteExpect<'a, MyCollisionWorld>,
         ReadStorage<'a, entity::Remove>,
         WriteStorage<'a, ObjectHandle>,
     );
@@ -243,7 +241,8 @@ impl<'a> System<'a> for RemovalSys {
     }
 }
 
-/// `ncollide` contact dispatcher that does not use state from previous tick.
+// FIXME: How to do this with ncollide 0.16? Is it even necessary?
+/*/// `ncollide` contact dispatcher that does not use state from previous tick.
 /// Adapted from the `DefaultContactDispatcher`.
 /// See also <http://users.nphysics.org/t/using-ncollide-in-less-stateful-ways/163>.
 struct StatelessContactDispatcher<P: Point, M> {
@@ -271,9 +270,9 @@ impl<P: Point, M: Isometry<P>> ContactDispatcher<P, M> for StatelessContactDispa
         let b_is_ball = b.is_shape::<Ball<P::Real>>();
 
         if a_is_ball && b_is_ball {
-            Some(Box::new(BallBallContactGenerator::<P, M>::new()))
+            Some(Box::new(BallBallManifoldGenerator::<P, M>::new()))
         } else if a.is_shape::<Plane<P::Vector>>() && b.is_support_map() {
-            let wo_manifold = PlaneSupportMapContactGenerator::<P, M>::new();
+            let wo_manifold = PlaneSupportMapManifoldGenerator::<P, M>::new();
 
             if !b_is_ball {
                 let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
@@ -283,7 +282,7 @@ impl<P: Point, M: Isometry<P>> ContactDispatcher<P, M> for StatelessContactDispa
                 Some(Box::new(wo_manifold))
             }
         } else if b.is_shape::<Plane<P::Vector>>() && a.is_support_map() {
-            let wo_manifold = SupportMapPlaneContactGenerator::<P, M>::new();
+            let wo_manifold = SupportMapPlaneManifoldGenerator::<P, M>::new();
 
             if !a_is_ball {
                 let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
@@ -296,7 +295,7 @@ impl<P: Point, M: Isometry<P>> ContactDispatcher<P, M> for StatelessContactDispa
             match nalgebra::dimension::<P::Vector>() {
                 2 => {
                     let simplex = VoronoiSimplex2::new();
-                    let wo_manifold = SupportMapSupportMapContactGenerator::new(simplex);
+                    let wo_manifold = SupportMapSupportMapManifoldGenerator::new(simplex);
 
                     if !a_is_ball && !b_is_ball {
                         let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
@@ -308,7 +307,7 @@ impl<P: Point, M: Isometry<P>> ContactDispatcher<P, M> for StatelessContactDispa
                 }
                 3 => {
                     let simplex = VoronoiSimplex3::new();
-                    let wo_manifold = SupportMapSupportMapContactGenerator::new(simplex);
+                    let wo_manifold = SupportMapSupportMapManifoldGenerator::new(simplex);
 
                     if !a_is_ball && !b_is_ball {
                         let mut manifold = OneShotContactManifoldGenerator::new(wo_manifold);
@@ -320,7 +319,7 @@ impl<P: Point, M: Isometry<P>> ContactDispatcher<P, M> for StatelessContactDispa
                 }
                 _ => {
                     let simplex = JohnsonSimplex::new_w_tls();
-                    let wo_manifold = SupportMapSupportMapContactGenerator::new(simplex);
+                    let wo_manifold = SupportMapSupportMapManifoldGenerator::new(simplex);
 
                     if false {
                         // !a_is_ball && !b_is_ball {
@@ -333,11 +332,11 @@ impl<P: Point, M: Isometry<P>> ContactDispatcher<P, M> for StatelessContactDispa
                 }
             }
         } else if a.is_composite_shape() {
-            Some(Box::new(CompositeShapeShapeContactGenerator::<P, M>::new()))
+            Some(Box::new(CompositeShapeShapeManifoldGenerator::<P, M>::new()))
         } else if b.is_composite_shape() {
-            Some(Box::new(ShapeCompositeShapeContactGenerator::<P, M>::new()))
+            Some(Box::new(ShapeCompositeShapeManifoldGenerator::<P, M>::new()))
         } else {
             None
         }
     }
-}
+}*/

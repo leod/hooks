@@ -54,8 +54,7 @@ pub trait HasComponent<T> {
 }
 
 /// Trait implemented by the component type enum associated with an EntitySnapshot.
-pub trait ComponentType: Debug + Clone + Sync + Send + Sized + 'static {
-    type EntitySnapshot: EntitySnapshot<ComponentType = Self>;
+pub trait ComponentType: Debug + Clone + Sync + Send + Sized + 'static { type EntitySnapshot: EntitySnapshot<ComponentType = Self>;
 }
 
 /// Meta information about replicated entity types.
@@ -74,12 +73,17 @@ pub struct EntityClass<T: ComponentType> {
 
 /// All possible replicated entity types. Every replicated entity has a `entity::Meta` component,
 /// storing an index into this map.
-#[derive(Default)]
 pub struct EntityClasses<T: ComponentType>(pub BTreeMap<EntityClassId, EntityClass<T>>);
+
+impl<T: ComponentType> Default for EntityClasses<T> {
+    fn default() -> Self {
+        EntityClasses(BTreeMap::new())
+    }
+}
 
 impl<T: ComponentType> EntityClasses<T> {
     pub fn new() -> Self {
-        EntityClasses(BTreeMap::new())
+        Default::default()
     }
 }
 
@@ -328,7 +332,7 @@ macro_rules! snapshot {
         pub mod $name {
             use bit_manager::{self, BitRead, BitWrite};
 
-            use specs::prelude::{Entities, System, ReadStorage, WriteStorage, Fetch, Join};
+            use specs::prelude::{Entities, System, ReadStorage, WriteStorage, Read, Join};
 
             use defs::PlayerId;
             use entity::Meta;
@@ -530,7 +534,7 @@ macro_rules! snapshot {
 
             impl<'a> System<'a> for StoreSnapshotSys {
                 type SystemData = (
-                    Fetch<'a, EntityClasses>,
+                    Read<'a, EntityClasses>,
                     Entities<'a>,
                     ReadStorage<'a, repl::Id>,
                     ReadStorage<'a, Meta>,
@@ -582,7 +586,7 @@ macro_rules! snapshot {
 
             impl<'a> System<'a> for LoadSnapshotSys<'a> {
                 type SystemData = (
-                    Fetch<'a, repl::EntityMap>,
+                    Read<'a, repl::EntityMap>,
                     LoadData<'a>,
                 );
 

@@ -54,7 +54,7 @@ where
     C: Component + Send + Sync + Clone,
 {
     type SystemData = (
-        Fetch<'a, repl::EntityMap>,
+        Read<'a, repl::EntityMap>,
         ReadStorage<'a, Active>,
         WriteStorage<'a, State<C>>,
     );

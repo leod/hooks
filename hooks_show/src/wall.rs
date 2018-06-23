@@ -2,7 +2,7 @@ use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
 use specs::prelude::{Join, ReadStorage, SystemData, World};
 
 use ggez;
-use ggez::graphics::{self, Drawable};
+use ggez::graphics::{self, Drawable, DrawParam};
 
 use hooks_game::game::entity::wall;
 use hooks_game::physics::{Orientation, Position};
@@ -34,17 +34,11 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
         let scaling = Matrix4::from_diagonal(&Vector4::new(size.0.x, size.0.y, 1.0, 1.0));
         let matrix = isometry.to_homogeneous() * scaling;
 
-        graphics::set_color(
-            ctx,
-            graphics::Color {
-                r: 1.0,
-                g: 1.0,
-                b: 1.0,
-                a: 1.0,
-            },
-        )?;
         with_transform(ctx, matrix, |ctx| {
-            input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)
+            input.assets.rect_fill.draw(
+                ctx,
+                DrawParam::new().color([1.0, 1.0, 1.0, 1.0])
+            )
         })?;
 
         let outline = 10.0;
@@ -55,21 +49,14 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
             1.0,
         ));
         let matrix = isometry.to_homogeneous() * scaling;
-        graphics::set_color(
-            ctx,
-            graphics::Color {
-                r: 0.4,
-                g: 0.4,
-                b: 0.4,
-                a: 1.0,
-            },
-        )?;
+
         with_transform(ctx, matrix, |ctx| {
-            input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)
+            input.assets.rect_fill.draw(
+                ctx,
+                DrawParam::new().color([0.4, 0.4, 0.4, 1.0]),
+            )
         })?;
     }
-
-    graphics::set_color(ctx, graphics::WHITE)?;
 
     Ok(())
 }

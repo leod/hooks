@@ -50,6 +50,7 @@ pub trait Component:
 pub struct Id(pub EntityId);
 
 /// Map from shared EntityId to the local ECS handle.
+#[derive(Debug, Default)]
 pub struct EntityMap(BTreeMap<EntityId, Entity>);
 
 impl EntityMap {
