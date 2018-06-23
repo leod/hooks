@@ -2,6 +2,7 @@ use std::f32;
 
 use nalgebra::{norm, zero, Point2, Vector2};
 
+use shred::SystemData;
 use specs::prelude::*;
 use specs::storage::BTreeStorage;
 
@@ -389,7 +390,7 @@ pub mod auth {
         }
 
         // Now that we have the IDs of all the segments, attach the definition to the hook
-        world.write::<Def>().insert(
+        world.write_storage::<Def>().insert(
             entity,
             Def {
                 index,
@@ -404,8 +405,8 @@ pub mod auth {
 
 #[derive(SystemData)]
 struct InteractionData<'a> {
-    entity_map: Fetch<'a, repl::EntityMap>,
-    events: FetchMut<'a, event::Sink>,
+    entity_map: Read<'a, repl::EntityMap>,
+    events: Write<'a, event::Sink>,
 
     repl_id: ReadStorage<'a, repl::Id>,
     update: ReadStorage<'a, Update>,
@@ -482,10 +483,10 @@ fn first_segment_interaction(
 struct RunInputData<'a> {
     entities: Entities<'a>,
 
-    game_info: Fetch<'a, GameInfo>,
-    entity_map: Fetch<'a, repl::EntityMap>,
+    game_info: ReadExpect<'a, GameInfo>,
+    entity_map: Read<'a, repl::EntityMap>,
 
-    constraints: FetchMut<'a, Constraints>,
+    constraints: Write<'a, Constraints>,
 
     input: ReadStorage<'a, CurrentInput>,
     hook_def: ReadStorage<'a, Def>,
@@ -732,8 +733,8 @@ pub fn run_input(world: &World) -> Result<(), repl::Error> {
 
 #[derive(SystemData)]
 struct RunInputPostSimData<'a> {
-    game_info: Fetch<'a, GameInfo>,
-    events: FetchMut<'a, event::Sink>,
+    game_info: ReadExpect<'a, GameInfo>,
+    events: Write<'a, event::Sink>,
 
     input: ReadStorage<'a, CurrentInput>,
     position: ReadStorage<'a, Position>,

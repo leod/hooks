@@ -12,7 +12,7 @@ show = ["hooks_show"]
 hooks_util = { path = "../hooks_util" }
 hooks_game = { path = "../hooks_game" }
 hooks_show = { path = "../hooks_show", optional = true }
-shred = "0.6.2"
+shred = "0.7.0"
 log = "0.4"
 bit_manager = "*"
 env_logger = "0.5.0-rc.2"

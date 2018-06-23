@@ -11,7 +11,7 @@ extern crate log;
 #[macro_use]
 extern crate mopa;
 extern crate nalgebra;
-extern crate ncollide;
+extern crate ncollide2d;
 extern crate rand;
 extern crate shred;
 #[macro_use]

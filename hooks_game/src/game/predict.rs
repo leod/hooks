@@ -57,8 +57,8 @@ impl Log {
         auth_snapshot: &game::WorldSnapshot,
     ) {
         let entity_map = world.write_resource::<EntityMap>();
-        let mut positions = world.write::<Position>();
-        let mut orientations = world.write::<Orientation>();
+        let mut positions = world.write_storage::<Position>();
+        let mut orientations = world.write_storage::<Orientation>();
 
         for item in join::FullJoinIter::new(our_snapshot.0.iter(), auth_snapshot.0.iter()) {
             match item {

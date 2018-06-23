@@ -58,7 +58,7 @@ pub mod auth {
 
     #[derive(SystemData)]
     struct TickData<'a> {
-        game_info: Fetch<'a, GameInfo>,
+        game_info: ReadExpect<'a, GameInfo>,
         test: WriteStorage<'a, Test>,
         position: WriteStorage<'a, Position>,
         orientation: WriteStorage<'a, Orientation>,

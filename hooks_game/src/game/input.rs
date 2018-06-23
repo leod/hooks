@@ -28,8 +28,8 @@ pub mod auth {
 
         // Simulate only these players' entities
         {
-            let repl_id = world.read::<repl::Id>();
-            let mut update = world.write();
+            let repl_id = world.read_storage::<repl::Id>();
+            let mut update = world.write_storage();
 
             update.clear();
 

@@ -1,10 +1,10 @@
 use std::f32;
 
 use nalgebra::{Isometry3, Matrix4, Point2, Rotation2, Vector3, Vector4};
-use specs::prelude::{Fetch, Join, ReadStorage, SystemData, World};
+use specs::prelude::{Read, Join, ReadStorage, SystemData, World};
 
 use ggez;
-use ggez::graphics::{self, Drawable};
+use ggez::graphics::{self, Drawable, DrawParam};
 
 use particle_frenzy;
 
@@ -59,7 +59,7 @@ fn handle_event(
 }
 
 type DrawData<'a> = (
-    Fetch<'a, EntityMap>,
+    Read<'a, EntityMap>,
     ReadStorage<'a, Position>,
     ReadStorage<'a, Orientation>,
     ReadStorage<'a, hook::Def>,
@@ -101,24 +101,13 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 let matrix = isometry.to_homogeneous() * scaling;
 
                 let color = if hook_def.index == 0 {
-                    graphics::Color {
-                        r: 0.0,
-                        g: 1.0,
-                        b: 0.0,
-                        a: 1.0,
-                    }
+                    [0.0, 1.0, 0.0, 1.0]
                 } else {
-                    graphics::Color {
-                        r: 1.0,
-                        g: 0.5,
-                        b: 0.0,
-                        a: 1.0,
-                    }
+                    [1.0, 0.5, 0.0, 1.0]
                 };
-                graphics::set_color(ctx, color)?;
 
                 with_transform(ctx, matrix, |ctx| {
-                    input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)
+                    input.assets.rect_fill.draw(ctx, DrawParam::new().color(color))
                 })?;
             }
 
@@ -139,37 +128,19 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
                 let matrix = isometry.to_homogeneous() * scaling;
 
                 let color = if i == 0 && fixed.is_some() {
-                    graphics::Color {
-                        r: 1.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 1.0,
-                    }
+                    [1.0, 0.0, 0.0, 1.0]
                 } else if i == 0 {
-                    graphics::Color {
-                        r: 1.0,
-                        g: 1.0,
-                        b: 1.0,
-                        a: 1.0,
-                    }
+                    [1.0, 1.0, 1.0, 1.0]
                 } else {
-                    graphics::Color {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 1.0,
-                        a: 1.0,
-                    }
+                    [0.0, 0.0, 1.0, 1.0]
                 };
-                graphics::set_color(ctx, color)?;
 
                 with_transform(ctx, matrix, |ctx| {
-                    input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)
+                    input.assets.rect_fill.draw(ctx, DrawParam::new().color(color))
                 })?;
             }
         }
     }
-
-    graphics::set_color(ctx, graphics::WHITE)?;
 
     Ok(())
 }

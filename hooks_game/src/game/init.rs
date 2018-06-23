@@ -6,6 +6,7 @@ use specs::prelude::World;
 
 use game::entity::test;
 use game::entity::wall;
+use game::entity::player;
 use physics::{AngularVelocity, Position, Velocity};
 use repl;
 
@@ -36,6 +37,27 @@ fn create_wall_rect(world: &mut World, center: Point2<f32>, size: Vector2<f32>, 
     );
 }
 
+fn create_tube(world: &mut World, pos: Point2<f32>, length: f32, width: f32, angle: f32) {
+    let o = Vector2::new(angle.sin(), -angle.cos());
+
+    let pos1 = pos - o * (width / 2.0 + 10.0);
+    let pos2 = pos + o * (width / 2.0 + 10.0);
+    let size = Vector2::new(length, 20.0);
+
+    wall::create(
+        world,
+        pos1,
+        size,
+        angle
+    );
+    wall::create(
+        world,
+        pos2,
+        size,
+        angle
+    );
+}
+
 fn create_state(world: &mut World) {
     /*let n_walls = 200;
     let mut rng = IsaacRng::new_unseeded();
@@ -58,10 +80,19 @@ fn create_state(world: &mut World) {
         world,
         Point2::new(0.0, 0.0),
         Vector2::new(8000.0, 1500.0),
-        200.0,
+        100.0,
     );
 
-    wall::create(
+    create_tube(
+        world,
+        Point2::new(300.0, 300.0),
+        500.0,
+        player::WIDTH + 5.0,
+        f32::consts::PI / 4.0,
+    );
+
+
+    /*wall::create(
         world,
         Point2::new(0.0, -500.0),
         Vector2::new(1500.0, 20.0),
@@ -84,7 +115,7 @@ fn create_state(world: &mut World) {
         Point2::new(4500.0, 0.0),
         Vector2::new(3000.0, 20.0),
         0.0,
-    );
+    );*/
 }
 
 pub mod auth {

@@ -1,5 +1,4 @@
 //! This crate is a bit of a placeholder to have some simple graphics.
-
 extern crate gfx_device_gl;
 extern crate ggez;
 #[macro_use]
@@ -217,7 +216,7 @@ impl Show {
         self.update_time(ctx);
         let delta = ggez::timer::get_delta(ctx);
 
-        let positions = world.read::<Position>();
+        let positions = world.read_storage::<Position>();
 
         if let Some(my_entity) = self.my_player_entity(world) {
             if let Some(position) = positions.get(my_entity) {

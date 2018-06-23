@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 
 use nalgebra::{Point2, Vector2};
-use specs::prelude::{Entity, Fetch, Storage, World};
+use specs::prelude::{Entity, Read, Storage, World};
 use specs::storage::MaskedStorage;
 
 use hooks_util::ordered_pair::OrderedPair;
@@ -64,6 +64,7 @@ pub struct Event {
 struct HandlersSetup(Vec<(String, String, Def)>);
 
 /// Resource to store the entity handlers for pairs of entity classes.
+#[derive(Default)]
 pub struct Handlers(BTreeMap<OrderedPair<EntityClassId>, (EntityClassId, EntityClassId, Def)>);
 
 pub fn set(
@@ -105,7 +106,7 @@ fn setup(world: &World) {
 }
 
 pub fn get_action<D>(
-    handlers: &Fetch<Handlers>,
+    handlers: &Read<Handlers>,
     meta: &Storage<entity::Meta, D>,
     entity_a: Entity,
     entity_b: Entity,
@@ -143,7 +144,7 @@ pub fn run(world: &World, event: &Event) -> Result<(), repl::Error> {
     setup(world);
 
     let (id_a, id_b) = {
-        let meta = world.read::<entity::Meta>();
+        let meta = world.read_storage::<entity::Meta>();
 
         // We assume here that every entity has an `entity::Meta` component, i.e. that it was
         // constructed by `entity::create`.

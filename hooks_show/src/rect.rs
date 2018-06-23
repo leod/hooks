@@ -1,8 +1,8 @@
-use nalgebra::{Isometry3, Matrix4, Point2, Vector3, Vector4};
+use nalgebra::{Isometry3, Matrix4, Vector3, Vector4};
 use specs::prelude::{Join, ReadStorage, SystemData, VecStorage, World};
 
 use ggez;
-use ggez::graphics::{self, Drawable};
+use ggez::graphics::{self, Drawable, DrawParam};
 
 use hooks_game;
 use hooks_game::entity::Active;
@@ -55,32 +55,19 @@ fn draw(ctx: &mut ggez::Context, input: &Input, world: &World) -> ggez::error::G
         let matrix = isometry.to_homogeneous() * scaling;
 
         let color = if (repl_id.0).0 == input.my_player_id {
-            graphics::Color {
-                r: 0.0,
-                g: 0.0,
-                b: 1.0,
-                a: 1.0,
-            }
+            [0.0, 0.0, 1.0, 1.0]
         } else {
-            graphics::Color {
-                r: 1.0,
-                g: 0.0,
-                b: 0.0,
-                a: 1.0,
-            }
+            [1.0, 0.0, 0.0, 1.0]
         };
-        graphics::set_color(ctx, color)?;
 
         with_transform(ctx, matrix, |ctx| {
             if draw.fill {
-                input.assets.rect_fill.draw(ctx, Point2::origin(), 0.0)
+                input.assets.rect_fill.draw(ctx, DrawParam::new().color(color))
             } else {
-                input.assets.rect_line.draw(ctx, Point2::origin(), 0.0)
+                input.assets.rect_line.draw(ctx, DrawParam::new().color(color))
             }
         })?;
     }
-
-    graphics::set_color(ctx, graphics::WHITE)?;
 
     Ok(())
 }
