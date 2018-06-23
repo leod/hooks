@@ -34,5 +34,4 @@ We use `make` for simplicity:
 - `make run-release`: Run both `hooks_server` and `hooks_client` locally. Requires `tmux` to be installed.
 - `make run-server-release`: Start just the server.
 - `make run-client-release`: Start just the client, connecting to `localhost`.
-- `make stress`: Run server, client, and connect 5 `random_bot` clients that just send random input. Requires `tmux` to be installed.
 - `make fmt`: `cargo fmt` all crates.
