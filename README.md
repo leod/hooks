@@ -14,17 +14,17 @@ Multiplayer synchronization works similarly to e.g. Quake 3:
 
 ## Overview
 We have the following library crates:
-- `hooks_util`
-- `hooks_game`: Code shared between `hooks_server` and `hooks_client`.
-  - `physics`: Simple 2D physics. Uses some kind of [position based dynamics](http://matthias-mueller-fischer.ch/talks/2017-EG-CourseNotes.pdf) for resolving collisions and constraints.
-  - `net`: Low-level networking with [enet](https://github.com/ruabmbua/enet-sys).
-  - `repl`: Entity replication and game state snapshots.
-  - `game`: Game logic.
-- `hooks_show`: Display the game state with [ggez](https://github.com/ggez/ggez).
+- [`hooks_util`](hooks_util)
+- [`hooks_game`](hooks_game): Crate shared between `hooks_server` and `hooks_client`.
+  - [`physics`](hooks_game/src/physics): Simple 2D physics. Uses some kind of [position based dynamics](http://matthias-mueller-fischer.ch/talks/2017-EG-CourseNotes.pdf) for resolving collisions and constraints.
+  - [`net`](hooks_game/src/net): Low-level networking with [enet](https://github.com/ruabmbua/enet-sys).
+  - [`repl`](hooks_game/src/repl): Entity replication and game state snapshots.
+  - [`game`](hooks_game/src/game): Game logic.
+- [`hooks_show`](hooks_show): Display the game state with [ggez](https://github.com/ggez/ggez).
 
 Binary crates:
-- `hooks_server`
-- `hooks_client`
+- [`hooks_server`](hooks_server)
+- [`hooks_client`](hooks_client)
 
 ## Running
 
@@ -32,6 +32,6 @@ I've tested only on Ubuntu 16.04 so far.
 
 We use `make` for simplicity:
 - `make run-release`: Run both `hooks_server` and `hooks_client` locally. Requires `tmux` to be installed.
-- `make run-server-release`: Start just the server.
-- `make run-client-release`: Start just the client, connecting to `localhost`.
+- `make run-server-release`: Start only the server.
+- `make run-client-release`: Start only the client, connecting to `localhost`.
 - `make fmt`: `cargo fmt` all crates.
