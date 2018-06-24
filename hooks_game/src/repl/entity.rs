@@ -3,18 +3,15 @@ use std::collections::BTreeMap;
 use specs::prelude::*;
 
 use defs::{EntityClassId, EntityId, EntityIndex, GameInfo, PlayerId, INVALID_PLAYER_ID};
-use entity;
+use entity::{self, ClassId};
 use event::{self, Event};
 use registry::Registry;
-use repl::{self, player};
+use repl::{self, player, component};
 
 pub use entity::Meta;
-pub use repl::snapshot::{ComponentType, EntityClass, EntityClasses, EntitySnapshot, WorldSnapshot};
 
 fn register<T: EntitySnapshot>(reg: &mut Registry) {
-    reg.resource(EntityClasses::<T::ComponentType>(BTreeMap::new()));
-
-    reg.event::<RemoveOrder>();
+    reg.resource(Classes(BTreeMap::new()));
 
     reg.removal_system(RemovalSys, "repl::entity");
 
@@ -22,15 +19,20 @@ fn register<T: EntitySnapshot>(reg: &mut Registry) {
     reg.resource(auth::IndexSource { next: 1 });
 }
 
-/// Event to remove entities, broadcast to clients
-#[derive(Debug, Clone, BitStore)]
-pub struct RemoveOrder(pub EntityId);
+pub(in super) struct Class {
+    /// Which components are to be replicated for this entity type. We use this knowledge to create
+    /// a smaller representation of the entity delta snapshot in the bitstreams. This means that
+    /// the set of components which are replicated for one entity can not change during its
+    /// lifetime.
+    pub components: Vec<component::TypeIndex>,
 
-impl Event for RemoveOrder {
-    fn class(&self) -> event::Class {
-        event::Class::Order
-    }
+    /// Are entities of this class to be replicated? Setting this to `false` can make sense for
+    /// entities that are replicated implicitly, such as the neutral entities in the initial state
+    /// of a map.
+    pub sync: bool,
 }
+
+pub(in super) struct Classes(BTreeMap<ClassId, Class>);
 
 /// Register a new entity class. This should only be called in register functions that are used by
 /// both the server and the clients. Server and clients can attach their specific entity

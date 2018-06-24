@@ -11,8 +11,6 @@ pub type EntityIndex = u32;
 /// Note that the zero id is reserved.
 pub type EntityId = (PlayerId, EntityIndex);
 
-pub type EntityClassId = u32;
-
 pub type TickNum = u32;
 
 pub type TickDeltaNum = u8;
