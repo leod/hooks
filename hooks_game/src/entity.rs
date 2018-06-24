@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use specs::prelude::{Entity, EntityBuilder, Join, VecStorage, World};
 use specs::storage::NullStorage;
 
-use defs::EntityClassId;
+use defs::ClassId;
 use registry::Registry;
 
 pub fn register(reg: &mut Registry) {
@@ -15,20 +15,22 @@ pub fn register(reg: &mut Registry) {
     reg.component::<Remove>();
 }
 
+pub type ClassId = u32;
+
 pub type Ctor = fn(EntityBuilder) -> EntityBuilder;
 
 /// Constructors, e.g. for adding client-side-specific components to replicated entities.
-struct Ctors(BTreeMap<EntityClassId, Vec<Ctor>>);
+struct Ctors(BTreeMap<ClassId, Vec<Ctor>>);
 
 /// Maps from entity class names to their unique id. This map should be exactly the same on server
 /// and clients and not change during a game.
-pub struct ClassIds(pub BTreeMap<String, EntityClassId>);
+pub struct ClassIds(pub BTreeMap<String, ClassId>);
 
 /// Meta-information about entities.
 #[derive(Component, Debug, Clone, PartialEq, BitStore)]
 #[storage(VecStorage)]
 pub struct Meta {
-    pub class_id: EntityClassId,
+    pub class_id: ClassId,
 }
 
 /// Is this entity active in the game?
@@ -41,16 +43,16 @@ pub struct Active;
 #[storage(NullStorage)]
 pub struct Remove;
 
-pub fn is_class_id_valid(world: &World, class_id: EntityClassId) -> bool {
+pub fn is_class_id_valid(world: &World, class_id: ClassId) -> bool {
     world.read_resource::<Ctors>().0.contains_key(&class_id)
 }
 
-pub fn get_class_id(world: &World, name: &str) -> Option<EntityClassId> {
+pub fn get_class_id(world: &World, name: &str) -> Option<ClassId> {
     world.read_resource::<ClassIds>().0.get(name).cloned()
 }
 
 /// Register a new entity class with a base constructor to add components that are always present.
-pub fn register_class(reg: &mut Registry, name: &str, ctor: Ctor) -> EntityClassId {
+pub fn register_class(reg: &mut Registry, name: &str, ctor: Ctor) -> ClassId {
     let world = reg.world();
 
     let mut ctors = world.write_resource::<Ctors>();
@@ -87,7 +89,7 @@ pub fn add_ctor(reg: &mut Registry, name: &str, ctor: Ctor) {
 /// Create a new entity of the given entity class, using the constructors associated with the
 /// class. Note that entities created with this function are not replicated automatically.
 /// Replicated entities should be created with `repl::entity::create`.
-pub fn create<F>(world: &mut World, class_id: EntityClassId, ctor: F) -> Entity
+pub fn create<F>(world: &mut World, class_id: ClassId, ctor: F) -> Entity
 where
     F: FnOnce(EntityBuilder) -> EntityBuilder,
 {
