@@ -3,6 +3,8 @@ Multiplayer catching game.
 
 This project is currently in a hiatus due to a lack of time. Hopefully, development will continue at some point...
 
+Currently compiles only with older versions of rustc, e.g. `nightly-2018-04-10` works for me.
+
 ## Demo
 This video shows where we are at: [https://vimeo.com/267324565](https://vimeo.com/267324565).
 
